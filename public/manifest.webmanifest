@@ -1,0 +1,48 @@
+{
+    "id": "/",
+    "name": "FinACourt",
+    "short_name": "FinACourt",
+    "description": "Discover local sports courts, check live availability, and manage reservations.",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "orientation": "portrait-primary",
+    "background_color": "#fafaf9",
+    "theme_color": "#146d4a",
+    "lang": "en",
+    "categories": ["sports", "business", "lifestyle"],
+    "icons": [
+        {
+            "src": "/icons/finacourt-logo-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/finacourt-logo-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/finacourt-logo-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ],
+    "shortcuts": [
+        {
+            "name": "Find courts",
+            "short_name": "Find courts",
+            "url": "/courts?source=pwa-shortcut",
+            "icons": [{ "src": "/icons/finacourt-logo-192.png", "sizes": "192x192" }]
+        },
+        {
+            "name": "My bookings",
+            "short_name": "Bookings",
+            "url": "/player/bookings",
+            "icons": [{ "src": "/icons/finacourt-logo-192.png", "sizes": "192x192" }]
+        }
+    ]
+}

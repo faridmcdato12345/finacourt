@@ -1,0 +1,319 @@
+<?php
+
+use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Marketplace\DealsController;
+use App\Http\Controllers\Marketplace\DiscoveryController;
+use App\Http\Controllers\Marketplace\HomeController;
+use App\Http\Controllers\Marketplace\OwnerAcquisitionController;
+use App\Http\Controllers\Marketplace\RobotsController;
+use App\Http\Controllers\Marketplace\SalesPartnerQrController;
+use App\Http\Controllers\Marketplace\SalesPartnerReferralController;
+use App\Http\Controllers\Marketplace\SitemapController;
+use App\Http\Controllers\Marketplace\VenueController as MarketplaceVenueController;
+use App\Http\Controllers\Marketplace\VenueDirectoryController as MarketplaceVenueDirectoryController;
+use App\Http\Controllers\Marketplace\VenueDirectoryReportController;
+use App\Http\Controllers\Marketplace\VisibilityLinkController as MarketplaceVisibilityLinkController;
+use App\Http\Controllers\Marketplace\VisibilityQrController;
+use App\Http\Controllers\Owner\AnalyticsController as OwnerAnalyticsController;
+use App\Http\Controllers\Owner\BookingAvailabilityController;
+use App\Http\Controllers\Owner\BookingController;
+use App\Http\Controllers\Owner\CourtResourceController;
+use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
+use App\Http\Controllers\Owner\GrowthRecommendationController as OwnerGrowthRecommendationController;
+use App\Http\Controllers\Owner\GrowthRecommendationStateController as OwnerGrowthRecommendationStateController;
+use App\Http\Controllers\Owner\OperatingHoursController;
+use App\Http\Controllers\Owner\OrganizationContextController;
+use App\Http\Controllers\Owner\PaymentController;
+use App\Http\Controllers\Owner\PromotionController;
+use App\Http\Controllers\Owner\PsgcLocationController;
+use App\Http\Controllers\Owner\ReactivationCampaignController;
+use App\Http\Controllers\Owner\VenueClaimController;
+use App\Http\Controllers\Owner\VenueController;
+use App\Http\Controllers\Owner\VenuePhotoController;
+use App\Http\Controllers\Owner\VenuePlaceController;
+use App\Http\Controllers\Owner\VisibilityController as OwnerVisibilityController;
+use App\Http\Controllers\Owner\VisibilityLinkController as OwnerVisibilityLinkController;
+use App\Http\Controllers\Partner\DashboardController as PartnerDashboardController;
+use App\Http\Controllers\Partner\LeadController as PartnerLeadController;
+use App\Http\Controllers\Platform\AnalyticsController as PlatformAnalyticsController;
+use App\Http\Controllers\Platform\CommissionEntryController as PlatformCommissionEntryController;
+use App\Http\Controllers\Platform\CommissionRuleController as PlatformCommissionRuleController;
+use App\Http\Controllers\Platform\DashboardController as PlatformDashboardController;
+use App\Http\Controllers\Platform\GrowthRecommendationController as PlatformGrowthRecommendationController;
+use App\Http\Controllers\Platform\PartnerPayoutController as PlatformPartnerPayoutController;
+use App\Http\Controllers\Platform\PaymentSettingsController as PlatformPaymentSettingsController;
+use App\Http\Controllers\Platform\SalesController as PlatformSalesController;
+use App\Http\Controllers\Platform\SalesLeadController as PlatformSalesLeadController;
+use App\Http\Controllers\Platform\SalesPartnerController as PlatformSalesPartnerController;
+use App\Http\Controllers\Platform\VenueDirectoryController as PlatformVenueDirectoryController;
+use App\Http\Controllers\Platform\VenueReviewController as PlatformVenueReviewController;
+use App\Http\Controllers\Player\Auth\AuthenticatedSessionController as PlayerAuthenticatedSessionController;
+use App\Http\Controllers\Player\Auth\RegisteredUserController as PlayerRegisteredUserController;
+use App\Http\Controllers\Player\BookingController as PlayerBookingController;
+use App\Http\Controllers\Player\MarketingPreferenceController as PlayerMarketingPreferenceController;
+use App\Http\Controllers\Player\NotificationController as PlayerNotificationController;
+use App\Http\Controllers\Player\ReactivationClickController;
+use App\Http\Controllers\Player\VenueReviewController as PlayerVenueReviewController;
+use App\Http\Controllers\Webhooks\PaymentWebhookController;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+Route::middleware('throttle:marketplace')->group(function () {
+    Route::get('/', HomeController::class)->name('marketplace.home');
+    Route::get('/for-court-owners', [OwnerAcquisitionController::class, 'show'])
+        ->name('marketplace.for-owners');
+    Route::get('/pricing', [OwnerAcquisitionController::class, 'pricing'])
+        ->name('marketplace.pricing');
+    Route::get('/courts', [DiscoveryController::class, 'index'])->name('marketplace.courts.index');
+    Route::get('/deals', DealsController::class)->name('marketplace.deals');
+    Route::get('/directory', [MarketplaceVenueDirectoryController::class, 'index'])
+        ->name('marketplace.directory.index');
+    Route::get('/directory/{listingSlug}', [MarketplaceVenueDirectoryController::class, 'show'])
+        ->name('marketplace.directory.show');
+    Route::get('/courts/{citySlug}', [DiscoveryController::class, 'city'])
+        ->name('marketplace.courts.city');
+    Route::get('/venues/{venueSlug}', MarketplaceVenueController::class)
+        ->name('marketplace.venues.show');
+});
+Route::post('/directory/{directoryListing}/report', VenueDirectoryReportController::class)
+    ->middleware('throttle:directory-report')
+    ->name('marketplace.directory.report');
+Route::get('/sitemap.xml', SitemapController::class)
+    ->middleware('throttle:marketplace')
+    ->name('marketplace.sitemap');
+Route::get('/robots.txt', RobotsController::class)->name('marketplace.robots');
+Route::get('/sales-referral/{referralCode}', SalesPartnerReferralController::class)
+    ->middleware('throttle:marketplace')
+    ->name('partner.referral');
+Route::get('/sales-referral/{referralCode}/qr.svg', SalesPartnerQrController::class)
+    ->middleware('throttle:marketplace')
+    ->name('partner.referral.qr');
+Route::get('/go/{visibilityLink:token}/qr.svg', VisibilityQrController::class)
+    ->middleware('throttle:marketplace')
+    ->name('visibility-links.qr');
+Route::get('/go/{visibilityLink:token}', MarketplaceVisibilityLinkController::class)
+    ->middleware('throttle:marketplace')
+    ->name('visibility-links.visit');
+Route::get('/venues/{venueSlug}/reserve', [PlayerBookingController::class, 'create'])
+    ->middleware('throttle:marketplace')
+    ->name('player.bookings.create');
+Route::get('/booking/{reference}', [PlayerBookingController::class, 'share'])
+    ->middleware(['signed', 'throttle:marketplace'])
+    ->name('bookings.share');
+Route::post('/webhooks/payments/{provider}', PaymentWebhookController::class)
+    ->middleware('throttle:payment-webhook')
+    ->name('webhooks.payments');
+
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
+    Route::post('/login', [AuthenticatedSessionController::class, 'store'])
+        ->middleware('throttle:login');
+    Route::get('/register', [RegisteredUserController::class, 'create'])->name('register');
+    Route::post('/register', [RegisteredUserController::class, 'store'])
+        ->middleware('throttle:6,1');
+    Route::get('/player/login', [PlayerAuthenticatedSessionController::class, 'create'])
+        ->name('player.login');
+    Route::post('/player/login', [PlayerAuthenticatedSessionController::class, 'store'])
+        ->middleware('throttle:login');
+    Route::get('/player/register', [PlayerRegisteredUserController::class, 'create'])
+        ->name('player.register');
+    Route::post('/player/register', [PlayerRegisteredUserController::class, 'store'])
+        ->middleware('throttle:6,1');
+});
+
+Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('logout');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/email/verify', fn () => view('auth.verify-email', [
+        'seo' => [
+            'title' => 'Verify your account email',
+            'description' => 'Verify your FinACourt account email before requesting venue ownership.',
+            'canonical' => route('verification.notice'),
+            'robots' => 'noindex,nofollow',
+            'type' => 'website',
+        ],
+        'structuredData' => [],
+    ]))->name('verification.notice');
+    Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+        $request->fulfill();
+
+        return redirect()->intended(route('owner.dashboard'))
+            ->with('status', 'Your account email is verified.');
+    })->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
+    Route::post('/email/verification-notification', function (Request $request) {
+        $request->user()->sendEmailVerificationNotification();
+
+        return back()->with('status', 'verification-link-sent');
+    })->middleware('throttle:6,1')->name('verification.send');
+});
+
+Route::prefix('player')->name('player.')->middleware(['auth', 'throttle:authenticated'])->group(function () {
+    Route::get('/bookings', [PlayerBookingController::class, 'index'])->name('bookings.index');
+    Route::get('/bookings/{reference}', [PlayerBookingController::class, 'show'])
+        ->name('bookings.show');
+    Route::post('/bookings/{reference}/confirm', [PlayerBookingController::class, 'confirm'])
+        ->middleware('throttle:player-booking')
+        ->name('bookings.confirm');
+    Route::post('/bookings/{reference}/checkout', [PlayerBookingController::class, 'checkout'])
+        ->middleware('throttle:player-booking')
+        ->name('bookings.checkout');
+    Route::get('/bookings/{reference}/payment/return', [PlayerBookingController::class, 'paymentReturn'])
+        ->name('bookings.payment.return');
+    Route::patch('/bookings/{reference}/cancel', [PlayerBookingController::class, 'cancel'])
+        ->middleware('throttle:player-booking')
+        ->name('bookings.cancel');
+    Route::post('/bookings/{reference}/review', [PlayerVenueReviewController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('bookings.review.store');
+    Route::patch('/notifications/{notification}/read', [PlayerNotificationController::class, 'read'])
+        ->name('notifications.read');
+    Route::get('/preferences', [PlayerMarketingPreferenceController::class, 'edit'])
+        ->name('preferences.edit');
+    Route::put('/preferences', [PlayerMarketingPreferenceController::class, 'update'])
+        ->name('preferences.update');
+    Route::get('/reactivation/{clickToken}', ReactivationClickController::class)
+        ->name('reactivation.click');
+});
+
+Route::post('/venues/{venueSlug}/holds', [PlayerBookingController::class, 'store'])
+    ->middleware(['auth', 'throttle:player-booking'])
+    ->name('player.bookings.store');
+
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:authenticated'])->group(function () {
+    Route::get('/dashboard', OwnerDashboardController::class)->name('dashboard');
+    Route::get('/analytics', OwnerAnalyticsController::class)->name('analytics');
+    Route::get('/growth', OwnerGrowthRecommendationController::class)->name('growth.index');
+    Route::post('/growth/{recommendationKey}/state', [OwnerGrowthRecommendationStateController::class, 'store'])
+        ->where('recommendationKey', '[a-f0-9]{64}')
+        ->name('growth.state.store');
+    Route::delete('/growth/{recommendationKey}/state', [OwnerGrowthRecommendationStateController::class, 'destroy'])
+        ->where('recommendationKey', '[a-f0-9]{64}')
+        ->name('growth.state.destroy');
+    Route::get('/visibility', OwnerVisibilityController::class)->name('visibility.index');
+    Route::get('/directory-claims', [VenueClaimController::class, 'index'])->name('directory-claims.index');
+    Route::get('/directory/{directoryListing}/claim', [VenueClaimController::class, 'create'])
+        ->middleware('verified')
+        ->name('directory-claims.create');
+    Route::post('/directory/{directoryListing}/claim', [VenueClaimController::class, 'store'])
+        ->middleware(['verified', 'throttle:directory-claim'])
+        ->name('directory-claims.store');
+    Route::post('/directory-claims/{claim}/proof/email', [VenueClaimController::class, 'resendEmailCode'])
+        ->middleware(['verified', 'throttle:directory-claim'])
+        ->name('directory-claims.proof.email');
+    Route::post('/directory-claims/{claim}/proof/verify', [VenueClaimController::class, 'verifyEmailCode'])
+        ->middleware(['verified', 'throttle:directory-claim-proof'])
+        ->name('directory-claims.proof.verify');
+    Route::delete('/directory-claims/{claim}', [VenueClaimController::class, 'cancel'])
+        ->name('directory-claims.cancel');
+    Route::get('/location-options/cities', PsgcLocationController::class)
+        ->name('location-options.cities');
+    Route::get('/bookings/availability', BookingAvailabilityController::class)
+        ->name('bookings.availability');
+    Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
+    Route::get('/bookings/create', [BookingController::class, 'create'])->name('bookings.create');
+    Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store');
+    Route::patch('/bookings/{booking}/cancel', [BookingController::class, 'cancel'])
+        ->name('bookings.cancel');
+    Route::patch('/bookings/{booking}/payment', [PaymentController::class, 'update'])
+        ->name('bookings.payment.update');
+    Route::resource('promotions', PromotionController::class);
+    Route::get('/reactivation', [ReactivationCampaignController::class, 'index'])
+        ->name('reactivation.index');
+    Route::get('/reactivation/create', [ReactivationCampaignController::class, 'create'])
+        ->name('reactivation.create');
+    Route::post('/reactivation', [ReactivationCampaignController::class, 'store'])
+        ->name('reactivation.store');
+    Route::get('/reactivation/{campaign}', [ReactivationCampaignController::class, 'show'])
+        ->name('reactivation.show');
+    Route::post('/reactivation/{campaign}/send', [ReactivationCampaignController::class, 'send'])
+        ->name('reactivation.send');
+    Route::patch('/reactivation/{campaign}/cancel', [ReactivationCampaignController::class, 'cancel'])
+        ->name('reactivation.cancel');
+    Route::post('/venues/{venue}/photos', [VenuePhotoController::class, 'store'])
+        ->name('venues.photos.store');
+    Route::post('/venues/{venue}/visibility-links', [OwnerVisibilityLinkController::class, 'store'])
+        ->name('venues.visibility-links.store');
+    Route::post('/venues/{venue}/google-place', [VenuePlaceController::class, 'store'])
+        ->name('venues.google-place.store');
+    Route::patch('/venues/{venue}/photos/{photo}', [VenuePhotoController::class, 'update'])
+        ->name('venues.photos.update');
+    Route::delete('/venues/{venue}/photos/{photo}', [VenuePhotoController::class, 'destroy'])
+        ->name('venues.photos.destroy');
+    Route::resource('venues', VenueController::class);
+    Route::get('/venues/{venue}/hours', [OperatingHoursController::class, 'edit'])
+        ->name('venues.hours.edit');
+    Route::put('/venues/{venue}/hours', [OperatingHoursController::class, 'update'])
+        ->name('venues.hours.update');
+    Route::resource('venues.resources', CourtResourceController::class)
+        ->only(['create', 'store', 'edit', 'update', 'destroy']);
+});
+
+Route::post('/owner/organizations/{organization}/activate', OrganizationContextController::class)
+    ->middleware('auth')
+    ->name('owner.organizations.activate');
+
+Route::prefix('partner')->name('partner.')->middleware(['auth', 'sales.partner', 'throttle:authenticated'])->group(function () {
+    Route::get('/dashboard', PartnerDashboardController::class)->name('dashboard');
+    Route::get('/leads', [PartnerLeadController::class, 'index'])->name('leads.index');
+    Route::get('/leads/create', [PartnerLeadController::class, 'create'])->name('leads.create');
+    Route::post('/leads', [PartnerLeadController::class, 'store'])->name('leads.store');
+    Route::get('/leads/{lead}', [PartnerLeadController::class, 'show'])->name('leads.show');
+    Route::put('/leads/{lead}', [PartnerLeadController::class, 'update'])->name('leads.update');
+    Route::patch('/leads/{lead}/status', [PartnerLeadController::class, 'transition'])->name('leads.transition');
+});
+
+Route::prefix('platform')->name('platform.')->middleware(['auth', 'platform.admin', 'throttle:authenticated'])->group(function () {
+    Route::get('/dashboard', PlatformDashboardController::class)->name('dashboard');
+    Route::get('/analytics', PlatformAnalyticsController::class)->name('analytics');
+    Route::get('/growth', PlatformGrowthRecommendationController::class)->name('growth.index');
+    Route::get('/payments', [PlatformPaymentSettingsController::class, 'index'])->name('payments.index');
+    Route::post('/payments/service-fees', [PlatformPaymentSettingsController::class, 'store'])->name('payments.service-fees.store');
+    Route::patch('/payments/service-fees/{rule}', [PlatformPaymentSettingsController::class, 'update'])->name('payments.service-fees.update');
+    Route::get('/reviews', [PlatformVenueReviewController::class, 'index'])->name('reviews.index');
+    Route::patch('/reviews/{review}', [PlatformVenueReviewController::class, 'update'])
+        ->name('reviews.update');
+    Route::get('/location-options/cities', PsgcLocationController::class)
+        ->name('location-options.cities');
+    Route::get('/directory', [PlatformVenueDirectoryController::class, 'index'])->name('directory.index');
+    Route::get('/directory/create', [PlatformVenueDirectoryController::class, 'create'])->name('directory.create');
+    Route::post('/directory', [PlatformVenueDirectoryController::class, 'store'])->name('directory.store');
+    Route::get('/directory/{directoryListing}/edit', [PlatformVenueDirectoryController::class, 'edit'])->name('directory.edit');
+    Route::put('/directory/{directoryListing}', [PlatformVenueDirectoryController::class, 'update'])->name('directory.update');
+    Route::post('/directory/{directoryListing}/verify', [PlatformVenueDirectoryController::class, 'verify'])->name('directory.verify');
+    Route::post('/directory/{directoryListing}/publish', [PlatformVenueDirectoryController::class, 'publish'])->name('directory.publish');
+    Route::post('/directory/{directoryListing}/close', [PlatformVenueDirectoryController::class, 'close'])->name('directory.close');
+    Route::post('/directory/{directoryListing}/remove', [PlatformVenueDirectoryController::class, 'remove'])->name('directory.remove');
+    Route::post('/directory/claims/{claim}/approve', [PlatformVenueDirectoryController::class, 'approveClaim'])->name('directory.claims.approve');
+    Route::post('/directory/claims/{claim}/reject', [PlatformVenueDirectoryController::class, 'rejectClaim'])->name('directory.claims.reject');
+    Route::post('/directory/claims/{claim}/verify-proof', [PlatformVenueDirectoryController::class, 'verifyClaimProof'])->name('directory.claims.verify-proof');
+    Route::post('/directory/{directoryListing}/verify-claimed-venue', [PlatformVenueDirectoryController::class, 'verifyClaimedVenue'])->name('directory.claimed-venue.verify');
+    Route::post('/directory/{directoryListing}/revoke-claimed-venue', [PlatformVenueDirectoryController::class, 'revokeClaimedVenue'])->name('directory.claimed-venue.revoke');
+    Route::patch('/directory/reports/{report}', [PlatformVenueDirectoryController::class, 'reviewReport'])->name('directory.reports.review');
+    Route::get('/sales', PlatformSalesController::class)->name('sales.index');
+    Route::post('/sales/partners', [PlatformSalesPartnerController::class, 'store'])->name('sales.partners.store');
+    Route::patch('/sales/partners/{partner}', [PlatformSalesPartnerController::class, 'update'])->name('sales.partners.update');
+    Route::patch('/sales/leads/{lead}/status', [PlatformSalesLeadController::class, 'transition'])->name('sales.leads.transition');
+    Route::post('/sales/leads/{lead}/activate', [PlatformSalesLeadController::class, 'activate'])->name('sales.leads.activate');
+    Route::post('/sales/leads/{lead}/override', [PlatformSalesLeadController::class, 'override'])->name('sales.leads.override');
+    Route::post('/sales/commission-rules', [PlatformCommissionRuleController::class, 'store'])->name('sales.rules.store');
+    Route::patch('/sales/commission-rules/{rule}', [PlatformCommissionRuleController::class, 'update'])->name('sales.rules.update');
+    Route::post('/sales/commissions/adjust', [PlatformCommissionEntryController::class, 'adjust'])->name('sales.commissions.adjust');
+    Route::post('/sales/commissions/{entry}/approve', [PlatformCommissionEntryController::class, 'approve'])->name('sales.commissions.approve');
+    Route::post('/sales/commissions/{entry}/reverse', [PlatformCommissionEntryController::class, 'reverse'])->name('sales.commissions.reverse');
+    Route::post('/sales/payouts', [PlatformPartnerPayoutController::class, 'store'])->name('sales.payouts.store');
+    Route::post('/sales/payouts/{payout}/approve', [PlatformPartnerPayoutController::class, 'approve'])->name('sales.payouts.approve');
+    Route::post('/sales/payouts/{payout}/pay', [PlatformPartnerPayoutController::class, 'pay'])->name('sales.payouts.pay');
+    Route::post('/sales/payouts/{payout}/cancel', [PlatformPartnerPayoutController::class, 'cancel'])->name('sales.payouts.cancel');
+});
+
+Route::get('/{sportSlug}/{citySlug}', [DiscoveryController::class, 'sportCity'])
+    ->middleware('throttle:marketplace')
+    ->where([
+        'sportSlug' => '[a-z0-9]+(?:-[a-z0-9]+)*',
+        'citySlug' => '[a-z0-9]+(?:-[a-z0-9]+)*',
+    ])
+    ->name('marketplace.courts.sport-city');

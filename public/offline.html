@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#146d4a">
+    <title>You're offline · FinACourt</title>
+    <style>
+        :root { color-scheme: light; font-family: ui-sans-serif, system-ui, sans-serif; background: #fafaf9; color: #0f172a; }
+        body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 1.25rem; box-sizing: border-box; }
+        main { width: min(100%, 32rem); background: white; border: 1px solid #e2e8f0; border-radius: 1.25rem; padding: 2rem; box-shadow: 0 12px 40px rgb(15 23 42 / .08); }
+        .logo { display: block; width: 4rem; height: 4rem; border-radius: 1rem; object-fit: cover; }
+        h1 { margin: 1.5rem 0 .5rem; font-size: 1.75rem; }
+        p { color: #475569; line-height: 1.6; }
+        button, a { display: inline-block; margin-top: 1rem; border: 0; border-radius: .75rem; padding: .8rem 1rem; background: #146d4a; color: white; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+        small { display: block; margin-top: 1rem; color: #64748b; line-height: 1.5; }
+    </style>
+</head>
+<body>
+<main>
+    <img src="/icons/finacourt-logo-192.png" alt="FinACourt" class="logo" width="64" height="64">
+    <h1>You’re offline</h1>
+    <p>Previously viewed discovery pages may still be available, but live court availability, reservations, and payment status always require a server connection.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+    <small>Reservations cannot be created offline. Reconnect before relying on a displayed time.</small>
+</main>
+</body>
+</html>

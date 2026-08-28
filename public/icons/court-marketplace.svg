@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">FinACourt</title>
+  <rect width="512" height="512" rx="112" fill="#146d4a"/>
+  <rect x="92" y="124" width="328" height="264" rx="20" fill="none" stroke="#ffffff" stroke-width="28"/>
+  <path d="M256 124v264M92 256h328M174 124c0 50-32 90-82 90M338 388c0-50 32-90 82-90" fill="none" stroke="#ffffff" stroke-width="24" stroke-linecap="round"/>
+</svg>

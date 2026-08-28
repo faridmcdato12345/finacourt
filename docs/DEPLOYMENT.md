@@ -1,0 +1,176 @@
+# Pilot deployment and operations runbook
+
+This document is the production boundary for the controlled MVP pilot. The root `docker-compose.yml` remains the reproducible development and verification environment; it is not a complete internet-facing production topology. Production infrastructure must provide TLS termination, secrets, durable MySQL storage, backups, centralized container logs, and supervised processes.
+
+## Supported runtime
+
+| Component | Version / expectation |
+| --- | --- |
+| PHP application | PHP 8.3 FPM with `bcmath`, `intl`, `pcntl`, `pdo_mysql`, and `zip` |
+| Composer | Composer 2 |
+| Web server | Nginx 1.27-compatible reverse proxy / static server |
+| Database | MySQL 8.4 with InnoDB and UTC database timestamps |
+| Frontend build | Node.js 22 and `npm ci` during build only |
+| Scheduler | One supervised `php artisan schedule:work` process, or cron invoking `schedule:run` every minute |
+| Queue / Redis | Not required by the current code; no queued job is dispatched |
+
+At runtime the required services are the PHP application, web server, MySQL, and scheduler. Node is a build-time dependency. The current database notification channel writes synchronously. If a hosted payment or web-push adapter later dispatches jobs, add and supervise a queue worker before enabling that adapter.
+
+## Required production environment
+
+Never copy local values or committed examples verbatim into production. Store secrets in the deployment platform's secret manager.
+
+| Variable | Production requirement |
+| --- | --- |
+| `APP_ENV` | `production` |
+| `APP_KEY` | One persistent, backed-up `base64:` key; never rotate without a session/data migration plan |
+| `APP_DEBUG` | `false` |
+| `APP_URL` | Canonical public `https://` origin |
+| `TRUSTED_HOSTS` | Comma-separated exact public hostnames |
+| `TRUSTED_PROXIES` | Comma-separated load-balancer IPs/CIDRs; never `*` on a directly reachable app |
+| `SECURITY_CSP_ENABLED` | `true` |
+| `DB_*` | Dedicated least-privilege MySQL database/user; never expose MySQL publicly |
+| `SESSION_DRIVER` | `database` for the current topology |
+| `SESSION_SECURE_COOKIE` | `true` |
+| `SESSION_HTTP_ONLY` | `true` |
+| `SESSION_SAME_SITE` | `lax`; reassess only for a documented cross-site flow |
+| `CACHE_STORE` | `database` unless a managed cache is intentionally introduced |
+| `QUEUE_CONNECTION` | `sync` is sufficient today; `database` requires a worker before queued work is added |
+| `LOG_CHANNEL` / `LOG_STACK` | Container-friendly `stack` / `stderr` |
+| `LOG_LEVEL` | `warning` for the pilot, adjusted temporarily during diagnosis |
+| `SLOW_REQUEST_MS` | Start at `1500`; tune from observed latency |
+| `PAYMENT_PROVIDER` | `manual` for pay-at-venue, or `paymongo` after PayMongo test/live credentials and webhooks are configured |
+| `PAYMONGO_ENABLED` | `true` only when PayMongo checkout should be registered as an available online provider |
+| `PAYMONGO_MODE` | `test` or `live`; must match the PayMongo keys and webhook endpoint mode |
+| `PAYMONGO_SECRET_KEY` | PayMongo secret API key from the Dashboard; never expose to the browser or source control |
+| `PAYMONGO_WEBHOOK_SECRET` | PayMongo endpoint signing secret; this is different from the API secret key |
+| `PAYMONGO_PAYMENT_METHOD_TYPES` | Comma-separated methods enabled for checkout, default `card,gcash,qrph`; must match methods active on the PayMongo account |
+| `PAYMONGO_SEND_EMAIL_RECEIPT` | Whether PayMongo should email receipts from hosted checkout |
+| `PAYMONGO_PASS_ON_FEES` | Whether PayMongo should add its own processing fee to the player total; default `false` |
+| `PAYMONGO_WEBHOOK_TOLERANCE_SECONDS` | Replay window for structured PayMongo signatures; default `300` |
+| `OWNER_PILOT_MONTHLY_FEE_CENTAVOS` | Current public monthly pilot price in integer centavos; committed default is `0` |
+| `OWNER_PILOT_BOOKING_FEE_BASIS_POINTS` | Current public platform booking fee; committed default is `0` |
+| `OWNER_PILOT_PLAN_NAME` / `OWNER_PILOT_AVAILABILITY` | Reviewed public pilot wording |
+| `OWNER_SALES_EMAIL` | Monitored public contact for prospective court owners |
+| `BOOKING_HOLD_MINUTES` | `15` unless the pilot policy explicitly changes |
+| `BOOKING_MAXIMUM_HOLD_MINUTES` | `60` or lower |
+| `BOOKING_REMINDER_HOURS` | `24` |
+| `REACTIVATION_INACTIVE_DAYS` | Lifecycle inactivity window; default `30` |
+| `REACTIVATION_FREQUENCY_COOLDOWN_DAYS` | Minimum per-organization contact interval; default `14` |
+| `REACTIVATION_AUDIENCE_LIMIT` | Hard per-campaign audience cap for synchronous MVP delivery; default `500` |
+| `REACTIVATION_SUGGESTION_HORIZON_DAYS` | Bounded upcoming-slot search; default `28` |
+| `GOOGLE_PLACES_ENABLED` | Keep `false`; Phase 15 ships a disabled provider boundary, not a live Places adapter |
+| `GOOGLE_MAPS_API_KEY` | Leave empty until a reviewed server-side Places adapter and restricted key exist |
+| `GOOGLE_BUSINESS_PROFILE_ENABLED` | Keep `false`; OAuth/profile management is intentionally not implemented |
+| `GOOGLE_BUSINESS_PROFILE_CLIENT_ID` / `GOOGLE_BUSINESS_PROFILE_CLIENT_SECRET` / `GOOGLE_BUSINESS_PROFILE_REDIRECT_URI` | Leave empty until Stage C access, consent, encrypted token storage, and revocation are implemented |
+| `PILOT_DEMO_SEED` | `false` |
+| `MAIL_*` | A real transactional provider only when an email notification channel is implemented |
+
+Provider-specific webhook secrets do not exist for the manual provider. The PayMongo adapter loads its API and webhook secrets from the environment, verifies the raw request body, uses the payment reference as its checkout idempotency key, and exposes `/webhooks/payments/paymongo` as its webhook URL.
+
+## Build and release
+
+All build commands run in containers. A production image/pipeline should install immutable dependencies and copy the generated artifacts into the release image; it must not run the Vite development server.
+
+```bash
+docker compose build app
+docker compose run --rm --no-deps app composer install --no-interaction
+docker compose run --rm --no-deps node npm ci
+docker compose run --rm test
+docker compose run --rm --no-deps app ./vendor/bin/pint --test
+docker compose run --rm --no-deps node npm run build
+```
+
+The release-image build, in an isolated build stage rather than the shared development dependency volume, must run `composer install --no-dev --classmap-authoritative --no-interaction`.
+
+For a deployed container, use the platform's equivalent of these in-container release commands:
+
+```bash
+php artisan migrate --force
+php artisan db:seed --class=Database\\Seeders\\PsgcLocationSeeder --force
+php artisan optimize
+php artisan storage:link
+php artisan about
+```
+
+`storage/framework`, `storage/logs`, and `bootstrap/cache` must be writable by the PHP user. Public build assets and application code should be read-only. The explicitly named `PsgcLocationSeeder` is idempotent reference-data setup and is required for the venue location selects. Do not run the general `db:seed` command in production; `DatabaseSeeder` contains pilot demo identities/metrics and refuses outside `local` and `testing` as a second guard.
+
+## Release checklist
+
+Before release:
+
+- Record the current image/release identifier and migration batch.
+- Take an encrypted MySQL backup and verify its object size/checksum.
+- Run the full MySQL test suite, Pint, dependency audits, and production frontend build.
+- Verify `.env`, provider keys, database dumps, and log files are absent from the image/source artifact.
+- Confirm `APP_URL`, trusted hosts/proxies, HTTPS-only cookies, CSP, and `APP_DEBUG=false`.
+- Review pending payments marked `requires_review` before changing payment adapters.
+
+During release:
+
+1. Put the application in maintenance mode only if the deployment cannot provide rolling replacement.
+2. Deploy the application and static build from the same revision.
+3. Run `php artisan migrate --force` exactly once, then idempotently import the bundled PSGC reference catalog with `php artisan db:seed --class=Database\\Seeders\\PsgcLocationSeeder --force`.
+4. Start/restart PHP, web, and the single scheduler process.
+5. Clear/rebuild framework caches with `php artisan optimize`.
+6. Disable maintenance mode.
+
+After release:
+
+- `GET /up` returns 200 (process liveness).
+- `GET /readyz` returns `{"status":"ready"}` (database and writable-path readiness).
+- `/`, `/for-court-owners`, `/pricing`, a real venue, `/robots.txt`, and `/sitemap.xml` return expected public HTML.
+- Owner login, one advisory availability read, and a non-destructive test booking in approved pilot inventory work.
+- Response headers include `X-Request-ID`, `X-Content-Type-Options`, `Referrer-Policy`, and production CSP; private pages include `X-Robots-Tag`.
+- Scheduler logs show `bookings:send-reminders` execution without overlapping instances.
+
+## Rollback
+
+Prefer forward fixes. Code rollback is safe only when the previous release understands the current schema. Do not blindly run `migrate:rollback` against production data.
+
+If a release must be reverted:
+
+1. Stop traffic-changing writes or enter maintenance mode.
+2. Preserve a new database backup.
+3. Inspect the migration batch and the `down()` method before any schema rollback.
+4. Restore the previous image and compatible static assets.
+5. Roll back schema only when explicitly reviewed; otherwise deploy a forward compatibility patch.
+6. Re-run liveness/readiness and the booking/payment smoke checks.
+
+## Backups and restore drills
+
+- Use automated encrypted MySQL backups with point-in-time recovery where the provider supports it.
+- Retain backups outside the application host/account failure domain.
+- Include the database and uploaded venue photos from the configured public storage disk; database metadata alone cannot restore those files.
+- Test a restore into an isolated database before the pilot, then on a documented cadence. Verify organizations, bookings, payment transitions, promotions, and analytics counts after restore.
+- Define recovery point and recovery time objectives with the pilot operator; the repository cannot choose infrastructure guarantees.
+
+## Webhook operations
+
+The manual provider has no webhook and `/webhooks/payments/manual` intentionally returns 404.
+
+For PayMongo:
+
+- Configure only this HTTPS endpoint: `/webhooks/payments/paymongo`.
+- Store `PAYMONGO_WEBHOOK_SECRET` in environment/secret storage.
+- Keep the application payment reference in PayMongo `reference_number` and metadata.
+- Subscribe to the Hosted Checkout payment-paid event supported by the PayMongo dashboard/docs.
+- Test valid, invalid, duplicate, wrong-amount, delayed-after-expiry, and interrupted-response deliveries in staging.
+- Alert on signature failures, repeated 5xx responses, and payments with `requires_review=1`.
+- Never treat the browser success return as payment confirmation.
+
+## Observability and incident signals
+
+Every dynamic response carries `X-Request-ID`; the same ID is attached to exception/slow-request log context. Tenant routes also attach `organization_id`. Logs intentionally omit request bodies, customer contact details, cookies, credentials, and webhook payloads.
+
+Monitor technically:
+
+- HTTP 5xx/429 rates and p95/p99 latency by named route.
+- `/readyz`, database connection saturation, slow queries, deadlocks, and lock-wait timeouts.
+- Booking conflict-validation volume versus unexpected database errors.
+- Payments requiring review, invalid webhook signatures, provider retries, and pending attempts whose holds expired.
+- Scheduler heartbeat and reminder command failures.
+- PHP worker saturation, memory, disk, database size, and backup/restore success.
+- Sitemap/robots availability and sudden public 404 changes after inventory updates.
+
+On a suspected tenant leak or payment-integrity incident, disable the affected route/provider, preserve logs and database snapshots, record request IDs, and do not mutate disputed payment/booking history until reviewed.
