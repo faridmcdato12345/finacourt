@@ -49,10 +49,10 @@ class VisibilityController extends Controller
                     'city' => $venue->city,
                     'score' => $report['score'],
                     'checks' => $report['checks'],
-                    'marketplace_status' => $publicReady ? 'Live' : 'Needs attention',
+                    'marketplace_status' => $publicReady ? 'Live' : 'Needs a few details',
                     'seo_status' => $publicReady && collect($report['checks'])
                         ->whereIn('code', ['description', 'address', 'map_pin', 'photos', 'hours', 'sports'])
-                        ->every('complete') ? 'Ready' : 'Needs attention',
+                        ->every('complete') ? 'Ready' : 'Needs a few details',
                     'location_status' => $venue->coordinates_verified_at ? 'Pin confirmed' : 'Pin not confirmed',
                     'photos_status' => $venue->photos->count().' photos',
                     'hours_status' => $venue->operatingHours->count() === 7 ? 'Configured' : 'Incomplete',
@@ -65,8 +65,8 @@ class VisibilityController extends Controller
                     ]).'#availability' : null,
                     'directions_url' => $directions->forVenue($venue),
                     'place_id_status' => $venue->google_place_id_verified_at
-                        ? 'Verified place match'
-                        : 'No verified place match',
+                        ? 'Google place saved'
+                        : 'Google place not linked',
                     'google_profile' => $businessProfiles->status($venue),
                     'edit_url' => route('owner.venues.edit', $venue),
                     'hours_url' => route('owner.venues.hours.edit', $venue),
@@ -91,16 +91,16 @@ class VisibilityController extends Controller
             'integrations' => [
                 'places' => [
                     'available' => $places->available(),
-                    'label' => $places->available() ? 'Place search configured' : 'Place search not configured',
+                    'label' => $places->available() ? 'Ready' : 'Not set up yet',
                 ],
                 'business_profile' => [
                     'available' => $businessProfiles->available(),
                     'label' => $businessProfiles->available()
-                        ? 'Google Business Profile available'
-                        : 'Google Business Profile connection unavailable',
+                        ? 'Ready'
+                        : 'Not connected yet',
                 ],
             ],
-            'scoreNote' => 'The score measures profile readiness from your saved data. It does not guarantee ranking on the marketplace or Google.',
+            'scoreNote' => 'This checks how ready your venue page is for players. It does not guarantee where you appear on FinACourt or Google.',
         ]);
     }
 }

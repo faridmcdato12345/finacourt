@@ -17,6 +17,6 @@ class VenuePlaceController extends Controller
     ): RedirectResponse {
         $confirm->handle($venue, $request->validated('place_reference'));
 
-        return back()->with('status', 'Google place and map pin confirmed.');
+        return back()->with('status', 'Google place and map pin saved.');
     }
 }

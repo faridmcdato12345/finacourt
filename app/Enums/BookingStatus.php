@@ -12,7 +12,7 @@ enum BookingStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Hold => 'Temporary hold',
+            self::Hold => 'Held for now',
             self::Confirmed => 'Confirmed',
             self::Cancelled => 'Cancelled',
             self::Expired => 'Expired',

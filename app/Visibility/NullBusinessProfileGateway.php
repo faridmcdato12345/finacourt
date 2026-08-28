@@ -16,8 +16,8 @@ class NullBusinessProfileGateway implements BusinessProfileGateway
     {
         return [
             'status' => 'unavailable',
-            'label' => 'Google profile connection unavailable',
-            'detail' => 'Your marketplace listing and booking links still work without Google. Connection will appear only after approved API access is configured.',
+            'label' => 'Google is not connected',
+            'detail' => 'Your FinACourt page and booking links still work without Google. A Google connection can be added later when it is set up.',
         ];
     }
 }

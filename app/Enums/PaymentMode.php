@@ -11,7 +11,7 @@ enum PaymentMode: string
     {
         return match ($this) {
             self::PayAtVenue => 'Pay at venue',
-            self::HostedCheckout => 'Hosted checkout',
+            self::HostedCheckout => 'Online checkout',
         };
     }
 }

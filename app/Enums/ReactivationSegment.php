@@ -14,8 +14,8 @@ enum ReactivationSegment: string
         return match ($this) {
             self::Inactive30 => 'No booking in 30 days',
             self::Inactive60 => 'No booking in 60 days',
-            self::PriorWeekday => 'Prior weekday players',
-            self::Sport => 'Previous players of a sport',
+            self::PriorWeekday => 'Weekday players',
+            self::Sport => 'Players of one sport',
         };
     }
 }

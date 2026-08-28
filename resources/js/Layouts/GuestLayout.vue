@@ -15,9 +15,9 @@
             <div class="absolute -right-28 -top-28 size-96 rounded-full border border-white/10"></div>
             <div class="absolute -right-8 -top-8 size-72 rounded-full border border-white/10"></div>
             <div class="relative max-w-lg">
-                <p class="mb-5 text-sm font-semibold uppercase tracking-[0.18em] text-court-300">Owner operations</p>
+                <p class="mb-5 text-sm font-semibold uppercase tracking-[0.18em] text-court-300">For court owners</p>
                 <p class="text-4xl font-semibold leading-tight tracking-tight">A clear home base for your courts, your team, and your bookings.</p>
-                <p class="mt-5 text-base leading-7 text-court-100/75">Manage inventory, schedules, reservations, promotions, payments, and marketplace performance in one secure workspace.</p>
+                <p class="mt-5 text-base leading-7 text-court-100/75">Manage courts, schedules, bookings, deals, payments, and player visits in one secure place.</p>
             </div>
         </aside>
     </div>

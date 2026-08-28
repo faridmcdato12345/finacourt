@@ -11,9 +11,9 @@ enum CustomerLifecycle: string
     public function label(): string
     {
         return match ($this) {
-            self::New => 'New customer',
-            self::Returning => 'Returning customer',
-            self::Inactive => 'Inactive customer',
+            self::New => 'First-time player',
+            self::Returning => 'Returning player',
+            self::Inactive => 'Past player',
         };
     }
 }

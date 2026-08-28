@@ -34,7 +34,13 @@ class GrowthRecommendationStateController extends Controller
             $request->integer('snooze_days') ?: null,
         );
 
-        return back()->with('status', "Recommendation {$status->value}.");
+        $message = match ($status) {
+            GrowthRecommendationStateStatus::Dismissed => 'Suggestion hidden.',
+            GrowthRecommendationStateStatus::Resolved => 'Suggestion marked done.',
+            GrowthRecommendationStateStatus::Snoozed => 'Reminder set. This suggestion will come back later.',
+        };
+
+        return back()->with('status', $message);
     }
 
     public function destroy(
@@ -47,6 +53,6 @@ class GrowthRecommendationStateController extends Controller
         Gate::authorize('viewDashboard', $organization);
         $states->restore($organization, $recommendationKey);
 
-        return back()->with('status', 'Recommendation restored.');
+        return back()->with('status', 'Suggestion shown again.');
     }
 }

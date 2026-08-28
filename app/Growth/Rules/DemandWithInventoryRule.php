@@ -60,8 +60,8 @@ class DemandWithInventoryRule implements RecommendationRule
                 organizationId: $context->organization->getKey(),
                 venueId: $venue->getKey(),
                 venueName: $venue->name,
-                title: "Players are searching for {$sport->name} while you have open slots",
-                explanation: "{$market['searches']} privacy-thresholded searches from {$market['unique_searchers']} estimated searchers requested {$sport->name} in {$venue->city} during the last {$context->lookbackDays} days. {$slots->count()} upcoming {$sport->name} slots are still available.",
+                title: "Players are searching for {$sport->name} while you have open times",
+                explanation: "{$market['searches']} searches from {$market['unique_searchers']} different searchers looked for {$sport->name} in {$venue->city} during the last {$context->lookbackDays} days. You still have {$slots->count()} upcoming {$sport->name} times available.",
                 evidence: [
                     'searches' => $market['searches'],
                     'unique_searchers' => $market['unique_searchers'],
@@ -70,7 +70,7 @@ class DemandWithInventoryRule implements RecommendationRule
                     'city' => $venue->city,
                     'sport' => $sport->name,
                 ],
-                actionLabel: 'Create a slot promotion',
+                actionLabel: 'Create a deal for one time',
                 actionUrl: route('owner.promotions.create', [
                     'resource' => $first['resource_id'],
                     'date' => $first['slot_date'],

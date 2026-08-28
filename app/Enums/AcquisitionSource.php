@@ -21,17 +21,17 @@ enum AcquisitionSource: string
     public function label(): string
     {
         return match ($this) {
-            self::MarketplaceOrganic => 'Marketplace organic',
-            self::MarketplacePromotion => 'Marketplace promotion',
-            self::CustomerReactivation => 'Customer reactivation',
-            self::GoogleOrganic => 'Google organic',
+            self::MarketplaceOrganic => 'FinACourt search',
+            self::MarketplacePromotion => 'FinACourt deal',
+            self::CustomerReactivation => 'Message to past players',
+            self::GoogleOrganic => 'Google Search',
             self::GoogleMaps => 'Google Maps',
             self::Facebook => 'Facebook',
             self::Instagram => 'Instagram',
             self::TikTok => 'TikTok',
             self::QrCode => 'QR code',
             self::Referral => 'Referral',
-            self::SalesPartner => 'Sales partner',
+            self::SalesPartner => 'Partner referral',
             self::Direct => 'Direct',
             self::Unknown => 'Unknown',
         };

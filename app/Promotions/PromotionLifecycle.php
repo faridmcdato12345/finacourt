@@ -30,7 +30,7 @@ class PromotionLifecycle
     {
         if ($promotion !== null && ! $promotion->status->canTransitionTo($target)) {
             throw ValidationException::withMessages([
-                'status' => "A {$promotion->status->label()} campaign cannot move to {$target->label()}.",
+                'status' => "A {$promotion->status->label()} deal cannot move to {$target->label()}.",
             ]);
         }
     }

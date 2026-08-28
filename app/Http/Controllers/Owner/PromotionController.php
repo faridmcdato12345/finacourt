@@ -117,7 +117,7 @@ class PromotionController extends Controller
         });
 
         return redirect()->route('owner.promotions.show', $promotion)
-            ->with('status', 'Promotion created. Review its public preview before sharing the campaign link.');
+            ->with('status', 'Deal created. Review how it looks before sharing it.');
     }
 
     public function show(Promotion $promotion): Response
@@ -191,7 +191,7 @@ class PromotionController extends Controller
         });
 
         return redirect()->route('owner.promotions.show', $promotion)
-            ->with('status', 'Promotion updated. Existing booking price snapshots were not changed.');
+            ->with('status', 'Deal updated. Existing bookings kept their original prices.');
     }
 
     public function destroy(Promotion $promotion): RedirectResponse
@@ -199,12 +199,12 @@ class PromotionController extends Controller
         Gate::authorize('delete', $promotion);
 
         if ($promotion->bookings()->exists()) {
-            return back()->with('status', 'Attributed promotions cannot be deleted. Deactivate the promotion instead.');
+            return back()->with('status', 'Deals with bookings cannot be deleted. Turn the deal off instead.');
         }
 
         $promotion->delete();
 
-        return redirect()->route('owner.promotions.index')->with('status', 'Promotion deleted.');
+        return redirect()->route('owner.promotions.index')->with('status', 'Deal deleted.');
     }
 
     /** @return array<string, mixed> */

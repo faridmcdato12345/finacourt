@@ -137,7 +137,7 @@ class VenueController extends Controller
         }
 
         return redirect()->route('owner.venues.show', $venue)
-            ->with('status', 'Venue created. Configure its resources and operating hours next.');
+            ->with('status', 'Venue created. Add courts and opening hours next.');
     }
 
     public function show(Venue $venue): Response
@@ -265,7 +265,7 @@ class VenueController extends Controller
         });
 
         return redirect()->route('owner.venues.show', $venue)
-            ->with('status', 'Venue settings updated.');
+            ->with('status', 'Venue details updated.');
     }
 
     public function destroy(Venue $venue): RedirectResponse

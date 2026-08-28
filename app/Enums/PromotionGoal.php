@@ -13,11 +13,11 @@ enum PromotionGoal: string
     public function label(): string
     {
         return match ($this) {
-            self::FillEmptySlots => 'Fill empty courts',
-            self::GetNewCustomers => 'Get new customers',
-            self::PromoteTodayOrTonight => 'Promote today or tonight',
-            self::IncreaseOffPeakBookings => 'Increase off-peak bookings',
-            self::PromoteSpecificSlots => 'Promote specific slots',
+            self::FillEmptySlots => 'Fill open court times',
+            self::GetNewCustomers => 'Get first-time players',
+            self::PromoteTodayOrTonight => 'Fill today or tonight',
+            self::IncreaseOffPeakBookings => 'Fill slower hours',
+            self::PromoteSpecificSlots => 'Pick exact court times',
         };
     }
 }

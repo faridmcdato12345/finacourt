@@ -17,7 +17,7 @@ enum BookingSource: string
             self::WalkIn => 'Walk-in',
             self::Phone => 'Phone',
             self::Messenger => 'Messenger',
-            self::Marketplace => 'Marketplace',
+            self::Marketplace => 'FinACourt',
         };
     }
 }

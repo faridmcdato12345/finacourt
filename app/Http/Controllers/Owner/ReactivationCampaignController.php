@@ -91,7 +91,7 @@ class ReactivationCampaignController extends Controller
         ]);
 
         return redirect()->route('owner.reactivation.show', $campaign)
-            ->with('status', 'Comeback campaign saved as a draft. Review the audience rules before sending.');
+            ->with('status', 'Message saved as a draft. Review who can receive it before sending.');
     }
 
     public function show(
@@ -133,7 +133,7 @@ class ReactivationCampaignController extends Controller
         $sender->handle($campaign);
 
         return redirect()->route('owner.reactivation.show', $campaign)
-            ->with('status', 'Campaign processed. Only opted-in prior customers outside the contact cooldown were notified.');
+            ->with('status', 'Message sent only to past players who agreed to receive messages and have not been contacted too recently.');
     }
 
     public function cancel(
@@ -144,7 +144,7 @@ class ReactivationCampaignController extends Controller
         Gate::authorize('cancel', $campaign);
 
         if ($campaign->status !== ReactivationCampaignStatus::Draft) {
-            return back()->with('status', 'Only a draft campaign can be cancelled.');
+            return back()->with('status', 'Only a draft message can be cancelled.');
         }
 
         $campaign->update([
@@ -152,7 +152,7 @@ class ReactivationCampaignController extends Controller
             'cancelled_at' => now('UTC'),
         ]);
 
-        return redirect()->route('owner.reactivation.index')->with('status', 'Draft campaign cancelled.');
+        return redirect()->route('owner.reactivation.index')->with('status', 'Draft message cancelled.');
     }
 
     private function authorizeTenant(ReactivationCampaign $campaign, TenantContext $context): void

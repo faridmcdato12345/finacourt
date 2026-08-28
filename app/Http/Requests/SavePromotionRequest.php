@@ -113,7 +113,7 @@ class SavePromotionRequest extends FormRequest
             if ($promotion !== null && ! $promotion->status->canTransitionTo($status)) {
                 $validator->errors()->add(
                     'status',
-                    "A {$promotion->status->label()} campaign cannot move to {$status->label()}.",
+                    "A {$promotion->status->label()} deal cannot move to {$status->label()}.",
                 );
             }
 
@@ -122,46 +122,46 @@ class SavePromotionRequest extends FormRequest
                 PromotionStatus::Completed,
                 PromotionStatus::Cancelled,
             ], true)) {
-                $validator->errors()->add('status', 'New campaigns must begin as draft, scheduled, or active.');
+                $validator->errors()->add('status', 'New deals must begin as draft, scheduled, or active.');
             }
 
             if ($status->acceptsBookings()
                 && $this->string('ends_on')->toString() < now($venue?->organization?->timezone)->toDateString()) {
-                $validator->errors()->add('status', 'An expired campaign cannot be scheduled or active.');
+                $validator->errors()->add('status', 'An expired deal cannot be scheduled or active.');
             }
 
             if ($resource !== null && $resource->venue_id !== $venue?->getKey()) {
-                $validator->errors()->add('resource_id', 'The selected resource must belong to the selected venue.');
+                $validator->errors()->add('resource_id', 'The selected court must belong to the selected venue.');
             }
 
             if ($type === PromotionType::Resource && $resource === null) {
-                $validator->errors()->add('resource_id', 'A resource promotion requires a court or resource.');
+                $validator->errors()->add('resource_id', 'Choose a court for this court deal.');
             }
 
             if ($type === PromotionType::Venue && $resource !== null) {
-                $validator->errors()->add('resource_id', 'A venue promotion applies to the whole venue.');
+                $validator->errors()->add('resource_id', 'A whole-venue deal should not be limited to one court.');
             }
 
             if ($type === PromotionType::TimeWindow && ! $this->filled('starts_at_time')) {
-                $validator->errors()->add('starts_at_time', 'A time-window promotion requires start and end times.');
+                $validator->errors()->add('starts_at_time', 'Add a start and end time for this date-and-time deal.');
             }
 
             $slots = $this->input('slots', []);
 
             if ($type === PromotionType::SpecificSlots && $slots === []) {
-                $validator->errors()->add('slots', 'Choose at least one available slot for this campaign type.');
+                $validator->errors()->add('slots', 'Choose at least one open court time for this deal type.');
             }
 
             if ($goal === PromotionGoal::PromoteSpecificSlots && $slots === []) {
-                $validator->errors()->add('slots', 'The specific-slot goal requires at least one selected slot.');
+                $validator->errors()->add('slots', 'Choose at least one court time for this deal goal.');
             }
 
             if ($type === PromotionType::Deal && $discountType === null) {
-                $validator->errors()->add('discount_type', 'A discount deal requires a discount configuration.');
+                $validator->errors()->add('discount_type', 'Choose how players get the discount.');
             }
 
             if ($discountType !== null && ! $this->filled('discount_value')) {
-                $validator->errors()->add('discount_value', 'Enter the percentage or promotional hourly rate.');
+                $validator->errors()->add('discount_value', 'Enter the percentage off or special hourly price.');
             }
 
             if ($discountType === null && $this->filled('discount_value')) {
@@ -183,18 +183,18 @@ class SavePromotionRequest extends FormRequest
                     ?? $venue->resources()->where('is_active', true)->min('base_hourly_rate');
 
                 if ($minimumRate === null) {
-                    $validator->errors()->add('resource_id', 'The venue needs an active resource before using a fixed promotional rate.');
+                    $validator->errors()->add('resource_id', 'The venue needs at least one bookable court before using a special hourly price.');
                 } elseif ((float) $this->input('discount_value') >= (float) $minimumRate) {
                     $validator->errors()->add(
                         'discount_value',
-                        'The promotional hourly rate must be lower than every applicable active resource rate.',
+                        'The special hourly price must be lower than the normal price for every court it applies to.',
                     );
                 }
             }
 
             if ($this->filled('starts_at_time')
                 && $this->string('ends_at_time')->toString() <= $this->string('starts_at_time')->toString()) {
-                $validator->errors()->add('ends_at_time', 'The applicability end time must be later than its start time.');
+                $validator->errors()->add('ends_at_time', 'The end time must be later than the start time.');
             }
 
             if ($venue !== null && $this->filled('audience_sport_id')
@@ -218,7 +218,7 @@ class SavePromotionRequest extends FormRequest
                 if ($slotResource === null || $slotResource->venue_id !== $venue?->getKey()) {
                     $validator->errors()->add(
                         "slots.{$index}.resource_id",
-                        'Each promoted slot must belong to the selected venue and tenant.',
+                        'Each chosen court time must belong to the selected venue.',
                     );
 
                     continue;
@@ -227,7 +227,7 @@ class SavePromotionRequest extends FormRequest
                 if ($resource !== null && $slotResource->getKey() !== $resource->getKey()) {
                     $validator->errors()->add(
                         "slots.{$index}.resource_id",
-                        'All selected slots must use the campaign court, or choose all venue courts.',
+                        'All chosen times must use the selected court, or choose all venue courts.',
                     );
                 }
 
@@ -237,7 +237,7 @@ class SavePromotionRequest extends FormRequest
                     || $slotDate > $this->string('ends_on')->toString()) {
                     $validator->errors()->add(
                         "slots.{$index}.slot_date",
-                        'Each selected slot must fall inside the campaign dates.',
+                        'Each chosen court time must be within the deal dates.',
                     );
                 }
 
@@ -247,7 +247,7 @@ class SavePromotionRequest extends FormRequest
                 if ($end <= $start) {
                     $validator->errors()->add(
                         "slots.{$index}.ends_at_time",
-                        'The slot end time must be later than its start time.',
+                        'The court-time end must be later than its start.',
                     );
 
                     continue;

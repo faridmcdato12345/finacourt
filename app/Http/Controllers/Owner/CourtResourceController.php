@@ -35,7 +35,7 @@ class CourtResourceController extends Controller
         ]);
 
         return redirect()->route('owner.venues.show', $venue)
-            ->with('status', 'Resource created with its base price.');
+            ->with('status', 'Court created with its normal price.');
     }
 
     public function edit(Venue $venue, CourtResource $resource): Response
@@ -67,7 +67,7 @@ class CourtResourceController extends Controller
         $resource->update($request->validated());
 
         return redirect()->route('owner.venues.show', $venue)
-            ->with('status', 'Resource and pricing updated.');
+            ->with('status', 'Court details and price updated.');
     }
 
     public function destroy(Venue $venue, CourtResource $resource): RedirectResponse
@@ -88,11 +88,11 @@ class CourtResourceController extends Controller
         });
 
         if (! $deleted) {
-            return back()->with('status', 'Resources with booking history cannot be deleted. Mark the resource inactive instead.');
+            return back()->with('status', 'Courts with booking history cannot be deleted. Turn bookings off for this court instead.');
         }
 
         return redirect()->route('owner.venues.show', $venue)
-            ->with('status', 'Resource deleted.');
+            ->with('status', 'Court deleted.');
     }
 
     private function ensureNestedResource(Venue $venue, CourtResource $resource): void

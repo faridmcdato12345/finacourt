@@ -37,15 +37,15 @@ class VisibilityScore
             fn ($resource) => (float) $resource->base_hourly_rate >= 0,
         ) && $openHours->isNotEmpty();
         $checks = collect([
-            $this->check('marketplace', 'Marketplace listing', 15, $venue->is_published && $activeResources->isNotEmpty(), 'Publish the venue and keep at least one court active.'),
+            $this->check('marketplace', 'Shown on FinACourt', 15, $venue->is_published && $activeResources->isNotEmpty(), 'Publish the venue and keep at least one court active.'),
             $this->check('description', 'Useful venue description', 10, mb_strlen(trim((string) $venue->description)) >= 80, 'Add at least 80 characters describing the facility and player experience.'),
             $this->check('address', 'Complete address', 10, $hasCompleteLocation, 'Add the street address, city or municipality, and province or region.'),
-            $this->check('map_pin', 'Confirmed map pin', 10, $hasVerifiedPin, 'Confirm latitude and longitude so players can find the entrance.'),
-            $this->check('photos', 'Photo coverage', 15, $hasPhotoSet, 'Add a cover photo and at least two more real venue photos.'),
+            $this->check('map_pin', 'Map pin checked', 10, $hasVerifiedPin, 'Add or confirm the map pin so players can find the entrance.'),
+            $this->check('photos', 'Enough photos', 15, $hasPhotoSet, 'Add a cover photo and at least two more real venue photos.'),
             $this->check('hours', 'Opening hours', 10, $venue->operatingHours->count() === 7 && $openHours->isNotEmpty(), 'Configure all seven days and keep at least one day open.'),
             $this->check('sports', 'Sports and courts', 10, $venue->sports->contains('is_active', true) && $activeResources->isNotEmpty(), 'Select an active sport and configure an active court for it.'),
             $this->check('contact', 'Player contact details', 10, filled($venue->phone) || filled($venue->email) || filled($venue->website), 'Add at least one public phone number, email address, or website.'),
-            $this->check('booking', 'Online booking ready', 10, $venue->is_published && $hasBookableInventory, 'Publish bookable inventory with opening hours and a valid base rate.'),
+            $this->check('booking', 'Online booking ready', 10, $venue->is_published && $hasBookableInventory, 'Publish at least one court with opening hours and a valid hourly price.'),
         ]);
         $completeWeight = $checks->where('complete', true)->sum('weight');
 

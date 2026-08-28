@@ -13,10 +13,10 @@ enum PromotionType: string
     public function label(): string
     {
         return match ($this) {
-            self::Venue => 'Venue promotion',
-            self::Resource => 'Court or resource promotion',
-            self::TimeWindow => 'Time-window promotion',
-            self::SpecificSlots => 'Specific available slots',
+            self::Venue => 'Whole venue deal',
+            self::Resource => 'Court deal',
+            self::TimeWindow => 'Date and time deal',
+            self::SpecificSlots => 'Exact court times',
             self::Deal => 'Discount deal',
         };
     }

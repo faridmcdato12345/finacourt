@@ -11,7 +11,7 @@ enum PromotionDiscountType: string
     {
         return match ($this) {
             self::Percentage => 'Percentage off',
-            self::FixedHourlyRate => 'Promotional hourly rate',
+            self::FixedHourlyRate => 'Special hourly rate',
         };
     }
 }

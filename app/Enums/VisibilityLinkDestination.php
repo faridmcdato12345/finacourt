@@ -13,7 +13,7 @@ enum VisibilityLinkDestination: string
         return match ($this) {
             self::Venue => 'Venue page',
             self::Booking => 'Booking page',
-            self::Promotion => 'Promotion page',
+            self::Promotion => 'Deal page',
         };
     }
 }

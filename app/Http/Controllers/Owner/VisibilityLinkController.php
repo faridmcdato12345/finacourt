@@ -23,6 +23,6 @@ class VisibilityLinkController extends Controller
             : null;
         $links->create($venue, $destination, $promotion, $request->user());
 
-        return back()->with('status', 'Stable QR destination created.');
+        return back()->with('status', 'QR code link created.');
     }
 }

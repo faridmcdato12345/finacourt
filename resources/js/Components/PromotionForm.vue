@@ -102,8 +102,8 @@ function submit() {
 <template>
     <form class="space-y-7" @submit.prevent="submit">
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <p class="text-xs font-semibold uppercase tracking-wider text-court-700">Campaign goal</p>
-            <h2 class="mt-2 text-lg font-semibold">What do you want to achieve?</h2>
+            <p class="text-xs font-semibold uppercase tracking-wider text-court-700">Deal goal</p>
+            <h2 class="mt-2 text-lg font-semibold">What should this deal help with?</h2>
             <div class="mt-5 grid gap-3 sm:grid-cols-2">
                 <label v-for="goal in goals" :key="goal.value" :class="['cursor-pointer rounded-xl border p-4 transition', form.goal === goal.value ? 'border-court-500 bg-court-50 ring-2 ring-court-100' : 'border-slate-200 hover:border-court-200']">
                     <input v-model="form.goal" type="radio" :value="goal.value" class="sr-only">
@@ -114,20 +114,20 @@ function submit() {
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 class="text-lg font-semibold">Campaign</h2>
+            <h2 class="text-lg font-semibold">Deal details</h2>
             <div class="mt-5 grid gap-5 sm:grid-cols-2">
                 <label class="sm:col-span-2"><span class="text-sm font-medium">Title</span><input v-model="form.title" required maxlength="255" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><FormError :message="form.errors.title" /></label>
                 <label class="sm:col-span-2"><span class="text-sm font-medium">Description</span><textarea v-model="form.description" rows="4" maxlength="2000" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"></textarea><FormError :message="form.errors.description" /></label>
-                <label><span class="text-sm font-medium">Promotion type</span><AppSelect v-model="form.promotion_type" :options="types" class="mt-2" aria-label="Promotion type" /><FormError :message="form.errors.promotion_type" /></label>
-                <label><span class="text-sm font-medium">Campaign status</span><AppSelect v-model="form.status" :options="statuses" class="mt-2" aria-label="Campaign status" /><FormError :message="form.errors.status" /></label>
+                <label><span class="text-sm font-medium">Deal type</span><AppSelect v-model="form.promotion_type" :options="types" class="mt-2" aria-label="Deal type" /><FormError :message="form.errors.promotion_type" /></label>
+                <label><span class="text-sm font-medium">Deal status</span><AppSelect v-model="form.status" :options="statuses" class="mt-2" aria-label="Deal status" /><FormError :message="form.errors.status" /></label>
                 <label><span class="text-sm font-medium">Venue</span><AppSelect v-model="form.venue_id" :options="venues" option-value="id" option-label="name" class="mt-2" aria-label="Promotion venue" @change="venueChanged" /><FormError :message="form.errors.venue_id" /></label>
-                <label><span class="text-sm font-medium">Audience sport <span class="font-normal text-slate-400">optional</span></span><AppSelect v-model="form.audience_sport_id" :options="[{ value: '', label: 'All sports at this venue' }, ...sports]" class="mt-2" aria-label="Audience sport" /><FormError :message="form.errors.audience_sport_id" /></label>
-                <label class="sm:col-span-2"><span class="text-sm font-medium">Court/resource <span class="font-normal text-slate-400">optional unless resource promotion</span></span><AppSelect v-model="form.resource_id" :options="[{ value: '', label: 'All active venue resources' }, ...resources.map((resource) => ({ value: resource.id, label: `${resource.name} · ₱${resource.base_hourly_rate}/hour${resource.is_active ? '' : ' · inactive'}`, disabled: !resource.is_active }))]" class="mt-2" aria-label="Promotion resource" /><FormError :message="form.errors.resource_id" /></label>
+                <label><span class="text-sm font-medium">Show to players looking for <span class="font-normal text-slate-400">optional</span></span><AppSelect v-model="form.audience_sport_id" :options="[{ value: '', label: 'Any sport at this venue' }, ...sports]" class="mt-2" aria-label="Sport this deal is for" /><FormError :message="form.errors.audience_sport_id" /></label>
+                <label class="sm:col-span-2"><span class="text-sm font-medium">Court <span class="font-normal text-slate-400">optional</span></span><AppSelect v-model="form.resource_id" :options="[{ value: '', label: 'All active courts at this venue' }, ...resources.map((resource) => ({ value: resource.id, label: `${resource.name} · ₱${resource.base_hourly_rate}/hour${resource.is_active ? '' : ' · inactive'}`, disabled: !resource.is_active }))]" class="mt-2" aria-label="Court for this deal" /><FormError :message="form.errors.resource_id" /></label>
             </div>
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 class="text-lg font-semibold">Price</h2><p class="mt-1 text-sm text-slate-500">Leave both fields empty for a promotional placement without a discount. Final booking prices remain server-calculated.</p>
+            <h2 class="text-lg font-semibold">Price</h2><p class="mt-1 text-sm text-slate-500">Leave both fields empty if you only want to highlight this venue without changing the price. FinACourt calculates the final price when a player books.</p>
             <div class="mt-5 grid gap-5 sm:grid-cols-2">
                 <label><span class="text-sm font-medium">Discount method</span><AppSelect v-model="form.discount_type" :options="[{ value: '', label: 'No price discount' }, ...discountTypes]" class="mt-2" aria-label="Discount method" /><FormError :message="form.errors.discount_type" /></label>
                 <label><span class="text-sm font-medium">Value</span><input v-model="form.discount_value" type="number" min="0" max="999999.99" step="0.01" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3" :placeholder="form.discount_type === 'percentage' ? '20' : '500'"><FormError :message="form.errors.discount_value" /></label>
@@ -135,26 +135,26 @@ function submit() {
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 class="text-lg font-semibold">Campaign schedule</h2><p class="mt-1 text-sm text-slate-500">Dates and times use the organization timezone. Recurring windows and selected slots must fit completely inside these dates.</p>
+            <h2 class="text-lg font-semibold">When this deal runs</h2><p class="mt-1 text-sm text-slate-500">Dates and times use your venue time. Any selected court times must fit inside these dates.</p>
             <div class="mt-5 grid gap-5 sm:grid-cols-2">
                 <label><span class="text-sm font-medium">Starts on</span><input v-model="form.starts_on" type="date" required class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><FormError :message="form.errors.starts_on" /></label>
                 <label><span class="text-sm font-medium">Ends on</span><input v-model="form.ends_on" type="date" required class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><FormError :message="form.errors.ends_on" /></label>
-                <div class="sm:col-span-2"><span class="text-sm font-medium">Recurring weekdays <span class="font-normal text-slate-400">none selected means every day</span></span><div class="mt-3 flex flex-wrap gap-2"><label v-for="day in weekdays" :key="day.value" class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><input v-model="form.days_of_week" type="checkbox" :value="day.value" class="rounded border-slate-300">{{ day.label }}</label></div><FormError :message="form.errors.days_of_week" /></div>
-                <label><span class="text-sm font-medium">Recurring daily start <span class="font-normal text-slate-400">optional</span></span><input v-model="form.starts_at_time" type="time" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><FormError :message="form.errors.starts_at_time" /></label>
-                <label><span class="text-sm font-medium">Recurring daily end <span class="font-normal text-slate-400">optional</span></span><input v-model="form.ends_at_time" type="time" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><FormError :message="form.errors.ends_at_time" /></label>
+                <div class="sm:col-span-2"><span class="text-sm font-medium">Days of the week <span class="font-normal text-slate-400">leave blank for every day</span></span><div class="mt-3 flex flex-wrap gap-2"><label v-for="day in weekdays" :key="day.value" class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm"><input v-model="form.days_of_week" type="checkbox" :value="day.value" class="rounded border-slate-300">{{ day.label }}</label></div><FormError :message="form.errors.days_of_week" /></div>
+                <label><span class="text-sm font-medium">Daily start time <span class="font-normal text-slate-400">optional</span></span><input v-model="form.starts_at_time" type="time" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><FormError :message="form.errors.starts_at_time" /></label>
+                <label><span class="text-sm font-medium">Daily end time <span class="font-normal text-slate-400">optional</span></span><input v-model="form.ends_at_time" type="time" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><FormError :message="form.errors.ends_at_time" /></label>
             </div>
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-xs font-semibold uppercase tracking-wider text-court-700">Specific inventory</p><h2 class="mt-2 text-lg font-semibold">Promoted court slots</h2><p class="mt-1 text-sm text-slate-500">One campaign can contain multiple exact court/date/time windows.</p></div><button type="button" class="rounded-xl border border-court-300 px-4 py-2.5 text-sm font-semibold text-court-800" @click="addSlot()">Add custom slot</button></div>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-xs font-semibold uppercase tracking-wider text-court-700">Exact court times</p><h2 class="mt-2 text-lg font-semibold">Court times in this deal</h2><p class="mt-1 text-sm text-slate-500">One deal can include more than one exact court, date, and time.</p></div><button type="button" class="rounded-xl border border-court-300 px-4 py-2.5 text-sm font-semibold text-court-800" @click="addSlot()">Add custom time</button></div>
             <FormError :message="form.errors.slots" />
 
             <div v-if="visibleOpportunities.length" class="mt-5 rounded-xl bg-court-50 p-4">
-                <p class="text-sm font-semibold text-court-900">Available inventory suggestions</p>
-                <p class="mt-1 text-xs text-court-700">Deterministic suggestions from current hours and active reservations. Adding one still requires your approval and campaign save.</p>
+                <p class="text-sm font-semibold text-court-900">Open times you can promote</p>
+                <p class="mt-1 text-xs text-court-700">Suggested from your opening hours and current bookings. Nothing is shown to players until you save it.</p>
                 <div class="mt-3 flex gap-2 overflow-x-auto pb-1">
                     <button v-for="slot in visibleOpportunities" :key="`${slot.resource_id}-${slot.slot_date}-${slot.starts_at_time}`" type="button" class="min-w-52 rounded-xl border border-court-200 bg-white p-3 text-left text-xs shadow-sm" @click="addSlot(slot)">
-                        <span class="block font-semibold text-slate-900">{{ slot.resource_name }}</span><span class="mt-1 block text-slate-500">{{ slot.slot_date }} · {{ slot.starts_at_time }}–{{ slot.ends_at_time }}</span><span :class="['mt-2 block font-semibold', slot.is_last_minute ? 'text-amber-700' : 'text-court-700']">{{ slot.is_last_minute ? 'Last-minute opening' : 'Unsold upcoming slot' }} · Add</span>
+                        <span class="block font-semibold text-slate-900">{{ slot.resource_name }}</span><span class="mt-1 block text-slate-500">{{ slot.slot_date }} · {{ slot.starts_at_time }}–{{ slot.ends_at_time }}</span><span :class="['mt-2 block font-semibold', slot.is_last_minute ? 'text-amber-700' : 'text-court-700']">{{ slot.is_last_minute ? 'Last-minute opening' : 'Open upcoming time' }} · Add</span>
                     </button>
                 </div>
             </div>
@@ -168,13 +168,13 @@ function submit() {
                     <button type="button" class="rounded-xl border border-red-200 px-3 py-3 text-sm font-semibold text-red-700" @click="removeSlot(index)">Remove</button>
                 </div>
             </div>
-            <div v-else class="mt-5 rounded-xl border border-dashed border-slate-300 px-5 py-8 text-center text-sm text-slate-500">No exact slots selected. The recurring campaign rules above will apply.</div>
+            <div v-else class="mt-5 rounded-xl border border-dashed border-slate-300 px-5 py-8 text-center text-sm text-slate-500">No exact times selected. The date and time choices above will apply.</div>
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <label class="flex items-start gap-3"><input v-model="form.is_public" type="checkbox" class="mt-1 rounded border-slate-300"><span><strong class="block text-sm">Public marketplace</strong><span class="text-sm text-slate-500">Eligible active campaigns can appear in search, deals, venue pages, and discovery surfaces.</span></span></label>
+            <label class="flex items-start gap-3"><input v-model="form.is_public" type="checkbox" class="mt-1 rounded border-slate-300"><span><strong class="block text-sm">Show on public site</strong><span class="text-sm text-slate-500">Active deals can appear in search, the deals page, and venue pages.</span></span></label>
         </section>
 
-        <div class="flex justify-end"><button :disabled="form.processing" class="rounded-xl bg-court-700 px-6 py-3 font-semibold text-white disabled:opacity-50">{{ promotion ? 'Save campaign' : 'Create campaign' }}</button></div>
+        <div class="flex justify-end"><button :disabled="form.processing" class="rounded-xl bg-court-700 px-6 py-3 font-semibold text-white disabled:opacity-50">{{ promotion ? 'Save deal' : 'Create deal' }}</button></div>
     </form>
 </template>

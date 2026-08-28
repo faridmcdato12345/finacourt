@@ -26,13 +26,13 @@ class VisibilityLinkManager
 
         if ($destination === VisibilityLinkDestination::Promotion && $promotion === null) {
             throw ValidationException::withMessages([
-                'promotion_id' => 'Choose a promotion for this QR destination.',
+                'promotion_id' => 'Choose a deal for this QR code.',
             ]);
         }
 
         if ($destination !== VisibilityLinkDestination::Promotion && $promotion !== null) {
             throw ValidationException::withMessages([
-                'promotion_id' => 'A promotion is only valid for a promotion QR destination.',
+                'promotion_id' => 'A deal can only be used with a deal QR code.',
             ]);
         }
 
@@ -41,7 +41,7 @@ class VisibilityLinkManager
             || $promotion->venue_id !== $venue->getKey()
         )) {
             throw ValidationException::withMessages([
-                'promotion_id' => 'The selected promotion does not belong to this venue.',
+                'promotion_id' => 'The selected deal does not belong to this venue.',
             ]);
         }
 

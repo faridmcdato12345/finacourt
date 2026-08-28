@@ -15,13 +15,13 @@ enum GrowthRecommendationType: string
     public function label(): string
     {
         return match ($this) {
-            self::EmptyInventory => 'Empty upcoming inventory',
-            self::DemandWithInventory => 'Demand with available inventory',
-            self::UnfulfilledDemand => 'Unfulfilled marketplace demand',
-            self::InactiveCustomers => 'Inactive previous customers',
-            self::RepeatSuccessfulCampaign => 'Successful campaign to repeat',
-            self::LowBookingConversion => 'High traffic with low conversion',
-            self::ChannelConversionGap => 'Acquisition channel opportunity',
+            self::EmptyInventory => 'Open court times',
+            self::DemandWithInventory => 'Players are searching',
+            self::UnfulfilledDemand => 'Searches without a good match',
+            self::InactiveCustomers => 'Past players to invite back',
+            self::RepeatSuccessfulCampaign => 'Deal worth repeating',
+            self::LowBookingConversion => 'Lots of visits, few bookings',
+            self::ChannelConversionGap => 'Where players come from',
         };
     }
 }

@@ -19,7 +19,7 @@ defineEmits(['submit']);
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="grid gap-5 sm:grid-cols-2">
                 <div class="sm:col-span-2">
-                    <label for="name" class="mb-2 block text-sm font-medium text-slate-800">Resource name</label>
+                    <label for="name" class="mb-2 block text-sm font-medium text-slate-800">Court name</label>
                     <input id="name" v-model="form.name" required placeholder="Court 1" class="w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-court-600" />
                     <FormError :message="form.errors.name" />
                 </div>
@@ -29,8 +29,8 @@ defineEmits(['submit']);
                     <FormError :message="form.errors.sport_id" />
                 </div>
                 <div>
-                    <label for="resource_type" class="mb-2 block text-sm font-medium text-slate-800">Resource type</label>
-                    <AppSelect id="resource_type" v-model="form.resource_type" :options="resourceTypes" required aria-label="Resource type" />
+                    <label for="resource_type" class="mb-2 block text-sm font-medium text-slate-800">Court type</label>
+                    <AppSelect id="resource_type" v-model="form.resource_type" :options="resourceTypes" required aria-label="Court type" />
                     <FormError :message="form.errors.resource_type" />
                 </div>
                 <div>
@@ -39,16 +39,16 @@ defineEmits(['submit']);
                     <FormError :message="form.errors.setting" />
                 </div>
                 <div>
-                    <label for="booking_increment_minutes" class="mb-2 block text-sm font-medium text-slate-800">Booking increment</label>
-                    <AppSelect id="booking_increment_minutes" v-model="form.booking_increment_minutes" :options="increments.map((increment) => ({ value: increment, label: `${increment} minutes` }))" required aria-label="Booking increment" />
+                    <label for="booking_increment_minutes" class="mb-2 block text-sm font-medium text-slate-800">Smallest booking time</label>
+                    <AppSelect id="booking_increment_minutes" v-model="form.booking_increment_minutes" :options="increments.map((increment) => ({ value: increment, label: `${increment} minutes` }))" required aria-label="Smallest booking time" />
                     <FormError :message="form.errors.booking_increment_minutes" />
                 </div>
             </div>
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 class="text-lg font-semibold text-slate-950">Base pricing and status</h2>
-            <p class="mt-1 text-sm text-slate-500">This rate becomes the default input for the Phase 3 booking engine.</p>
+            <h2 class="text-lg font-semibold text-slate-950">Price and booking status</h2>
+            <p class="mt-1 text-sm text-slate-500">This is the normal hourly price players will see.</p>
             <div class="mt-6 grid gap-5 sm:grid-cols-2">
                 <div>
                     <label for="base_hourly_rate" class="mb-2 block text-sm font-medium text-slate-800">Hourly rate (PHP)</label>
@@ -60,7 +60,7 @@ defineEmits(['submit']);
                 </div>
                 <label class="flex items-center gap-4 self-end rounded-xl border border-slate-200 px-4 py-3">
                     <input v-model="form.is_active" type="checkbox" class="size-5 rounded border-slate-300 text-court-700" />
-                    <span><span class="block text-sm font-semibold text-slate-900">Active resource</span><span class="text-xs text-slate-500">Inactive resources will not be bookable later.</span></span>
+                    <span><span class="block text-sm font-semibold text-slate-900">Allow bookings</span><span class="text-xs text-slate-500">Turn this off when players should not be able to book this court.</span></span>
                 </label>
             </div>
         </section>

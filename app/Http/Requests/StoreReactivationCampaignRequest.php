@@ -47,7 +47,7 @@ class StoreReactivationCampaignRequest extends FormRequest
             $segment = ReactivationSegment::from($this->string('segment')->toString());
 
             if ($segment === ReactivationSegment::Sport && ! $this->filled('sport_id')) {
-                $validator->errors()->add('sport_id', 'Choose a sport for this customer segment.');
+                $validator->errors()->add('sport_id', 'Choose a sport for this player group.');
 
                 return;
             }

@@ -22,11 +22,11 @@ function destroyResource(resource) {
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
                         <h2 class="text-3xl font-semibold tracking-tight text-slate-950">{{ venue.name }}</h2>
-                        <span :class="['rounded-full px-3 py-1 text-xs font-semibold', venue.is_published && (!venue.requires_platform_review || venue.verified_at) ? 'bg-court-100 text-court-800' : 'bg-slate-200 text-slate-600']">{{ venue.is_published && (!venue.requires_platform_review || venue.verified_at) ? 'Published' : venue.is_published ? 'Marketplace review pending' : 'Draft' }}</span>
-                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ venue.verified_at ? 'Verified' : 'Verification pending' }}</span>
+                        <span :class="['rounded-full px-3 py-1 text-xs font-semibold', venue.is_published && (!venue.requires_platform_review || venue.verified_at) ? 'bg-court-100 text-court-800' : 'bg-slate-200 text-slate-600']">{{ venue.is_published && (!venue.requires_platform_review || venue.verified_at) ? 'Published' : venue.is_published ? 'Waiting for FinACourt check' : 'Draft' }}</span>
+                        <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ venue.verified_at ? 'Checked by FinACourt' : 'Waiting for FinACourt check' }}</span>
                     </div>
                     <p class="mt-2 text-slate-600">{{ venue.address }}, {{ venue.city }}, {{ venue.province }}</p>
-                    <p v-if="venue.requires_platform_review && !venue.verified_at" class="mt-3 max-w-2xl rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">This claimed venue remains private even when publication is selected. Finish the venue and add an active court; FinACourt must then complete a separate marketplace review before players can find or book it.</p>
+                    <p v-if="venue.requires_platform_review && !venue.verified_at" class="mt-3 max-w-2xl rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">This claimed venue stays private until FinACourt checks it. Finish the venue details and add an active court, then FinACourt can review it before players find or book it.</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <Link :href="`/owner/venues/${venue.id}/hours`" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Operating hours</Link>
@@ -38,17 +38,17 @@ function destroyResource(resource) {
                 <div class="space-y-6">
                     <section id="resources" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                         <div class="flex items-center justify-between gap-4">
-                            <div><h3 class="text-lg font-semibold text-slate-950">Courts & resources</h3><p class="mt-1 text-sm text-slate-500">Booking targets and their base prices.</p></div>
-                            <Link :href="`/owner/venues/${venue.id}/resources/create`" class="rounded-xl bg-court-700 px-4 py-2.5 text-sm font-semibold text-white">Add resource</Link>
+                            <div><h3 class="text-lg font-semibold text-slate-950">Courts</h3><p class="mt-1 text-sm text-slate-500">Courts players can book and their normal hourly prices.</p></div>
+                            <Link :href="`/owner/venues/${venue.id}/resources/create`" class="rounded-xl bg-court-700 px-4 py-2.5 text-sm font-semibold text-white">Add court</Link>
                         </div>
                         <div v-if="venue.resources.length" class="mt-6 divide-y divide-slate-100">
                             <div v-for="resource in venue.resources" :key="resource.id" class="flex flex-col gap-4 py-5 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-2">
                                         <p class="font-semibold text-slate-950">{{ resource.name }}</p>
-                                        <span :class="['rounded-full px-2.5 py-1 text-xs font-semibold', resource.is_active ? 'bg-court-50 text-court-800' : 'bg-slate-100 text-slate-500']">{{ resource.is_active ? 'Active' : 'Inactive' }}</span>
+                                        <span :class="['rounded-full px-2.5 py-1 text-xs font-semibold', resource.is_active ? 'bg-court-50 text-court-800' : 'bg-slate-100 text-slate-500']">{{ resource.is_active ? 'Bookable' : 'Not bookable' }}</span>
                                     </div>
-                                    <p class="mt-1 text-sm text-slate-500">{{ resource.sport }} · {{ resource.resource_type }} · {{ resource.setting }} · {{ resource.booking_increment_minutes }} min increments</p>
+                                    <p class="mt-1 text-sm text-slate-500">{{ resource.sport }} · {{ resource.resource_type }} · {{ resource.setting }} · minimum {{ resource.booking_increment_minutes }} minutes</p>
                                     <p class="mt-2 text-sm font-semibold text-slate-900">{{ money.format(resource.base_hourly_rate) }} / hour</p>
                                 </div>
                                 <div class="flex gap-2">
@@ -57,7 +57,7 @@ function destroyResource(resource) {
                                 </div>
                             </div>
                         </div>
-                        <p v-else class="mt-6 rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">No resources configured yet.</p>
+                        <p v-else class="mt-6 rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">No courts added yet.</p>
                     </section>
 
                     <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -67,7 +67,7 @@ function destroyResource(resource) {
                             <div><dt class="text-slate-400">Phone</dt><dd class="mt-1 font-medium text-slate-800">{{ venue.phone || 'Not set' }}</dd></div>
                             <div><dt class="text-slate-400">Email</dt><dd class="mt-1 font-medium text-slate-800">{{ venue.email || 'Not set' }}</dd></div>
                             <div><dt class="text-slate-400">Website</dt><dd class="mt-1 break-all font-medium text-slate-800">{{ venue.website || 'Not set' }}</dd></div>
-                            <div><dt class="text-slate-400">Coordinates</dt><dd class="mt-1 font-medium text-slate-800">{{ venue.latitude && venue.longitude ? `${venue.latitude}, ${venue.longitude}` : 'Not set' }}</dd></div>
+                            <div><dt class="text-slate-400">Map pin</dt><dd class="mt-1 font-medium text-slate-800">{{ venue.latitude && venue.longitude ? `${venue.latitude}, ${venue.longitude}` : 'Not set' }}</dd></div>
                         </dl>
                     </section>
 

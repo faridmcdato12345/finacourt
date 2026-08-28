@@ -56,15 +56,15 @@ class EmptyInventoryRule implements RecommendationRule
                     organizationId: $context->organization->getKey(),
                     venueId: $venue->getKey(),
                     venueName: $venue->name,
-                    title: "{$countPhrase} upcoming slots are still empty",
-                    explanation: "A bounded {$horizon}-day inventory scan found {$countPhrase} bookable slots at {$venue->name} with no active reservation or existing slot promotion. {$lastMinute} are within 24 hours.",
+                    title: "{$countPhrase} upcoming court times are still open",
+                    explanation: "FinACourt checked the next {$horizon} days and found {$countPhrase} bookable times at {$venue->name} that do not have bookings or deals yet. {$lastMinute} are within 24 hours.",
                     evidence: [
                         'empty_slot_count' => $count,
                         'last_minute_slot_count' => $lastMinute,
                         'horizon_days' => $horizon,
                         'scan_capped' => $bounded,
                     ],
-                    actionLabel: 'Promote a suggested slot',
+                    actionLabel: 'Create a deal for an open time',
                     actionUrl: route('owner.promotions.create', [
                         'resource' => $first['resource_id'],
                         'date' => $first['slot_date'],

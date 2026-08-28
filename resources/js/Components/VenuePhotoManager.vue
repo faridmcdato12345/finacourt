@@ -42,7 +42,7 @@ function deletePhoto(photo) {
         <div class="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
             <div>
                 <h2 class="text-lg font-semibold text-slate-950">Venue photos</h2>
-                <p class="mt-1 text-sm leading-6 text-slate-500">Add up to 10 JPG, PNG, or WebP photos. The cover photo appears first on the marketplace.</p>
+                <p class="mt-1 text-sm leading-6 text-slate-500">Add up to 10 JPG, PNG, or WebP photos. The cover photo appears first on the public site.</p>
             </div>
             <span class="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ venue.photos.length }}/10</span>
         </div>
@@ -55,7 +55,7 @@ function deletePhoto(photo) {
                 </div>
                 <div class="flex items-center justify-between gap-2 p-3">
                     <button v-if="!photo.is_primary" type="button" class="text-xs font-semibold text-court-700 hover:text-court-900" @click="makePrimary(photo)">Make cover</button>
-                    <span v-else class="text-xs font-medium text-slate-500">Shown first publicly</span>
+                    <span v-else class="text-xs font-medium text-slate-500">Shown first</span>
                     <button type="button" class="text-xs font-semibold text-red-600 hover:text-red-800" @click="deletePhoto(photo)">Delete</button>
                 </div>
             </article>

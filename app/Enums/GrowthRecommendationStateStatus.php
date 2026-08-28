@@ -11,9 +11,9 @@ enum GrowthRecommendationStateStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Dismissed => 'Dismissed',
-            self::Snoozed => 'Snoozed',
-            self::Resolved => 'Resolved',
+            self::Dismissed => 'Hidden',
+            self::Snoozed => 'Reminder set',
+            self::Resolved => 'Done',
         };
     }
 }

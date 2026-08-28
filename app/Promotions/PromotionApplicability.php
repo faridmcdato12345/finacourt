@@ -37,7 +37,7 @@ class PromotionApplicability
 
         if (! $promotion || ! $promotion->appliesTo($resource, $window->localStart, $window->localEnd)) {
             throw ValidationException::withMessages([
-                'campaign' => 'This promotion is inactive, expired, or does not apply to the selected court and time.',
+                'campaign' => 'This deal is off, expired, or does not apply to the selected court and time.',
             ]);
         }
 

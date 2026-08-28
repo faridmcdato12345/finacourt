@@ -8,5 +8,5 @@ defineProps({ promotion: Object, venues: Array, types: Array, discountTypes: Arr
 
 <template>
     <Head :title="`Edit ${promotion.title}`" />
-    <OwnerLayout><div class="mx-auto max-w-5xl"><Link :href="`/owner/promotions/${promotion.id}`" class="text-sm font-semibold text-court-700">← Campaign preview</Link><h2 class="mt-4 text-3xl font-semibold tracking-tight">Edit campaign</h2><p class="mt-2 text-sm text-slate-500">Changes affect only future booking calculations, never existing snapshots.</p><PromotionForm class="mt-7" v-bind="$props" /></div></OwnerLayout>
+    <OwnerLayout><div class="mx-auto max-w-5xl"><Link :href="`/owner/promotions/${promotion.id}`" class="text-sm font-semibold text-court-700">← Deal preview</Link><h2 class="mt-4 text-3xl font-semibold tracking-tight">Edit deal</h2><p class="mt-2 text-sm text-slate-500">Changes affect new bookings only. Old bookings keep the price shown when they were made.</p><PromotionForm class="mt-7" v-bind="$props" /></div></OwnerLayout>
 </template>

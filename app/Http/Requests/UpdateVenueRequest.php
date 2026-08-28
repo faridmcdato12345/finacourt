@@ -78,7 +78,7 @@ class UpdateVenueRequest extends FormRequest
             if ($venue->resources()->whereNotIn('sport_id', $sportIds)->exists()) {
                 $validator->errors()->add(
                     'sports',
-                    'A sport used by an existing resource cannot be removed from this venue.',
+                    'A sport used by an existing court cannot be removed from this venue.',
                 );
             }
         }];
