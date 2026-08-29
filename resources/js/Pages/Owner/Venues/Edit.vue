@@ -30,7 +30,7 @@ function submit() {
 }
 
 function destroyVenue() {
-    if (window.confirm(`Delete ${props.venue.name} and all of its resources? This cannot be undone.`)) {
+    if (window.confirm(`Delete ${props.venue.name}, its courts, photos, and opening hours? This cannot be undone.`)) {
         router.delete(`/owner/venues/${props.venue.id}`);
     }
 }
@@ -42,7 +42,7 @@ function destroyVenue() {
         <div class="mx-auto max-w-5xl">
             <Link :href="`/owner/venues/${venue.id}`" class="text-sm font-semibold text-court-700 hover:text-court-800">← Back to venue</Link>
             <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Edit {{ venue.name }}</h2>
-            <p class="mt-2 text-slate-600">Update photos, location, sports, amenities, contact details, and whether players can see it.</p>
+            <p class="mt-2 text-slate-600">Update photos, location, sports, facilities, contact details, and whether players can see it.</p>
             <div class="mt-8 space-y-7">
                 <VenuePhotoManager :venue="venue" />
                 <VenueForm :form="form" :sports="sports" :amenities="amenities" :location-parents="locationParents" :existing-state="venue" :map-embed-base-url="mapEmbedBaseUrl" submit-label="Save venue" @submit="submit" />
@@ -50,7 +50,7 @@ function destroyVenue() {
 
             <section class="mt-10 rounded-2xl border border-red-200 bg-red-50 p-6">
                 <h3 class="font-semibold text-red-900">Delete venue</h3>
-                <p class="mt-1 text-sm leading-6 text-red-700">This also deletes its courts, opening hours, selected amenities, and uploaded photos.</p>
+                <p class="mt-1 text-sm leading-6 text-red-700">This also deletes its courts, opening hours, selected facilities, and uploaded photos.</p>
                 <button type="button" class="mt-4 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100" @click="destroyVenue">Delete venue</button>
             </section>
         </div>

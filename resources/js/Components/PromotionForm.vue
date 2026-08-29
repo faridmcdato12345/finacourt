@@ -88,7 +88,7 @@ function removeSlot(index) {
 function slotResources() {
     return resources.value.map((resource) => ({
         value: resource.id,
-        label: `${resource.name} · ${resource.sport}${resource.is_active ? '' : ' · inactive'}`,
+        label: `${resource.name} · ${resource.sport}${resource.is_active ? '' : ' · not bookable'}`,
         disabled: !resource.is_active,
     }));
 }
@@ -104,10 +104,18 @@ function submit() {
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <p class="text-xs font-semibold uppercase tracking-wider text-court-700">Deal goal</p>
             <h2 class="mt-2 text-lg font-semibold">What should this deal help with?</h2>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">Choose the main reason for creating this deal. This helps FinACourt present it clearly; you will still choose the venue, court times, price, and whether players can see it in the sections below.</p>
             <div class="mt-5 grid gap-3 sm:grid-cols-2">
-                <label v-for="goal in goals" :key="goal.value" :class="['cursor-pointer rounded-xl border p-4 transition', form.goal === goal.value ? 'border-court-500 bg-court-50 ring-2 ring-court-100' : 'border-slate-200 hover:border-court-200']">
+                <label v-for="goal in goals" :key="goal.value" :class="['group cursor-pointer rounded-2xl border p-5 transition', form.goal === goal.value ? 'border-court-500 bg-court-50 shadow-sm ring-2 ring-court-100' : 'border-slate-200 bg-white hover:border-court-300 hover:bg-court-50/30']">
                     <input v-model="form.goal" type="radio" :value="goal.value" class="sr-only">
-                    <span class="text-sm font-semibold text-slate-900">{{ goal.label }}</span>
+                    <span class="flex items-start gap-3">
+                        <span aria-hidden="true" :class="['mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border text-xs font-bold transition', form.goal === goal.value ? 'border-court-700 bg-court-700 text-white' : 'border-slate-300 bg-white text-transparent group-hover:border-court-400']">✓</span>
+                        <span>
+                            <span class="block text-sm font-semibold text-slate-950">{{ goal.label }}</span>
+                            <span class="mt-1.5 block text-xs leading-5 text-slate-500">{{ goal.description }}</span>
+                            <span :class="['mt-3 block text-xs font-semibold', form.goal === goal.value ? 'text-court-800' : 'text-slate-400']">{{ form.goal === goal.value ? 'Selected' : 'Choose this goal' }}</span>
+                        </span>
+                    </span>
                 </label>
             </div>
             <FormError :message="form.errors.goal" />
@@ -120,9 +128,9 @@ function submit() {
                 <label class="sm:col-span-2"><span class="text-sm font-medium">Description</span><textarea v-model="form.description" rows="4" maxlength="2000" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"></textarea><FormError :message="form.errors.description" /></label>
                 <label><span class="text-sm font-medium">Deal type</span><AppSelect v-model="form.promotion_type" :options="types" class="mt-2" aria-label="Deal type" /><FormError :message="form.errors.promotion_type" /></label>
                 <label><span class="text-sm font-medium">Deal status</span><AppSelect v-model="form.status" :options="statuses" class="mt-2" aria-label="Deal status" /><FormError :message="form.errors.status" /></label>
-                <label><span class="text-sm font-medium">Venue</span><AppSelect v-model="form.venue_id" :options="venues" option-value="id" option-label="name" class="mt-2" aria-label="Promotion venue" @change="venueChanged" /><FormError :message="form.errors.venue_id" /></label>
+                <label><span class="text-sm font-medium">Venue</span><AppSelect v-model="form.venue_id" :options="venues" option-value="id" option-label="name" class="mt-2" aria-label="Venue for this deal" @change="venueChanged" /><FormError :message="form.errors.venue_id" /></label>
                 <label><span class="text-sm font-medium">Show to players looking for <span class="font-normal text-slate-400">optional</span></span><AppSelect v-model="form.audience_sport_id" :options="[{ value: '', label: 'Any sport at this venue' }, ...sports]" class="mt-2" aria-label="Sport this deal is for" /><FormError :message="form.errors.audience_sport_id" /></label>
-                <label class="sm:col-span-2"><span class="text-sm font-medium">Court <span class="font-normal text-slate-400">optional</span></span><AppSelect v-model="form.resource_id" :options="[{ value: '', label: 'All active courts at this venue' }, ...resources.map((resource) => ({ value: resource.id, label: `${resource.name} · ₱${resource.base_hourly_rate}/hour${resource.is_active ? '' : ' · inactive'}`, disabled: !resource.is_active }))]" class="mt-2" aria-label="Court for this deal" /><FormError :message="form.errors.resource_id" /></label>
+                <label class="sm:col-span-2"><span class="text-sm font-medium">Court <span class="font-normal text-slate-400">optional</span></span><AppSelect v-model="form.resource_id" :options="[{ value: '', label: 'All bookable courts at this venue' }, ...resources.map((resource) => ({ value: resource.id, label: `${resource.name} · ₱${resource.base_hourly_rate}/hour${resource.is_active ? '' : ' · not bookable'}`, disabled: !resource.is_active }))]" class="mt-2" aria-label="Court for this deal" /><FormError :message="form.errors.resource_id" /></label>
             </div>
         </section>
 

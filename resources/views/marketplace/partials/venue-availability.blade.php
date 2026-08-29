@@ -27,12 +27,12 @@
                 data-resource="{{ $selectedResource->id }}"
                 data-date="{{ $availabilityDate }}"
                 data-increment="{{ $selectedResource->booking_increment_minutes }}"
-                data-maximum-duration="240"
+                data-maximum-duration="{{ config('booking.maximum_player_booking_minutes') }}"
             >
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <p class="text-sm font-semibold">Select your times on {{ $selectedResource->name }}</p>
-                        <p class="mt-1 text-xs text-slate-400">Choose one or more consecutive slots, up to 4 hours.</p>
+                        <p class="mt-1 text-xs text-slate-400">Choose any consecutive available times within today’s opening hours.</p>
                     </div>
                     <p class="shrink-0 text-xs text-slate-400">{{ $availability['opens_at'] }}–{{ $availability['closes_at'] }}</p>
                 </div>

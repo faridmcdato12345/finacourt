@@ -233,7 +233,7 @@ class VenueClaimWorkflow
 
             if (! $venue->is_published || ! $venue->resources()->marketplace()->exists()) {
                 throw ValidationException::withMessages([
-                    'listing' => 'The owner must finish the venue, add an active court, and request publication before marketplace review.',
+                    'listing' => 'Finish the venue details, add a court players can book, and choose “Show this venue to players” before asking FinACourt to check it.',
                 ]);
             }
 

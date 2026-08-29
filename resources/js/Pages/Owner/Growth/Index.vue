@@ -30,7 +30,7 @@ const evidenceLabels = {
     minimum_group_size: 'Minimum group size',
     promotion_id: 'Deal ID',
     qualified_bookings: 'Confirmed bookings',
-    qualified_booking_value: 'Booked court value',
+    qualified_booking_value: 'Value of confirmed bookings',
     currency: 'Currency',
     campaign_status: 'Deal status',
     profile_views: 'Venue page visits',

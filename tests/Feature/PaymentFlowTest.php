@@ -161,6 +161,53 @@ class PaymentFlowTest extends TestCase
         $this->assertSame('gcash', $transition->metadata['paymongo_payment_method']);
     }
 
+    public function test_current_paymongo_v2_webhook_shape_is_verified_and_idempotent(): void
+    {
+        $this->enablePayMongo();
+        Http::fake([
+            'https://api.paymongo.test/v2/checkout_sessions' => Http::response([
+                'data' => [
+                    'id' => 'cs_test_current_v2',
+                    'attributes' => ['checkout_url' => 'https://checkout.paymongo.test/cs_test_current_v2'],
+                ],
+            ]),
+        ]);
+
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+        $booking = $this->createHold($player, $venue, $resource);
+        $this->actingAs($player)->post(route('player.bookings.checkout', $booking->reference));
+        $payment = $booking->payment->refresh();
+        $payload = $this->payMongoV2CheckoutPayload($payment, $booking, 'cs_test_current_v2');
+
+        $this->postPayMongoWebhook($payload)->assertOk()->assertJsonPath('result', 'processed');
+        $this->postPayMongoWebhook($payload)->assertOk()->assertJsonPath('result', 'duplicate');
+
+        $this->assertSame(PaymentStatus::Paid, $payment->refresh()->status);
+        $this->assertSame(BookingStatus::Confirmed, $booking->refresh()->status);
+        $this->assertSame('qrph', $payment->transitions()->whereNotNull('external_event_id')->sole()->metadata['paymongo_payment_method']);
+    }
+
+    public function test_paymongo_configuration_rejects_a_secret_key_from_the_wrong_mode(): void
+    {
+        $this->enablePayMongo();
+        config()->set('payments.providers.paymongo.secret_key', 'sk_live_wrong_environment');
+
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+
+        $this->actingAs($player)->post(route('player.bookings.store', $venue->slug), [
+            'resource_id' => $resource->getKey(),
+            'booking_date' => now('Asia/Manila')->addDays(7)->toDateString(),
+            'start_time' => '09:00',
+            'duration_minutes' => 60,
+            'customer_name' => 'Pat Player',
+            'terms' => '1',
+        ])->assertSessionHasErrors('payment');
+
+        $this->assertDatabaseCount('payments', 0);
+    }
+
     public function test_paymongo_webhook_rejects_invalid_signature(): void
     {
         $this->enablePayMongo();
@@ -549,6 +596,54 @@ class PaymentFlowTest extends TestCase
                                 ],
                             ]],
                         ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function payMongoV2CheckoutPayload(
+        Payment $payment,
+        Booking $booking,
+        string $checkoutSessionId,
+    ): array {
+        return [
+            'event_type' => 'send.webhook',
+            'data' => [
+                'type' => 'checkout_session.payment.paid',
+                'resource' => 'checkout_session',
+                'livemode' => false,
+                'organization_id' => 'org_test_fincourt',
+                'created_at' => now('UTC')->toIso8601String(),
+                'updated_at' => now('UTC')->toIso8601String(),
+                'data' => [
+                    'id' => $checkoutSessionId,
+                    'type' => 'checkout_session',
+                    'attributes' => [
+                        'reference_number' => $payment->reference,
+                        'metadata' => [
+                            'payment_reference' => $payment->reference,
+                            'booking_reference' => $booking->reference,
+                            'expected_amount_centavos' => '65000',
+                        ],
+                        'line_items' => [[
+                            'name' => $booking->venue->name.' · '.$booking->resource->name,
+                            'amount' => 65000,
+                            'currency' => 'PHP',
+                            'quantity' => 1,
+                        ]],
+                        'payment_intent' => ['id' => 'pi_test_current_v2'],
+                        'payments' => [[
+                            'id' => 'pay_test_current_v2',
+                            'attributes' => [
+                                'amount' => 65000,
+                                'fee' => 1300,
+                                'net_amount' => 63700,
+                                'currency' => 'PHP',
+                                'status' => 'paid',
+                                'source' => ['type' => 'qrph'],
+                            ],
+                        ]],
                     ],
                 ],
             ],

@@ -14,15 +14,15 @@ readonly class PlaceCandidate
         public string $source = 'google_places',
     ) {
         if ($placeId === '' || mb_strlen($placeId) > 2048) {
-            throw new InvalidArgumentException('The resolved place identifier is invalid.');
+            throw new InvalidArgumentException('Google returned an invalid place reference.');
         }
 
         if ($formattedAddress === '' || mb_strlen($formattedAddress) > 500) {
-            throw new InvalidArgumentException('The resolved address is invalid.');
+            throw new InvalidArgumentException('Google returned an invalid address.');
         }
 
         if ($latitude < -90 || $latitude > 90 || $longitude < -180 || $longitude > 180) {
-            throw new InvalidArgumentException('The resolved coordinates are invalid.');
+            throw new InvalidArgumentException('Google returned an invalid map pin.');
         }
     }
 }

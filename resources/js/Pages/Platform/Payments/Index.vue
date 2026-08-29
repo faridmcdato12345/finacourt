@@ -1,5 +1,6 @@
 <script setup>
 import { Head, router, useForm } from '@inertiajs/vue3';
+import { reactive } from 'vue';
 import AppSelect from '../../../Components/AppSelect.vue';
 import PlatformLayout from '../../../Layouts/PlatformLayout.vue';
 
@@ -10,6 +11,8 @@ const props = defineProps({
     provider: { type: Object, required: true },
     feeTypes: { type: Array, required: true },
 });
+
+const refundReferences = reactive({});
 
 const form = useForm({
     name: 'FinACourt booking service fee',
@@ -44,6 +47,12 @@ function toggleRule(rule) {
         preserveScroll: true,
     });
 }
+
+function recordRefund(payment) {
+    router.post(`/platform/payments/${payment.id}/record-refund`, {
+        external_reference: refundReferences[payment.id],
+    }, { preserveScroll: true });
+}
 </script>
 
 <template>
@@ -65,6 +74,12 @@ function toggleRule(rule) {
                     <p class="mt-1 font-semibold text-slate-950">{{ provider.mode_label }}</p>
                     <p class="mt-1 text-xs text-slate-500">
                         {{ provider.hosted_checkout_available ? 'Online checkout is ready.' : 'Online checkout is not fully configured.' }}
+                    </p>
+                    <ul v-if="provider.configuration_issues?.length" class="mt-2 list-disc space-y-1 pl-4 text-xs text-amber-800">
+                        <li v-for="issue in provider.configuration_issues" :key="issue">{{ issue }}</li>
+                    </ul>
+                    <p v-if="provider.paymongo_pass_on_fees" class="mt-2 max-w-xs text-xs leading-5 text-amber-800">
+                        PayMongo will add its payment-method fee at checkout. Keep this off if the FinACourt fee should be the only amount above the court price.
                     </p>
                 </div>
             </section>
@@ -273,7 +288,8 @@ function toggleRule(rule) {
                                 <th class="px-5 py-3">Venue</th>
                                 <th class="px-5 py-3 text-right">Court price</th>
                                 <th class="px-5 py-3 text-right">FinACourt fee</th>
-                                <th class="px-5 py-3 text-right sm:px-6">Player total</th>
+                                <th class="px-5 py-3 text-right">Player total</th>
+                                <th class="px-5 py-3 text-right sm:px-6">Refund</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -288,10 +304,17 @@ function toggleRule(rule) {
                                 </td>
                                 <td class="px-5 py-4 text-right">{{ money(payment.venue_amount) }}</td>
                                 <td class="px-5 py-4 text-right">{{ money(payment.platform_service_fee_amount) }}</td>
-                                <td class="px-5 py-4 text-right font-semibold sm:px-6">{{ money(payment.amount) }}</td>
+                                <td class="px-5 py-4 text-right font-semibold">{{ money(payment.amount) }}</td>
+                                <td class="px-5 py-4 text-right sm:px-6">
+                                    <div v-if="payment.can_record_external_refund" class="flex min-w-64 items-center justify-end gap-2">
+                                        <input v-model="refundReferences[payment.id]" class="min-w-0 rounded-lg border border-slate-300 px-3 py-2 text-xs" placeholder="External refund reference">
+                                        <button :disabled="!refundReferences[payment.id]" class="whitespace-nowrap rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-40" @click="recordRefund(payment)">Record full refund</button>
+                                    </div>
+                                    <span v-else class="text-xs text-slate-400">—</span>
+                                </td>
                             </tr>
                             <tr v-if="!metrics.recent_payments.length">
-                                <td colspan="5" class="px-6 py-10 text-center text-slate-500">No service-fee payments yet.</td>
+                                <td colspan="6" class="px-6 py-10 text-center text-slate-500">No service-fee payments yet.</td>
                             </tr>
                         </tbody>
                     </table>

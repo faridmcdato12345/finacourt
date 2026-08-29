@@ -26,7 +26,7 @@ class PromotionSlotSynchronizer
                 ->first();
 
             if ($resource === null) {
-                throw new LogicException('Promotion slots must use resources from the campaign venue and tenant.');
+                throw new LogicException('Deal times must use courts from the selected venue.');
             }
 
             $slot = filled($data['id'] ?? null)
@@ -34,7 +34,7 @@ class PromotionSlotSynchronizer
                 : null;
 
             if (filled($data['id'] ?? null) && $slot === null) {
-                throw new LogicException('A promotion slot cannot be moved between campaigns.');
+                throw new LogicException('A deal time cannot be moved to another deal.');
             }
 
             $slot ??= new PromotionSlot([

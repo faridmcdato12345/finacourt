@@ -17,6 +17,7 @@ const page = usePage();
                     <Link href="/platform/dashboard" class="text-slate-300 hover:text-white">Overview</Link>
                     <Link href="/platform/analytics" class="text-slate-300 hover:text-white">Analytics</Link>
                     <Link href="/platform/payments" class="text-slate-300 hover:text-white">Payments</Link>
+                    <Link href="/platform/owner-payouts" class="text-slate-300 hover:text-white">Owner payouts</Link>
                     <Link href="/platform/growth" class="text-slate-300 hover:text-white">Growth rules</Link>
                     <Link href="/platform/reviews" class="text-slate-300 hover:text-white">Reviews</Link>
                     <Link href="/platform/directory" class="text-slate-300 hover:text-white">Venue guide</Link>

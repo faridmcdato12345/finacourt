@@ -191,7 +191,7 @@ class GrowthRecommendationsTest extends TestCase
         $this->assertSame(2, $recommendation->evidence['stronger_qualified_bookings']);
         $this->assertSame('direct', $recommendation->evidence['comparison_source']);
         $this->assertSame(0, $recommendation->evidence['comparison_qualified_bookings']);
-        $this->assertStringContainsString('not proof of causation', $recommendation->explanation);
+        $this->assertStringContainsString('helpful sign', $recommendation->explanation);
     }
 
     public function test_owner_can_snooze_dismiss_resolve_and_restore_only_current_tenant_recommendations(): void

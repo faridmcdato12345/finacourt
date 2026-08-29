@@ -34,7 +34,11 @@ class VenueController extends Controller
         $validated = $request->validate([
             'resource' => ['nullable', 'integer'],
             'date' => ['nullable', 'date_format:Y-m-d'],
-            'duration' => ['nullable', 'integer', 'between:15,240'],
+            'duration' => [
+                'nullable',
+                'integer',
+                'between:15,'.config('booking.maximum_player_booking_minutes'),
+            ],
             'campaign' => ['nullable', 'string', 'max:40'],
             'slot' => ['nullable', 'string', 'max:40'],
         ]);

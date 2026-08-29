@@ -125,6 +125,12 @@ class Booking extends Model
         return $this->hasMany(AnalyticsEvent::class);
     }
 
+    /** @return HasMany<OwnerSettlementEntry, $this> */
+    public function settlementEntries(): HasMany
+    {
+        return $this->hasMany(OwnerSettlementEntry::class);
+    }
+
     /** @return HasOne<Payment, $this> */
     public function payment(): HasOne
     {

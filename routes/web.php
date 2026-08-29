@@ -25,9 +25,13 @@ use App\Http\Controllers\Owner\GrowthRecommendationStateController as OwnerGrowt
 use App\Http\Controllers\Owner\OperatingHoursController;
 use App\Http\Controllers\Owner\OrganizationContextController;
 use App\Http\Controllers\Owner\PaymentController;
+use App\Http\Controllers\Owner\PayoutProfileController as OwnerPayoutProfileController;
+use App\Http\Controllers\Owner\PayoutRequestController as OwnerPayoutRequestController;
+use App\Http\Controllers\Owner\PayoutStatementController as OwnerPayoutStatementController;
 use App\Http\Controllers\Owner\PromotionController;
 use App\Http\Controllers\Owner\PsgcLocationController;
 use App\Http\Controllers\Owner\ReactivationCampaignController;
+use App\Http\Controllers\Owner\SettlementController as OwnerSettlementController;
 use App\Http\Controllers\Owner\VenueClaimController;
 use App\Http\Controllers\Owner\VenueController;
 use App\Http\Controllers\Owner\VenuePhotoController;
@@ -41,7 +45,11 @@ use App\Http\Controllers\Platform\CommissionEntryController as PlatformCommissio
 use App\Http\Controllers\Platform\CommissionRuleController as PlatformCommissionRuleController;
 use App\Http\Controllers\Platform\DashboardController as PlatformDashboardController;
 use App\Http\Controllers\Platform\GrowthRecommendationController as PlatformGrowthRecommendationController;
+use App\Http\Controllers\Platform\OwnerPayoutController as PlatformOwnerPayoutController;
+use App\Http\Controllers\Platform\OwnerPayoutStatementController as PlatformOwnerPayoutStatementController;
+use App\Http\Controllers\Platform\OwnerSettlementController as PlatformOwnerSettlementController;
 use App\Http\Controllers\Platform\PartnerPayoutController as PlatformPartnerPayoutController;
+use App\Http\Controllers\Platform\PaymentRefundController as PlatformPaymentRefundController;
 use App\Http\Controllers\Platform\PaymentSettingsController as PlatformPaymentSettingsController;
 use App\Http\Controllers\Platform\SalesController as PlatformSalesController;
 use App\Http\Controllers\Platform\SalesLeadController as PlatformSalesLeadController;
@@ -220,6 +228,13 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:
         ->name('bookings.cancel');
     Route::patch('/bookings/{booking}/payment', [PaymentController::class, 'update'])
         ->name('bookings.payment.update');
+    Route::get('/earnings', OwnerSettlementController::class)->name('settlements.index');
+    Route::put('/earnings/payment-details', [OwnerPayoutProfileController::class, 'update'])
+        ->name('settlements.profile.update');
+    Route::post('/earnings/request', OwnerPayoutRequestController::class)
+        ->name('settlements.request');
+    Route::get('/earnings/payouts/{payout}/statement', OwnerPayoutStatementController::class)
+        ->name('settlements.payouts.statement');
     Route::resource('promotions', PromotionController::class);
     Route::get('/reactivation', [ReactivationCampaignController::class, 'index'])
         ->name('reactivation.index');
@@ -273,6 +288,16 @@ Route::prefix('platform')->name('platform.')->middleware(['auth', 'platform.admi
     Route::get('/payments', [PlatformPaymentSettingsController::class, 'index'])->name('payments.index');
     Route::post('/payments/service-fees', [PlatformPaymentSettingsController::class, 'store'])->name('payments.service-fees.store');
     Route::patch('/payments/service-fees/{rule}', [PlatformPaymentSettingsController::class, 'update'])->name('payments.service-fees.update');
+    Route::post('/payments/{payment}/record-refund', PlatformPaymentRefundController::class)->name('payments.refunds.store');
+    Route::get('/owner-payouts', PlatformOwnerSettlementController::class)->name('owner-payouts.index');
+    Route::post('/owner-payouts', [PlatformOwnerPayoutController::class, 'store'])->name('owner-payouts.store');
+    Route::post('/owner-payouts/adjustments', [PlatformOwnerPayoutController::class, 'adjust'])->name('owner-payouts.adjustments.store');
+    Route::post('/owner-payouts/{payout}/approve', [PlatformOwnerPayoutController::class, 'approve'])->name('owner-payouts.approve');
+    Route::post('/owner-payouts/{payout}/send', [PlatformOwnerPayoutController::class, 'send'])->name('owner-payouts.send');
+    Route::post('/owner-payouts/{payout}/fail', [PlatformOwnerPayoutController::class, 'fail'])->name('owner-payouts.fail');
+    Route::post('/owner-payouts/{payout}/cancel', [PlatformOwnerPayoutController::class, 'cancel'])->name('owner-payouts.cancel');
+    Route::post('/owner-payouts/{payout}/reverse', [PlatformOwnerPayoutController::class, 'reverse'])->name('owner-payouts.reverse');
+    Route::get('/owner-payouts/{payout}/statement', PlatformOwnerPayoutStatementController::class)->name('owner-payouts.statement');
     Route::get('/reviews', [PlatformVenueReviewController::class, 'index'])->name('reviews.index');
     Route::patch('/reviews/{review}', [PlatformVenueReviewController::class, 'update'])
         ->name('reviews.update');

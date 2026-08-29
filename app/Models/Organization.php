@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable(['name', 'slug', 'timezone'])]
 class Organization extends Model
@@ -75,5 +76,22 @@ class Organization extends Model
     public function venueClaimRequests(): HasMany
     {
         return $this->hasMany(VenueClaimRequest::class);
+    }
+
+    public function payoutProfile(): HasOne
+    {
+        return $this->hasOne(OwnerPayoutProfile::class);
+    }
+
+    /** @return HasMany<OwnerSettlementEntry, $this> */
+    public function settlementEntries(): HasMany
+    {
+        return $this->hasMany(OwnerSettlementEntry::class);
+    }
+
+    /** @return HasMany<OwnerPayout, $this> */
+    public function ownerPayouts(): HasMany
+    {
+        return $this->hasMany(OwnerPayout::class);
     }
 }

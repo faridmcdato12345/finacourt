@@ -34,8 +34,8 @@ defineEmits(['submit']);
                     <FormError :message="form.errors.resource_type" />
                 </div>
                 <div>
-                    <label for="setting" class="mb-2 block text-sm font-medium text-slate-800">Setting</label>
-                    <AppSelect id="setting" v-model="form.setting" :options="settings" required aria-label="Court setting" />
+                    <label for="setting" class="mb-2 block text-sm font-medium text-slate-800">Indoor or outdoor</label>
+                    <AppSelect id="setting" v-model="form.setting" :options="settings" required aria-label="Indoor or outdoor" />
                     <FormError :message="form.errors.setting" />
                 </div>
                 <div>
@@ -47,7 +47,7 @@ defineEmits(['submit']);
         </section>
 
         <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 class="text-lg font-semibold text-slate-950">Price and booking status</h2>
+            <h2 class="text-lg font-semibold text-slate-950">Price and booking</h2>
             <p class="mt-1 text-sm text-slate-500">This is the normal hourly price players will see.</p>
             <div class="mt-6 grid gap-5 sm:grid-cols-2">
                 <div>

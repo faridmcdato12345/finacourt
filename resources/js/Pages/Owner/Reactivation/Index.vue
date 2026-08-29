@@ -17,7 +17,7 @@ defineProps({ report: Object, segments: Object, rules: Object });
             <section class="mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Past-player message results">
                 <div v-for="metric in [
                     ['Players found', report.audience], ['Sent', report.sent], ['Reached', report.delivered],
-                    ['Opened link', report.clicks], ['Bookings', report.resulting_bookings], ['Booked value', `₱${report.resulting_revenue}`]
+                    ['Opened link', report.clicks], ['Bookings', report.resulting_bookings], ['Value of bookings', `₱${report.resulting_revenue}`]
                 ]" :key="metric[0]" class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">{{ metric[0] }}</p><p class="mt-2 text-2xl font-semibold text-slate-950">{{ metric[1] }}</p></div>
             </section>
 

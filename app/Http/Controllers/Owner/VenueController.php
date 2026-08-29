@@ -291,7 +291,7 @@ class VenueController extends Controller
         });
 
         if (! $deleted) {
-            return back()->with('status', 'Venues with booking history cannot be deleted. Unpublish the venue instead.');
+            return back()->with('status', 'A venue with past bookings cannot be deleted. Hide it from players instead.');
         }
 
         Storage::disk('public')->delete($photoPaths);

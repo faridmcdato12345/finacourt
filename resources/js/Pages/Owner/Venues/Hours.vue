@@ -16,7 +16,7 @@ function submit() {
     <OwnerLayout>
         <div class="mx-auto max-w-4xl">
             <Link :href="`/owner/venues/${venue.id}`" class="text-sm font-semibold text-court-700">← Back to venue</Link>
-            <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Operating hours</h2>
+            <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Opening hours</h2>
             <p class="mt-2 text-slate-600">Set regular weekly hours for {{ venue.name }}. Overnight hours are not supported yet.</p>
 
             <form class="mt-8" @submit.prevent="submit">
@@ -42,4 +42,3 @@ function submit() {
         </div>
     </OwnerLayout>
 </template>
-

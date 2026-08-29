@@ -2,6 +2,7 @@
 
 namespace App\Payments;
 
+use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
 use App\Models\Booking;
 use App\Models\CourtResource;
@@ -42,6 +43,12 @@ class TransitionManualPayment
             CourtResource::query()->whereKey($booking->resource_id)->lockForUpdate()->firstOrFail();
             $booking = Booking::query()->whereKey($bookingId)->lockForUpdate()->firstOrFail();
             $payment = Payment::query()->whereKey($payment->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($payment->mode !== PaymentMode::PayAtVenue) {
+                throw ValidationException::withMessages([
+                    'payment' => 'Online payments can only be changed by a verified payment-provider notification.',
+                ]);
+            }
 
             if ($payment->amount !== $booking->player_total_amount || $payment->currency !== $booking->currency) {
                 throw ValidationException::withMessages([

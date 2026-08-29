@@ -165,7 +165,7 @@ class SavePromotionRequest extends FormRequest
             }
 
             if ($discountType === null && $this->filled('discount_value')) {
-                $validator->errors()->add('discount_type', 'Choose how the entered discount value should be applied.');
+                $validator->errors()->add('discount_type', 'Choose how this discount should work.');
             }
 
             if ($discountType === PromotionDiscountType::Percentage
@@ -202,7 +202,7 @@ class SavePromotionRequest extends FormRequest
                     ->where('is_active', true)
                     ->where('sport_id', (int) $this->input('audience_sport_id'))
                     ->exists()) {
-                $validator->errors()->add('audience_sport_id', 'Choose a sport offered by an active court at this venue.');
+                $validator->errors()->add('audience_sport_id', 'Choose a sport offered by a bookable court at this venue.');
             }
 
             $resources = CourtResource::query()

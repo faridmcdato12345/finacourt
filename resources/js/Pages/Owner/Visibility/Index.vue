@@ -68,7 +68,7 @@ async function copy(value, key) {
                     </div>
                     <div class="flex items-center gap-4">
                         <div class="grid size-24 place-items-center rounded-full border-[9px] border-court-100 bg-white shadow-sm" data-visibility-score>
-                            <div class="text-center"><strong class="block text-2xl text-court-900">{{ venue.score }}</strong><span class="text-[10px] font-semibold uppercase text-slate-400">ready</span></div>
+                            <div class="text-center"><strong class="block text-2xl text-court-900">{{ venue.score }}%</strong><span class="text-[10px] font-semibold uppercase text-slate-400">page ready</span></div>
                         </div>
                         <div class="space-y-2 text-sm">
                             <Link :href="venue.edit_url" class="block font-semibold text-court-800 hover:underline">Edit venue page →</Link>

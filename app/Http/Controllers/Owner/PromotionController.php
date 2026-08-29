@@ -243,6 +243,7 @@ class PromotionController extends Controller
             'goals' => collect(PromotionGoal::cases())->map(fn ($goal) => [
                 'value' => $goal->value,
                 'label' => $goal->label(),
+                'description' => $goal->description(),
             ]),
             'statuses' => collect(PromotionStatus::cases())
                 ->filter(fn ($status) => $promotion

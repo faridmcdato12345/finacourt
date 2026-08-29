@@ -20,7 +20,7 @@ class VisibilityLinkManager
     ): VisibilityLink {
         if (! Venue::query()->marketplace()->whereKey($venue->getKey())->exists()) {
             throw ValidationException::withMessages([
-                'destination' => 'Publish the venue with at least one active court before creating a public QR link.',
+                'destination' => 'Show the venue to players and keep at least one court bookable before creating a public QR link.',
             ]);
         }
 

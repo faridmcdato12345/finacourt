@@ -13,6 +13,9 @@ Phase 18 implementation update: 2026-08-25
 Phase 18 claim-security hardening update: 2026-08-26  
 Online payment gateway update: 2026-08-28  
 Platform booking service-fee update: 2026-08-28  
+Court-owner settlement update: 2026-08-29
+Court-owner payout-request and PayMongo alignment update: 2026-08-29
+Player booking-duration update: 2026-08-29
 Scope: the original audit was read-only; this document now also records completed Phases 11–18 and their verification.
 
 ## Executive assessment
@@ -39,6 +42,10 @@ Online card/e-wallet checkout is now implemented through a configurable PayMongo
 
 Platform booking service-fee configuration is now implemented as a targeted payment/monetization extension. Platform administrators can create and activate one current FinACourt booking-fee rule from `/platform/payments`. Player marketplace bookings store separate immutable snapshots for court price, FinACourt service fee, and player total; owner-entered manual/walk-in bookings keep a zero service fee by default. PayMongo checkout sends the court price and FinACourt service fee as separate line items while still reconciling against the trusted player-total snapshot.
 
+Court-owner settlements are now implemented as a manual, auditable payout extension around the stable payment flow. Verified hosted-checkout payments create idempotent court-price earnings after a configurable safety delay; pay-at-venue and review-required payments are excluded. Owners can save encrypted bank/GCash instructions and view balances/statements. Platform administrators prepare, approve, record external transfers, release failed batches, record returned transfers, and add separate corrections. Full external refunds create separate negative entries. No automatic fund transfer or complex marketplace split settlement was introduced.
+
+Court owners can now request their full server-calculated ready balance after a configurable minimum. Requests are tenant-locked, reserve the underlying ledger rows, snapshot the encrypted destination, reject staff and duplicate open requests, and remain subject to platform review before an external transfer is recorded. PayMongo compatibility is hardened around its current v2 Hosted Checkout payload, timestamped test/live webhook signatures, environment-key matching, immutable line-item totals, and explicit manual-settlement boundary. PayMongo split payments remain disabled because that product requires separately approved merchant relationships.
+
 The prerequisite public-boundary defect found by the alignment audit is also resolved: homepage player social proof now requires a confirmed marketplace booking attached to a currently public venue and active eligible resource, with matching organization and venue relationships. Manual, private, unpublished, inactive, and cross-associated records are excluded and regression tested.
 
 ## Roadmap status
@@ -49,8 +56,8 @@ The prerequisite public-boundary defect found by the alignment audit is also res
 | 2 — Venue and court operations | Existing foundation / completed | Tenant-scoped venues, generic court resources, sports, amenities, hours, publication, location, photos, base prices, and owner UI exist. Country, richer booking rules, and time-based base-rate rules remain intentionally absent. |
 | 3 — Booking engine and availability | Existing foundation / completed | A shared transactional creation action, resource locking, server-authoritative interval checks, expiring holds, operating-hour/slot enforcement, price snapshots, cancellation, manual bookings, and concurrency tests exist. |
 | 4 — Public marketplace and SEO | Existing foundation / completed | Server-rendered Blade pages, discovery filters, public venue pages, city/sport routes, canonical/meta/structured data, sitemap, maps, reviews, and public availability exist. The social-proof boundary is fixed; Phase 15 removes unsupported generic `InStock` claims from structured data. |
-| 5 — Player reservation flow | Existing foundation / completed | Guest browsing, player authentication, multi-slot selection, hold/confirm flow, history/detail/share/cancel paths, and server-side tamper protection exist. |
-| 6 — Payments | Existing foundation / completed with configurable online checkout and platform service fee | Payment model and audit transitions, provider contracts, manual/pay-at-venue fallback, PayMongo Hosted Checkout adapter, platform-admin service-fee rules, separate court-price/player-total snapshots, verified/idempotent webhook processing, amount/reference checks, and booking confirmation logic exist. The active provider is environment-selected; live processing still requires valid PayMongo credentials, enabled account payment methods, HTTPS webhook setup, and live-mode smoke testing. |
+| 5 — Player reservation flow | Existing foundation / completed | Guest browsing, player authentication, same-day consecutive multi-slot selection within operating hours, hold/confirm flow, history/detail/share/cancel paths, and server-side tamper protection exist. The former arbitrary four-hour player limit was removed; a configurable one-day safety ceiling remains. |
+| 6 — Payments | Existing foundation / completed with configurable online checkout, platform service fee, and manual owner settlements | Payment model and audit transitions, provider contracts, manual/pay-at-venue fallback, current PayMongo v2 Hosted Checkout adapter, platform-admin service-fee rules, separate court-price/player-total snapshots, verified/idempotent webhook processing, amount/reference checks, booking confirmation logic, encrypted owner payout destinations, court-earnings ledger, owner payout requests, refund adjustments, manual payout states, audit events, and CSV statements exist. The active provider is environment-selected; live processing still requires valid PayMongo credentials, enabled account payment methods, HTTPS webhook setup, external payout operations, and live-mode smoke testing. PayMongo split payment is not enabled without approved merchant relationships. |
 | 7 — Promotions | Existing foundation / completed as Promotions v1 | Tenant-scoped venue/resource/time-window promotions, discount calculation, campaign tokens, public discovery, booking attribution and snapshots, owner CRUD/preview, and counters exist. Phase 12 extends this foundation in place. |
 | 8 — Analytics and attribution | Existing foundation / completed for MVP | Privacy-conscious events, owner reports, platform acquisition reporting, traffic attribution, booking/revenue/promotion metrics, filters, and tests exist. Phase 11 extends this foundation rather than replacing it. |
 | 9 — PWA, notifications, performance, UX | Existing foundation / completed for MVP | Manifest, service worker, safe cache boundaries, offline page, database notifications, reminder scheduler, responsive UI, and production build exist. Real web push is represented only by an interface/null adapter. |
@@ -76,14 +83,14 @@ The prerequisite public-boundary defect found by the alignment audit is also res
 
 ### Domain inventory
 
-**Models:** `User`, `Organization`, `Membership`, `Venue`, `VenuePhoto`, `VenueReview`, `CourtResource`, `Sport`, `Amenity`, `OperatingHour`, `Booking`, `BookingAttribution`, `Payment`, `PaymentTransition`, `Promotion`, `PromotionSlot`, `AnalyticsEvent`, `PsgcLocation`, `MarketingPreference`, `ReactivationCampaign`, `ReactivationCampaignRecipient`, `VisibilityLink`, `SalesPartnerProfile`, `SalesLead`, `SalesPartnerAttribution`, `CommissionRule`, `CommissionEntry`, `PartnerPayout`, `PartnerAuditEvent`, `VenueDirectoryListing`, `VenueDirectoryHour`, `VenueClaimRequest`, `VenueDirectoryReport`, and `VenueDirectoryAudit`.
+**Models:** `User`, `Organization`, `Membership`, `Venue`, `VenuePhoto`, `VenueReview`, `CourtResource`, `Sport`, `Amenity`, `OperatingHour`, `Booking`, `BookingAttribution`, `Payment`, `PaymentTransition`, `OwnerPayoutProfile`, `OwnerSettlementEntry`, `OwnerPayout`, `OwnerPayoutEvent`, `Promotion`, `PromotionSlot`, `AnalyticsEvent`, `PsgcLocation`, `MarketingPreference`, `ReactivationCampaign`, `ReactivationCampaignRecipient`, `VisibilityLink`, `SalesPartnerProfile`, `SalesLead`, `SalesPartnerAttribution`, `CommissionRule`, `CommissionEntry`, `PartnerPayout`, `PartnerAuditEvent`, `VenueDirectoryListing`, `VenueDirectoryHour`, `VenueClaimRequest`, `VenueDirectoryReport`, and `VenueDirectoryAudit`.
 
 **Services and query objects:**
 
 - Analytics: `AnalyticsRecorder`, `AnalyticsReport`, `PlatformAcquisitionReport`, `AnalyticsPeriod`, `TrafficAttribution`, and `SnapshotBookingAttribution`.
 - Booking: `AvailabilityService`, `BookingWindow`, `BookingPrice`, `BookingReference`, `CreateBooking`, `ConfirmPlayerBooking`, and `CancelBooking`.
 - Marketplace: `MarketplaceQuery`, `StructuredData`, and `VenueMap`.
-- Payments: `PaymentProviderRegistry`, provider/webhook contracts, `ManualPaymentProvider`, `PayMongoPaymentProvider`, `StartHostedCheckout`, `CreatePaymentAttempt`, `ApplyVerifiedPaymentEvent`, `ApplyPaymentTransition`, and `TransitionManualPayment`.
+- Payments and owner settlements: `PaymentProviderRegistry`, provider/webhook contracts, `ManualPaymentProvider`, `PayMongoPaymentProvider`, `StartHostedCheckout`, `CreatePaymentAttempt`, `ApplyVerifiedPaymentEvent`, `ApplyPaymentTransition`, `TransitionManualPayment`, `RecordExternalRefund`, `OwnerSettlementLedger`, and `OwnerPayoutWorkflow`.
 - Promotions: `PromotionApplicability`, `PromotionMarketplace`, `PromotionTracker`, `PromotionLifecycle`, `PromotionSlotSynchronizer`, and `EmptySlotFinder`.
 - Customer reactivation: `CustomerBookingHistory`, `CustomerClassifier`, `RebookingSuggestion`, `SendReactivationCampaign`, `DeliverReactivationCampaign`, and `ReactivationReport`.
 - Visibility: `VisibilityScore`, `VisibilityLinkManager`, `GoogleDirections`, `ConfirmVenuePlace`, provider-neutral Places/Business Profile contracts, and null adapters.
@@ -438,6 +445,18 @@ The feature suite protects:
 - Existing booking conflicts, holds, promotion pricing, acquisition attribution, payment redirects, and webhook state transitions were extended in place rather than redesigned. No environment variable, queue worker, Redis service, or new payment provider was added.
 
 ## Verification performed
+
+### Court-owner settlements
+
+- Migration `2026_08_29_000029_create_owner_settlement_tables.php` creates encrypted owner payout profiles and snapshots, owner earning entries, payout batches, and payout events; it safely backfills only verified hosted-checkout court prices.
+- Migration `2026_08_29_000030_add_owner_request_fields_to_owner_payouts.php` records the requesting owner and request time without changing the reviewed manual-transfer lifecycle.
+- Both migrations were applied to the running development database. The owner-request migration was also freshly applied, rolled back one step, and reapplied successfully against isolated Docker MySQL.
+- Focused payment, service-fee, and owner-settlement run: **36 tests passed, 278 assertions**, covering current PayMongo v2 payloads/signatures, amount integrity, owner-request server authority, minimum balance, tenant/staff isolation, duplicate-request locking, approval/sending, refunds, and immutable fee/earnings snapshots.
+- Full Docker backend suite: **242 tests passed, 2,205 assertions**, including all booking concurrency, payment/webhook, tenant-isolation, service-fee, refund, promotion, analytics, and settlement regressions.
+- Repository-wide Pint check passed for **404 files**; frontend component tests passed (**2 tests**).
+- Production frontend build passed with **3,056 modules transformed**.
+
+See `docs/OWNER_SETTLEMENTS.md` for lifecycle and operating instructions.
 
 ### Platform booking service fee
 

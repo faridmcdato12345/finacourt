@@ -69,6 +69,12 @@ class Payment extends Model
         return $this->hasMany(PaymentTransition::class)->orderBy('id');
     }
 
+    /** @return HasMany<OwnerSettlementEntry, $this> */
+    public function settlementEntries(): HasMany
+    {
+        return $this->hasMany(OwnerSettlementEntry::class);
+    }
+
     public function effectiveStatus(?Booking $booking = null): PaymentStatus
     {
         $booking ??= $this->relationLoaded('booking') ? $this->booking : null;

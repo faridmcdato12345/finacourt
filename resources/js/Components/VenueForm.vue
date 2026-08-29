@@ -206,8 +206,8 @@ function selectPhotos(event) {
                     <FormError :message="form.errors.sports" />
                 </div>
                 <div>
-                    <h2 class="text-lg font-semibold text-slate-950">Amenities</h2>
-                    <p class="mt-1 text-sm text-slate-500">Choose the facilities available at this venue.</p>
+                    <h2 class="text-lg font-semibold text-slate-950">Facilities and extras</h2>
+                    <p class="mt-1 text-sm text-slate-500">Choose what players can use at this venue.</p>
                     <div class="mt-5 grid grid-cols-2 gap-3">
                         <label v-for="amenity in amenities" :key="amenity.id" class="flex items-center gap-3 rounded-xl border border-slate-200 px-4 py-3 text-sm">
                             <input v-model="form.amenities" type="checkbox" :value="amenity.id" class="size-4 rounded border-slate-300 text-court-700" />
@@ -223,13 +223,13 @@ function selectPhotos(event) {
             <div class="flex items-start gap-4">
                 <input id="is_published" v-model="form.is_published" type="checkbox" class="mt-1 size-5 rounded border-slate-300 text-court-700" />
                 <div>
-                    <label for="is_published" class="font-semibold text-slate-950">Publish venue</label>
-                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ existingState?.requires_platform_review && !existingState?.is_verified ? 'This saves that you want to show this venue publicly. Because this venue was claimed from the public guide, FinACourt must check it first before players can find or book it.' : 'When published, players can find this venue once it has at least one active court and sport.' }}</p>
+                    <label for="is_published" class="font-semibold text-slate-950">Show this venue to players</label>
+                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ existingState?.requires_platform_review && !existingState?.is_verified ? 'This tells FinACourt that the venue is ready to be shown. Because it was claimed from the public guide, FinACourt must check it before players can find or book it.' : 'Players can find this venue after it has at least one sport and one court they can book.' }}</p>
                     <FormError :message="form.errors.is_published" />
                 </div>
             </div>
             <div v-if="existingState" class="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-5 text-xs font-semibold">
-                <span class="rounded-full bg-court-50 px-3 py-1.5 text-court-800">{{ existingState.is_claimed ? 'Claimed' : 'Unclaimed' }}</span>
+                <span class="rounded-full bg-court-50 px-3 py-1.5 text-court-800">{{ existingState.is_claimed ? 'Claimed from the public guide' : 'Created in your account' }}</span>
                 <span class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">{{ existingState.is_verified ? 'Checked by FinACourt' : 'Waiting for FinACourt check' }}</span>
             </div>
         </section>

@@ -31,7 +31,40 @@ class PayMongoPaymentProvider implements WebhookPaymentProvider
 
     public function supportsHostedCheckout(): bool
     {
-        return $this->secretKey() !== '' && $this->webhookSecret() !== '';
+        return $this->configurationIssues() === [];
+    }
+
+    /** @return array<int, string> */
+    public function configurationIssues(): array
+    {
+        $issues = [];
+        $mode = strtolower((string) config('payments.providers.paymongo.mode', 'test'));
+
+        if (! in_array($mode, ['test', 'live'], true)) {
+            $issues[] = 'PAYMONGO_MODE must be test or live.';
+        }
+
+        if ($this->secretKey() === '') {
+            $issues[] = 'The PayMongo secret key is missing.';
+        } elseif ($mode === 'test' && ! str_starts_with($this->secretKey(), 'sk_test_')) {
+            $issues[] = 'Test mode requires a PayMongo test secret key.';
+        } elseif ($mode === 'live' && ! str_starts_with($this->secretKey(), 'sk_live_')) {
+            $issues[] = 'Live mode requires a PayMongo live secret key.';
+        }
+
+        if ($this->webhookSecret() === '') {
+            $issues[] = 'The PayMongo webhook signing secret is missing.';
+        }
+
+        if ($this->paymentMethodTypes() === []) {
+            $issues[] = 'At least one PayMongo payment method is required.';
+        }
+
+        if (parse_url($this->apiUrl('/'), PHP_URL_SCHEME) !== 'https') {
+            $issues[] = 'The PayMongo API URL must use HTTPS.';
+        }
+
+        return $issues;
     }
 
     public function createHostedCheckout(Payment $payment): HostedCheckout
@@ -66,6 +99,18 @@ class PayMongoPaymentProvider implements WebhookPaymentProvider
             ]);
         }
 
+        $lineItems = $this->lineItems($payment, $booking);
+        $lineItemTotal = array_sum(array_map(
+            fn (array $item): int => $item['amount'] * $item['quantity'],
+            $lineItems,
+        ));
+
+        if ($lineItemTotal !== $amountCentavos) {
+            throw ValidationException::withMessages([
+                'payment' => 'The checkout line items do not match the payment price snapshot.',
+            ]);
+        }
+
         $response = Http::withBasicAuth($this->secretKey(), '')
             ->acceptJson()
             ->asJson()
@@ -76,7 +121,7 @@ class PayMongoPaymentProvider implements WebhookPaymentProvider
                     'attributes' => [
                         'billing' => $this->billing($booking),
                         'description' => $this->description($booking),
-                        'line_items' => $this->lineItems($payment, $booking),
+                        'line_items' => $lineItems,
                         'payment_method_types' => $methodTypes,
                         'success_url' => route('player.bookings.payment.return', $booking->reference),
                         'cancel_url' => route('player.bookings.show', $booking->reference),
@@ -304,8 +349,7 @@ class PayMongoPaymentProvider implements WebhookPaymentProvider
             return hash_equals(hash_hmac('sha256', $timestamp.'.'.$payload, $secret), $signature);
         }
 
-        return ! str_contains($signatureHeader, ',')
-            && hash_equals(hash_hmac('sha256', $payload, $secret), $signatureHeader);
+        return false;
     }
 
     /** @return array<string, string> */
@@ -396,10 +440,10 @@ class PayMongoPaymentProvider implements WebhookPaymentProvider
     /** @return array<int, string> */
     private function paymentMethodTypes(): array
     {
-        return array_values(array_filter(array_map(
+        return array_values(array_unique(array_filter(array_map(
             fn ($method) => trim((string) $method),
             (array) config('payments.providers.paymongo.payment_method_types', []),
-        )));
+        ))));
     }
 
     private function apiUrl(string $path): string

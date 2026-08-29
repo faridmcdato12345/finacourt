@@ -6,6 +6,7 @@ use App\Bookings\CancelBooking;
 use App\Bookings\CreateBooking;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
+use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CancelBookingRequest;
@@ -165,13 +166,15 @@ class BookingController extends Controller
             'payment_reference' => $booking->payment?->reference,
             'payment_requires_review' => $booking->payment?->requires_review ?? false,
             'payment_review_reason' => $booking->payment?->review_reason,
-            'can_mark_paid' => in_array($booking->payment_status, [
+            'can_mark_paid' => $booking->payment_mode === PaymentMode::PayAtVenue && in_array($booking->payment_status, [
                 PaymentStatus::Pending,
                 PaymentStatus::Failed,
                 PaymentStatus::Cancelled,
             ], true),
-            'can_mark_failed' => $booking->payment_status === PaymentStatus::Pending,
-            'can_refund' => $booking->payment_status === PaymentStatus::Paid,
+            'can_mark_failed' => $booking->payment_mode === PaymentMode::PayAtVenue
+                && $booking->payment_status === PaymentStatus::Pending,
+            'can_refund' => $booking->payment_mode === PaymentMode::PayAtVenue
+                && $booking->payment_status === PaymentStatus::Paid,
             'created_by' => $booking->createdBy?->name,
             'can_cancel' => in_array($effectiveStatus, [BookingStatus::Hold, BookingStatus::Confirmed], true),
         ];

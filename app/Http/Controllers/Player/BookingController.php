@@ -287,7 +287,11 @@ class BookingController extends Controller
             'resource' => ['required', 'integer'],
             'date' => ['required', 'date_format:Y-m-d'],
             'start' => ['required', 'date_format:H:i'],
-            'duration' => ['required', 'integer', 'between:15,240'],
+            'duration' => [
+                'required',
+                'integer',
+                'between:15,'.config('booking.maximum_player_booking_minutes'),
+            ],
             'campaign' => ['nullable', 'string', 'max:40'],
         ];
     }

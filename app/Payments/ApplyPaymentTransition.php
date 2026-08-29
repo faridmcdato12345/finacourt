@@ -9,6 +9,7 @@ use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\User;
 use App\Notifications\BookingNotifier;
+use App\Settlements\OwnerSettlementLedger;
 use Illuminate\Validation\ValidationException;
 
 class ApplyPaymentTransition
@@ -16,6 +17,7 @@ class ApplyPaymentTransition
     public function __construct(
         private readonly AnalyticsRecorder $analytics,
         private readonly BookingNotifier $notifications,
+        private readonly OwnerSettlementLedger $settlements,
     ) {}
 
     /**
@@ -86,6 +88,12 @@ class ApplyPaymentTransition
             'note' => $note,
             'metadata' => $metadata,
         ]);
+
+        if ($target === PaymentStatus::Paid) {
+            $this->settlements->recordPaidPayment($payment);
+        } elseif ($target === PaymentStatus::Refunded) {
+            $this->settlements->recordRefund($payment, $actor);
+        }
 
         if ($target === PaymentStatus::Paid) {
             $booking->refresh();

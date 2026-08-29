@@ -22,14 +22,14 @@ function destroyResource(resource) {
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
                         <h2 class="text-3xl font-semibold tracking-tight text-slate-950">{{ venue.name }}</h2>
-                        <span :class="['rounded-full px-3 py-1 text-xs font-semibold', venue.is_published && (!venue.requires_platform_review || venue.verified_at) ? 'bg-court-100 text-court-800' : 'bg-slate-200 text-slate-600']">{{ venue.is_published && (!venue.requires_platform_review || venue.verified_at) ? 'Published' : venue.is_published ? 'Waiting for FinACourt check' : 'Draft' }}</span>
+                        <span :class="['rounded-full px-3 py-1 text-xs font-semibold', venue.is_published && (!venue.requires_platform_review || venue.verified_at) ? 'bg-court-100 text-court-800' : 'bg-slate-200 text-slate-600']">{{ venue.is_published && (!venue.requires_platform_review || venue.verified_at) ? 'Visible to players' : venue.is_published ? 'Waiting for FinACourt check' : 'Hidden from players' }}</span>
                         <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">{{ venue.verified_at ? 'Checked by FinACourt' : 'Waiting for FinACourt check' }}</span>
                     </div>
                     <p class="mt-2 text-slate-600">{{ venue.address }}, {{ venue.city }}, {{ venue.province }}</p>
-                    <p v-if="venue.requires_platform_review && !venue.verified_at" class="mt-3 max-w-2xl rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">This claimed venue stays private until FinACourt checks it. Finish the venue details and add an active court, then FinACourt can review it before players find or book it.</p>
+                    <p v-if="venue.requires_platform_review && !venue.verified_at" class="mt-3 max-w-2xl rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">This claimed venue stays private until FinACourt checks it. Finish the venue details and add a court players can book, then FinACourt can review it before players find or book it.</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                    <Link :href="`/owner/venues/${venue.id}/hours`" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Operating hours</Link>
+                    <Link :href="`/owner/venues/${venue.id}/hours`" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Opening hours</Link>
                     <Link :href="`/owner/venues/${venue.id}/edit`" class="rounded-xl bg-court-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-court-800">Edit venue</Link>
                 </div>
             </div>
@@ -48,7 +48,7 @@ function destroyResource(resource) {
                                         <p class="font-semibold text-slate-950">{{ resource.name }}</p>
                                         <span :class="['rounded-full px-2.5 py-1 text-xs font-semibold', resource.is_active ? 'bg-court-50 text-court-800' : 'bg-slate-100 text-slate-500']">{{ resource.is_active ? 'Bookable' : 'Not bookable' }}</span>
                                     </div>
-                                    <p class="mt-1 text-sm text-slate-500">{{ resource.sport }} · {{ resource.resource_type }} · {{ resource.setting }} · minimum {{ resource.booking_increment_minutes }} minutes</p>
+                                    <p class="mt-1 text-sm text-slate-500">{{ resource.sport }} · {{ resource.resource_type }} · {{ resource.setting }} · shortest booking: {{ resource.booking_increment_minutes }} minutes</p>
                                     <p class="mt-2 text-sm font-semibold text-slate-900">{{ money.format(resource.base_hourly_rate) }} / hour</p>
                                 </div>
                                 <div class="flex gap-2">
@@ -88,7 +88,7 @@ function destroyResource(resource) {
 
                 <aside class="space-y-6">
                     <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex items-center justify-between"><h3 class="font-semibold text-slate-950">Operating hours</h3><Link :href="`/owner/venues/${venue.id}/hours`" class="text-sm font-semibold text-court-700">Edit</Link></div>
+                        <div class="flex items-center justify-between"><h3 class="font-semibold text-slate-950">Opening hours</h3><Link :href="`/owner/venues/${venue.id}/hours`" class="text-sm font-semibold text-court-700">Edit</Link></div>
                         <dl class="mt-4 space-y-3 text-sm">
                             <div v-for="hour in venue.operating_hours" :key="hour.day" class="flex justify-between gap-4"><dt class="text-slate-500">{{ hour.day }}</dt><dd class="font-medium text-slate-800">{{ hour.is_closed ? 'Closed' : `${hour.opens_at}–${hour.closes_at}` }}</dd></div>
                         </dl>
@@ -98,9 +98,9 @@ function destroyResource(resource) {
                         <div class="mt-4 flex flex-wrap gap-2"><span v-for="sport in venue.sports" :key="sport.id" class="rounded-full bg-court-50 px-3 py-1.5 text-xs font-semibold text-court-800">{{ sport.name }}</span></div>
                     </section>
                     <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <h3 class="font-semibold text-slate-950">Amenities</h3>
+                        <h3 class="font-semibold text-slate-950">Facilities and extras</h3>
                         <div v-if="venue.amenities.length" class="mt-4 flex flex-wrap gap-2"><span v-for="amenity in venue.amenities" :key="amenity.id" class="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-700">{{ amenity.name }}</span></div>
-                        <p v-else class="mt-3 text-sm text-slate-500">No amenities selected.</p>
+                        <p v-else class="mt-3 text-sm text-slate-500">No facilities or extras selected.</p>
                     </section>
                 </aside>
             </div>

@@ -60,6 +60,6 @@ class OperatingHoursController extends Controller
         });
 
         return redirect()->route('owner.venues.show', $venue)
-            ->with('status', 'Operating hours updated.');
+            ->with('status', 'Opening hours updated.');
     }
 }

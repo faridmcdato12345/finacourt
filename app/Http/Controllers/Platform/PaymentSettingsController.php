@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Platform;
 
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
+use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
 use App\Enums\PlatformServiceFeeType;
 use App\Http\Controllers\Controller;
@@ -14,6 +15,7 @@ use App\Models\Payment;
 use App\Models\PlatformServiceFeeRule;
 use App\Payments\PaymentProviderRegistry;
 use App\Payments\PlatformServiceFeeCalculator;
+use App\Payments\Providers\PayMongoPaymentProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -44,6 +46,11 @@ class PaymentSettingsController extends Controller
                 'mode' => $provider->mode()->value,
                 'mode_label' => $provider->mode()->label(),
                 'hosted_checkout_available' => $provider->supportsHostedCheckout(),
+                'configuration_issues' => $provider instanceof PayMongoPaymentProvider
+                    ? $provider->configurationIssues()
+                    : [],
+                'paymongo_pass_on_fees' => $provider instanceof PayMongoPaymentProvider
+                    && (bool) config('payments.providers.paymongo.pass_on_fees', false),
             ],
             'feeTypes' => collect(PlatformServiceFeeType::cases())->map(fn (PlatformServiceFeeType $type) => [
                 'value' => $type->value,
@@ -162,6 +169,8 @@ class PaymentSettingsController extends Controller
                     'platform_service_fee_amount' => $payment->platform_service_fee_amount,
                     'currency' => $payment->currency,
                     'created_at' => $payment->created_at?->toDateString(),
+                    'can_record_external_refund' => $payment->mode === PaymentMode::HostedCheckout
+                        && $payment->status === PaymentStatus::Paid,
                 ])->all(),
         ];
     }

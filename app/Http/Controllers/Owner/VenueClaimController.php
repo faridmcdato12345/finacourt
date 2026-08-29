@@ -129,7 +129,7 @@ class VenueClaimController extends Controller
             $validated['code'],
         );
 
-        return back()->with('status', 'Ownership proof confirmed. A safety hold now gives the venue time to report an unauthorized request before approval.');
+        return back()->with('status', 'Venue email confirmed. FinACourt will wait briefly before final approval so the venue has time to report a suspicious request.');
     }
 
     public function cancel(

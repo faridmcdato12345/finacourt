@@ -73,6 +73,76 @@ When PayMongo hosted checkout is active, checkout line items are separated into
 the venue court price and the FinACourt service fee. Webhook reconciliation still
 matches the trusted player-total snapshot.
 
+## Court-owner payouts
+
+Verified online checkout payments create a separate court-owner earnings entry
+for the court-price portion only. Pay-at-venue payments do not create an entry,
+because the owner already receives that money directly. Payments requiring
+manual review are also excluded.
+
+Owners can view earnings, payout history, CSV statements, and securely save a
+bank/GCash destination at:
+
+```text
+/owner/earnings
+```
+
+After the ready balance reaches `OWNER_PAYOUT_MINIMUM_CENTAVOS`, the account
+owner can use **Request payout** on that page. FinACourt calculates the amount
+from unassigned ready ledger entries; the request does not accept a browser-
+supplied amount, currency, or organization. One open payout is allowed per
+court-owner account. Staff users cannot request or view owner payouts.
+
+Platform administrators prepare, approve, and record externally sent payouts
+at:
+
+```text
+/platform/owner-payouts
+```
+
+FinACourt does not send funds automatically. The administrator makes the actual
+transfer outside the application and records its reference. Full refunds made
+outside the application can be recorded from `/platform/payments`; this adds a
+negative owner-earnings entry rather than editing history.
+
+See `docs/OWNER_SETTLEMENTS.md` for the ledger, lifecycle, security, and current
+limitations.
+
+## PayMongo compatibility boundary
+
+The adapter follows PayMongo's current Hosted Checkout direction:
+
+- it creates `/v2/checkout_sessions` from the server;
+- it uses HTTP Basic authentication and a stable idempotency key;
+- it accepts the current `send.webhook` / `checkout_session.payment.paid`
+  envelope as well as the older event envelope;
+- it requires the timestamped `Paymongo-Signature` test (`te`) or live (`li`)
+  HMAC before parsing the event;
+- test mode requires an `sk_test_` key and live mode requires an `sk_live_`
+  key;
+- line items must add up exactly to FinACourt's immutable player-total
+  snapshot before a Checkout Session is created.
+
+Keep `PAYMONGO_PASS_ON_FEES=false` when the FinACourt service fee should be the
+only amount above the court price. If enabled, PayMongo may add its own method-
+specific transaction fee on the hosted page; that provider fee is not owner
+earnings or FinACourt's configured booking fee.
+
+PayMongo payment splitting is intentionally disabled. PayMongo documents it as
+a separately activated marketplace product requiring a configured merchant
+relationship. FinACourt must not invent child merchant IDs or silently enable
+split settlement. Until the platform is approved and a later explicitly scoped
+integration is completed, PayMongo settles collected funds to the platform's
+configured account and FinACourt's audited owner payout remains an external
+bank/GCash transfer.
+
+Official references:
+
+- https://docs.paymongo.com/docs/payment-channels-hosted-checkout
+- https://docs.paymongo.com/docs/developer-tools-webhook-setup-management
+- https://developers.paymongo.com/docs/seeds-payment-splitting
+- https://developers.paymongo.com/v1/docs/refunding-transactions
+
 ## Security and payment truth
 
 - FinACourt never collects raw card or wallet credentials.
@@ -89,6 +159,9 @@ matches the trusted player-total snapshot.
   `payment_transitions.external_event_id` uniqueness.
 - If a paid webhook arrives after a hold expires, the payment is recorded but
   flagged for review and the booking is not silently re-secured.
+- Court owners cannot manually mark hosted-checkout payments paid or refunded.
+  Hosted payment success remains webhook-authoritative, while external full
+  refunds can only be recorded by a platform administrator with a reference.
 
 ## Switching providers
 

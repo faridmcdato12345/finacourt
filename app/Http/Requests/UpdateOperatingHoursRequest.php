@@ -38,7 +38,7 @@ class UpdateOperatingHoursRequest extends FormRequest
             $days = $hours->pluck('day_of_week')->map(fn ($day) => (int) $day)->sort()->values()->all();
 
             if ($days !== range(0, 6)) {
-                $validator->errors()->add('hours', 'Operating hours must include each day of the week exactly once.');
+                $validator->errors()->add('hours', 'Opening hours must include every day of the week once.');
             }
 
             foreach ($hours as $index => $hour) {

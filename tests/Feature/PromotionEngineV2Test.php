@@ -22,11 +22,27 @@ use App\Models\Venue;
 use App\Promotions\EmptySlotFinder;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class PromotionEngineV2Test extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_deal_goal_choices_include_plain_language_explanations(): void
+    {
+        [, , , $owner] = $this->setupInventory();
+
+        $this->actingAs($owner)
+            ->get(route('owner.promotions.create'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Promotions/Create')
+                ->has('goals', count(PromotionGoal::cases()))
+                ->where('goals.0.label', PromotionGoal::FillEmptySlots->label())
+                ->where('goals.0.description', PromotionGoal::FillEmptySlots->description())
+                ->where('goals.4.description', PromotionGoal::PromoteSpecificSlots->description()));
+    }
 
     public function test_owner_creates_one_campaign_with_multiple_stable_eligible_slots(): void
     {

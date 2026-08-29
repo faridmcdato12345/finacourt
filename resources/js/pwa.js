@@ -130,7 +130,7 @@ function bindConsecutiveSlotPickers() {
         const summaryTime = picker.querySelector('[data-slot-summary-time]');
         const summaryDetail = picker.querySelector('[data-slot-summary-detail]');
         const continueLink = picker.querySelector('[data-slot-continue]');
-        const maximumDuration = Number(picker.dataset.maximumDuration || 240);
+        const maximumDuration = Number(picker.dataset.maximumDuration || 1440);
         let selected = [];
 
         if (!slots.length || !summary || !summaryTime || !summaryDetail || !continueLink) return;

@@ -40,7 +40,8 @@ class PlayerReservationFlowTest extends TestCase
             'duration' => 60,
         ]))
             ->assertOk()
-            ->assertSee('Choose one or more consecutive slots, up to 4 hours.')
+            ->assertSee('Choose any consecutive available times within today’s opening hours.')
+            ->assertSee('data-maximum-duration="1440"', false)
             ->assertSee('data-slot-picker', false)
             ->assertSee('data-start="09:00"', false);
 
@@ -138,6 +139,33 @@ class PlayerReservationFlowTest extends TestCase
         $this->assertSame('15:00', $booking->end_at->setTimezone('Asia/Manila')->format('H:i'));
         $this->assertSame('1950.00', $booking->total_amount);
         $this->assertSame('650.00', $booking->unit_price);
+    }
+
+    public function test_player_can_book_more_than_four_consecutive_hours_within_operating_hours(): void
+    {
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create(['email' => 'long-booking-player@example.com']);
+        $date = $this->futureDate();
+
+        $this->get(route('player.bookings.create', [
+            'venueSlug' => $venue->slug,
+            'resource' => $resource->getKey(),
+            'date' => $date,
+            'start' => '12:00',
+            'duration' => 360,
+        ]))->assertOk();
+
+        $this->actingAs($player)
+            ->post(route('player.bookings.store', $venue->slug), [
+                ...$this->holdData($resource, '12:00'),
+                'duration_minutes' => 360,
+            ])->assertRedirect();
+
+        $booking = Booking::query()->sole();
+
+        $this->assertSame('12:00', $booking->start_at->setTimezone('Asia/Manila')->format('H:i'));
+        $this->assertSame('18:00', $booking->end_at->setTimezone('Asia/Manila')->format('H:i'));
+        $this->assertSame('3900.00', $booking->total_amount);
     }
 
     public function test_stale_or_unavailable_slot_fails_cleanly(): void

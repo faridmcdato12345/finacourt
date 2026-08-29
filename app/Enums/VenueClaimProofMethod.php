@@ -15,11 +15,11 @@ enum VenueClaimProofMethod: string
     {
         return match ($this) {
             self::PublicEmailCode => 'Code sent to the venue’s public email',
-            self::OfficialPhoneCall => 'Call to the independently sourced venue number',
-            self::OfficialDomainEmail => 'Reply from an official venue-domain email',
-            self::BusinessDocuments => 'Business and venue-control documents',
-            self::InPerson => 'In-person venue verification',
-            self::LegacyAdminReview => 'Earlier administrator review',
+            self::OfficialPhoneCall => 'Call to a public venue phone number',
+            self::OfficialDomainEmail => 'Reply from an official venue email',
+            self::BusinessDocuments => 'Business documents showing you manage it',
+            self::InPerson => 'In-person venue check',
+            self::LegacyAdminReview => 'Earlier FinACourt check',
         };
     }
 
