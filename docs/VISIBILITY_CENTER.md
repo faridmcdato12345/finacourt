@@ -82,7 +82,7 @@ These values document the future boundary; the Phase 15 null providers remain ac
 
 ## Limitations
 
-- There is no live Places picker, draggable Google map, Business Profile connection, Google profile read/write, or Google performance metric import.
+- There is no live Places picker, Google map, Business Profile connection, Google profile read/write, or Google performance metric import. Owners can accurately place their saved venue pin with the interactive OpenStreetMap map without a Google account or API key.
 - A copied Google-tagged booking URL records only visits that keep that marker or have an identifiable Google referrer. It does not claim complete Google attribution.
 - Stable link visit counters are aggregate scans/visits, not unique people.
 - Place ID refresh is not scheduled because the live Places provider is disabled.

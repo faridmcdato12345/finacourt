@@ -98,6 +98,7 @@ class ApplyPaymentTransition
         if ($target === PaymentStatus::Paid) {
             $booking->refresh();
             $this->analytics->recordBookingCompleted($booking);
+            $this->notifications->confirmed($booking);
             $this->notifications->paymentReceived($booking);
         }
 

@@ -15,7 +15,7 @@
             : null;
     @endphp
 
-    <section class="relative overflow-hidden border-b border-slate-200 bg-white">
+    <section data-player-hero class="relative overflow-hidden border-b border-slate-200 bg-white">
         <div class="absolute inset-y-0 right-0 hidden w-[48%] lg:block">
             <div class="court-visual h-full">
                 <div class="absolute inset-0 bg-gradient-to-r from-white via-white/25 to-transparent"></div>
@@ -36,7 +36,7 @@
                 <p class="mt-6 max-w-2xl text-lg leading-8 text-slate-600">Compare real sports facilities, transparent hourly prices, and availability calculated from venue schedules.</p>
             </div>
 
-            <form action="{{ route('marketplace.courts.index') }}" method="get" class="app-card relative z-10 mt-10 grid max-w-6xl gap-3 p-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_0.9fr_0.8fr_auto] lg:gap-0 lg:p-2">
+            <form action="{{ route('marketplace.courts.index') }}" method="get" data-player-card class="app-card relative z-10 mt-10 grid max-w-6xl gap-3 p-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_0.9fr_0.8fr_auto] lg:gap-0 lg:p-2">
                 <div class="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 hover:border-slate-200 lg:gap-2 lg:rounded-none lg:border-0 lg:border-r lg:border-slate-200 lg:px-3 lg:py-0">
                     <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-court-50 text-court-700 lg:size-7 lg:bg-transparent">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-5 lg:size-4'])</span>
                     <div class="min-w-0 flex-1"><span class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 lg:text-[9px]">Location</span>@include('marketplace.partials.public-select', ['name' => 'city', 'value' => '', 'options' => [['value' => '', 'label' => 'Any city'], ...$cities->map(fn ($city) => ['value' => $city->city_slug, 'label' => $city->city.', '.$city->province])->all()], 'placeholder' => 'Any city', 'ariaLabel' => 'Location', 'variant' => 'hero-slim', 'fallbackClass' => 'app-select app-select-quiet mt-1 font-semibold lg:h-8 lg:py-0 lg:text-xs'])</div>
@@ -65,7 +65,7 @@
         <section class="border-b border-slate-200 bg-white">
             <div class="page-shell scrollbar-none flex gap-3 overflow-x-auto py-5">
                 @foreach ($sports->take(5) as $sport)
-                    <a href="{{ route('marketplace.courts.index', ['sport' => $sport->slug]) }}" class="flex min-w-40 shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-[0_5px_18px_rgba(15,23,42,0.03)] hover:border-court-400 hover:bg-court-50 hover:text-court-800"><span class="grid size-8 place-items-center rounded-full bg-court-50 text-court-700">@include('marketplace.partials.icon', ['name' => 'sport-'.$sport->slug, 'class' => 'size-5'])</span>{{ $sport->name }}</a>
+                    <a data-sport-chip href="{{ route('marketplace.courts.index', ['sport' => $sport->slug]) }}" class="flex min-w-40 shrink-0 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-[0_5px_18px_rgba(15,23,42,0.03)] hover:border-court-400 hover:bg-court-50 hover:text-court-800"><span class="grid size-8 place-items-center rounded-full bg-court-50 text-court-700">@include('marketplace.partials.icon', ['name' => 'sport-'.$sport->slug, 'class' => 'size-5'])</span>{{ $sport->name }}</a>
                 @endforeach
                 <a href="{{ route('marketplace.courts.index') }}" class="flex min-w-36 shrink-0 items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-[0_5px_18px_rgba(15,23,42,0.03)] hover:border-court-400 hover:bg-court-50 hover:text-court-800">@include('marketplace.partials.icon', ['name' => 'grid-dots', 'class' => 'size-5']) More @include('marketplace.partials.icon', ['name' => 'chevron-right', 'class' => 'size-4'])</a>
             </div>

@@ -1,8 +1,12 @@
 <script setup>
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import GuestLayout from '../../Layouts/GuestLayout.vue';
+import SocialLoginButtons from '../../Components/SocialLoginButtons.vue';
+
+defineProps({ socialProviders: { type: Array, default: () => [] } });
 
 const form = useForm({ name: '', email: '', organization_name: '', password: '', password_confirmation: '' });
+const page = usePage();
 
 function submit() {
     form.post('/register', { onFinish: () => form.reset('password', 'password_confirmation') });
@@ -17,7 +21,10 @@ function submit() {
             <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Create your organization</h1>
             <p class="mt-3 text-slate-600">This account becomes the organization owner. Staff access can be added later.</p>
 
-            <form class="mt-8 space-y-4" @submit.prevent="submit">
+            <p v-if="page.props.errors?.social" role="alert" class="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ page.props.errors.social }}</p>
+            <SocialLoginButtons :providers="socialProviders" />
+
+            <form :class="socialProviders.length ? '' : 'mt-8'" class="space-y-4" @submit.prevent="submit">
                 <div>
                     <label for="name" class="mb-1.5 block text-sm font-medium text-slate-800">Your name</label>
                     <input id="name" v-model="form.name" required autocomplete="name" class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-sm focus:border-court-600" />
@@ -50,4 +57,3 @@ function submit() {
         </div>
     </GuestLayout>
 </template>
-

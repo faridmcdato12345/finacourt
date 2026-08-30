@@ -3,7 +3,7 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import VenueForm from '../../../Components/VenueForm.vue';
 import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
 
-defineProps({ sports: Array, amenities: Array, locationParents: Array, mapEmbedBaseUrl: String });
+defineProps({ sports: Array, amenities: Array, locationParents: Array, mapTileUrl: String });
 
 const form = useForm({
     name: '', slug: '', description: '', address: '', city: '', province: '',
@@ -25,7 +25,7 @@ function submit() {
             <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Create a venue</h2>
             <p class="mt-2 text-slate-600">Add one location for your courts.</p>
             <div class="mt-8">
-                <VenueForm :form="form" :sports="sports" :amenities="amenities" :location-parents="locationParents" :map-embed-base-url="mapEmbedBaseUrl" allow-photo-upload submit-label="Create venue" @submit="submit" />
+                <VenueForm :form="form" :sports="sports" :amenities="amenities" :location-parents="locationParents" :map-tile-url="mapTileUrl" allow-photo-upload submit-label="Create venue" @submit="submit" />
             </div>
         </div>
     </OwnerLayout>

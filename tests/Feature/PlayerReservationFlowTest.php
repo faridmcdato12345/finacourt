@@ -216,6 +216,12 @@ class PlayerReservationFlowTest extends TestCase
 
         $this->assertSame(BookingStatus::Confirmed, $hold->refresh()->status);
         $this->assertNull($hold->expires_at);
+
+        $this->actingAs($player)
+            ->get(route('player.bookings.show', $hold->reference))
+            ->assertOk()
+            ->assertSee('data-booking-celebration', false)
+            ->assertSee('You’re ready to play');
     }
 
     public function test_player_history_and_details_only_include_their_own_bookings(): void
@@ -230,8 +236,20 @@ class PlayerReservationFlowTest extends TestCase
         $this->actingAs($playerA)
             ->get(route('player.bookings.index'))
             ->assertOk()
+            ->assertSee('data-player-bookings-hero', false)
+            ->assertSee('Your playbook')
+            ->assertSee('data-player-booking-card', false)
+            ->assertSee('Open game pass')
             ->assertSee($bookingA->reference)
             ->assertDontSee($bookingB->reference);
+
+        $this->actingAs($playerA)
+            ->get(route('player.bookings.show', $bookingA->reference))
+            ->assertOk()
+            ->assertSee('data-player-game-pass-hero', false)
+            ->assertSee('Your game pass')
+            ->assertSee('data-player-game-ticket', false)
+            ->assertSee('Share game pass');
 
         $this->actingAs($playerA)
             ->get(route('player.bookings.show', $bookingB->reference))
@@ -344,6 +362,7 @@ class PlayerReservationFlowTest extends TestCase
             'booking_date' => $this->futureDate(),
             'start_time' => $start,
             'duration_minutes' => 60,
+            'payment_option' => 'pay_at_venue',
             'customer_name' => 'Jamie Player',
             'customer_phone' => '+63 900 000 0000',
             'terms' => '1',

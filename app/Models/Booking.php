@@ -57,6 +57,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'cancelled_by_user_id',
     'cancellation_reason',
     'confirmation_notified_at',
+    'owner_confirmation_notified_at',
     'payment_notified_at',
     'reminder_notified_at',
 ])]
@@ -194,6 +195,7 @@ class Booking extends Model
             'payment_status' => PaymentStatus::class,
             'cancelled_at' => 'immutable_datetime',
             'confirmation_notified_at' => 'immutable_datetime',
+            'owner_confirmation_notified_at' => 'immutable_datetime',
             'payment_notified_at' => 'immutable_datetime',
             'reminder_notified_at' => 'immutable_datetime',
         ];

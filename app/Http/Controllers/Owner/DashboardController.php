@@ -9,8 +9,10 @@ use App\Enums\PaymentStatus;
 use App\Growth\GrowthRecommendationEngine;
 use App\Http\Controllers\Controller;
 use App\Models\Booking;
+use App\Models\Venue;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -51,6 +53,12 @@ class DashboardController extends Controller
             });
         $period = AnalyticsPeriod::fromFilters([], $timezone);
         $report = $analytics->generate($period, $organization);
+        $featuredVenue = $organization->venues()
+            ->whereHas('photos')
+            ->with('photos:id,venue_id,storage_path,alt_text,sort_order,is_primary')
+            ->orderBy('name')
+            ->first();
+        $coverPhoto = $featuredVenue?->photos->first();
 
         return Inertia::render('Owner/Dashboard', [
             'organization' => [
@@ -63,6 +71,10 @@ class DashboardController extends Controller
                 'active_courts' => $organization->venues()->withCount([
                     'resources as active_resources_count' => fn ($query) => $query->where('is_active', true),
                 ])->get()->sum('active_resources_count'),
+                'cover_photo' => $coverPhoto && $featuredVenue instanceof Venue ? [
+                    'url' => Storage::disk('public')->url($coverPhoto->storage_path),
+                    'alt_text' => $coverPhoto->alt_text ?: $featuredVenue->name.' venue photo',
+                ] : null,
             ],
             'today' => [
                 'date' => $today->toDateString(),

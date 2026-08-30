@@ -60,6 +60,24 @@ class PwaNotificationTest extends TestCase
         $this->assertStringNotContainsString('backgroundSync', $worker);
     }
 
+    public function test_player_shell_has_app_like_navigation_and_accessible_motion_fallbacks(): void
+    {
+        $this->get(route('marketplace.home'))
+            ->assertOk()
+            ->assertSee('class="player-experience', false)
+            ->assertSee('data-player-hero', false)
+            ->assertSee('player-mobile-dock', false)
+            ->assertSee('aria-label="Player shortcuts"', false)
+            ->assertSee('aria-current="page"', false);
+
+        $styles = file_get_contents(resource_path('css/app.css'));
+        $behavior = file_get_contents(resource_path('js/pwa.js'));
+
+        $this->assertStringContainsString('@media (prefers-reduced-motion: reduce)', $styles);
+        $this->assertStringContainsString("matchMedia('(prefers-reduced-motion: reduce)')", $behavior);
+        $this->assertStringContainsString('IntersectionObserver', $behavior);
+    }
+
     public function test_response_headers_allow_only_narrow_public_caching(): void
     {
         [$organization, $venue, , $owner] = $this->inventory();

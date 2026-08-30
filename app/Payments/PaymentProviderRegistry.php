@@ -2,6 +2,8 @@
 
 namespace App\Payments;
 
+use App\Enums\PaymentMode;
+use App\Enums\PlayerPaymentOption;
 use App\Payments\Contracts\PaymentProvider;
 
 class PaymentProviderRegistry
@@ -33,5 +35,25 @@ class PaymentProviderRegistry
 
         return $this->find($key)
             ?? throw new \LogicException("Payment provider [{$key}] is not registered.");
+    }
+
+    public function forPlayerOption(PlayerPaymentOption $option): ?PaymentProvider
+    {
+        $key = match ($option) {
+            PlayerPaymentOption::Online => (string) config('payments.online_provider', 'paymongo'),
+            PlayerPaymentOption::PayAtVenue => 'manual',
+        };
+        $provider = $this->find($key);
+        $expectedMode = match ($option) {
+            PlayerPaymentOption::Online => PaymentMode::HostedCheckout,
+            PlayerPaymentOption::PayAtVenue => PaymentMode::PayAtVenue,
+        };
+
+        return $provider?->mode() === $expectedMode ? $provider : null;
+    }
+
+    public function online(): ?PaymentProvider
+    {
+        return $this->forPlayerOption(PlayerPaymentOption::Online);
     }
 }

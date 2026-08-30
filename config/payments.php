@@ -2,6 +2,7 @@
 
 return [
     'default' => env('PAYMENT_PROVIDER', 'manual'),
+    'online_provider' => env('PAYMENT_ONLINE_PROVIDER', 'paymongo'),
 
     'providers' => [
         'manual' => [

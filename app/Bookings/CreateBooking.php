@@ -66,7 +66,12 @@ class CreateBooking
                 lockForUpdate: true,
             );
             $price = $this->prices->quote($resource, $window->durationMinutes, $promotion);
-            $paymentMode = ($data['create_payment'] ?? false) ? $this->createPayment->mode() : null;
+            $paymentProvider = ($data['create_payment'] ?? false)
+                ? ($data['payment_provider'] ?? null)
+                : null;
+            $paymentMode = ($data['create_payment'] ?? false)
+                ? $this->createPayment->mode($paymentProvider)
+                : null;
             $serviceFee = $paymentMode === null
                 ? $this->serviceFees->emptyQuoteFromAmount($price['total_amount'])
                 : $this->serviceFees->quote($price['total_amount'], $price['currency']);
@@ -113,7 +118,7 @@ class CreateBooking
             );
 
             if ($booking->payment_mode !== null) {
-                $this->createPayment->handle($booking, $creator);
+                $this->createPayment->handle($booking, $creator, $paymentProvider);
             }
 
             if ($promotion !== null) {

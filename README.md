@@ -37,7 +37,7 @@ If your Linux/WSL user does not use UID/GID `1000`, set `APP_UID` and `APP_GID` 
 ```bash
 docker compose up -d
 docker compose ps
-docker compose logs -f app web node scheduler
+docker compose logs -f app web node scheduler queue
 docker compose exec app php artisan migrate
 docker compose down
 ```
@@ -54,8 +54,9 @@ docker compose down
 | `node` | Node 22 and Vite development server | `node` |
 | `test` | One-off PHP test runner using the isolated MySQL test database | `test` |
 | `scheduler` | Laravel scheduler for idempotent booking reminders | `scheduler` |
+| `queue` | Laravel database-queue worker for retryable transactional email | `queue` |
 
-Redis and queue workers remain omitted because the current notification delivery is a small synchronous database write. The scheduler is required only for reminders; booking holds and availability remain logically correct without it.
+Redis remains unnecessary. The database-backed `queue` service sends retryable court-owner confirmation emails after a booking transaction commits. The scheduler is required only for reminders; booking holds and availability remain logically correct without either background process.
 
 ## Tests and quality checks
 
@@ -163,7 +164,7 @@ Pilot pricing is configured in `config/owner_pricing.php`. The committed default
 
 A player can submit one 1–5 star review after their own confirmed booking has ended. The review derives its organization, venue, resource, booking, and player from that server-owned booking record. It enters a pending queue at `/platform/reviews`; only an explicit platform administrator can publish or reject it. Owners cannot suppress reviews. Public venue averages, review counts, visible review cards, and review JSON-LD use published records only. Player names are abbreviated publicly, while moderation retains the authenticated identity and booking reference.
 
-Venue maps use the existing latitude/longitude fields plus `coordinates_verified_at`. Owners must enter both coordinates and inspect the map preview; saving records the pin as owner-verified. Public map embedding and GeoCoordinates structured data remain hidden until the pin is verified. The default embed uses OpenStreetMap with visible contributor attribution and no API credentials. `MAP_EMBED_BASE_URL`, `MAP_PUBLIC_BASE_URL`, and `MAP_FRAME_ORIGIN` allow a production deployment to switch to a suitable hosted map service. Do not bulk download or offline-cache map tiles.
+Venue maps use the existing latitude/longitude fields plus `coordinates_verified_at`. Owners can use browser location, click the interactive map, or drag its pin to the venue entrance; each map change updates the saved coordinates. Saving records the pin as owner-verified. Public map embedding and GeoCoordinates structured data remain hidden until the pin is verified. The default owner map and public embed use OpenStreetMap with visible contributor attribution and no API credentials. `MAP_TILE_URL`, `MAP_TILE_ORIGIN`, `MAP_EMBED_BASE_URL`, `MAP_PUBLIC_BASE_URL`, and `MAP_FRAME_ORIGIN` allow a production deployment to use an approved compatible map host. Do not bulk download or offline-cache map tiles.
 
 Venue owners can upload JPG, PNG, and WebP photos while creating a venue or from its edit page. A venue supports 10 photos, with up to 5 files per request and a 5 MB limit per file. Uploads use randomized storage names under Laravel's `public` disk; the first upload becomes the cover photo and owners can select another cover or delete photos. Docker creates the `public/storage` link automatically. Production deployments using object storage should configure the public disk/CDN and add resizing or responsive derivative generation before accepting high-volume uploads.
 
@@ -243,9 +244,11 @@ Nginx serves versioned build assets with immutable one-year headers, while `sw.j
 
 Booking confirmation, verified/manual payment confirmation, and roughly 24-hour booking reminders create durable Laravel database notifications for the booking's `player_user_id`. Per-booking timestamps and row locking make every hook idempotent. Players can review and mark only their own notifications as read; browser notification permission is always user-initiated.
 
+When a player confirms a pay-at-venue booking, or a verified PayMongo webhook confirms an online payment, every owner member of that booking's organization receives a queued email with an immutable booking summary and a private owner-workspace link. Staff and unrelated tenants are excluded. A booking-level handoff timestamp and row lock prevent repeat submissions or duplicate webhooks from scheduling the email twice. The default local `MAIL_MAILER=log` writes the message to `storage/logs/laravel.log`; production must configure a real transactional mail transport.
+
 The `WebPushGateway` contract is bound to a no-op adapter because no VAPID keys or push provider exist in the repository. Supported browsers can surface new durable notifications when the player next opens booking history, and the service worker already understands standard push payloads. True background web push requires a production adapter, subscription storage, VAPID/provider secrets in the environment, delivery retries, and revocation handling; none are fabricated here.
 
-The Docker `scheduler` service runs Laravel's scheduler and the hourly `bookings:send-reminders` command. `BOOKING_REMINDER_HOURS` defaults to 24. The reminder scan is indexed, processes bounded chunks, locks each candidate, and records delivery before another scheduler pass can duplicate it. No queue worker or Redis is required for the current database-only channel.
+The Docker `scheduler` service runs Laravel's scheduler and the hourly `bookings:send-reminders` command. `BOOKING_REMINDER_HOURS` defaults to 24. The reminder scan is indexed, processes bounded chunks, locks each candidate, and records delivery before another scheduler pass can duplicate it. The separate Docker `queue` service processes the `emails` queue before `default`; Redis is not required because the application uses the database queue driver.
 
 ### Performance and UX boundaries
 

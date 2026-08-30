@@ -58,7 +58,12 @@ return Application::configure(basePath: dirname(__DIR__))
         if ($trustedHostPatterns !== []) {
             $middleware->trustHosts(at: $trustedHostPatterns, subdomains: false);
         }
-        $middleware->validateCsrfTokens(except: ['webhooks/payments/*']);
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/payments/*',
+            // Apple returns its authorization response with form_post. OAuth
+            // state validation still protects this exact callback route.
+            'auth/apple/callback',
+        ]);
         $middleware->redirectGuestsTo(fn (Request $request) => $request->is('player/*') || $request->is('venues/*/holds')
             ? route('player.login')
             : route('login'));

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
+use App\Enums\PlayerPaymentOption;
 use App\Models\Booking;
 use App\Models\CourtResource;
 use App\Models\Membership;
@@ -14,6 +15,7 @@ use App\Models\Payment;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
+use App\Notifications\OwnerBookingConfirmedNotification;
 use App\Payments\Contracts\WebhookPaymentProvider;
 use App\Payments\Exceptions\InvalidWebhookSignature;
 use App\Payments\HostedCheckout;
@@ -22,11 +24,110 @@ use App\Payments\VerifiedPaymentEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class PaymentFlowTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_reservation_page_shows_clear_online_and_pay_at_venue_choices(): void
+    {
+        $this->enablePayMongo();
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+
+        $this->actingAs($player)->get(route('player.bookings.create', [
+            'venueSlug' => $venue->slug,
+            'resource' => $resource->getKey(),
+            'date' => now('Asia/Manila')->addDays(7)->toDateString(),
+            'start' => '09:00',
+            'duration' => 60,
+        ]))
+            ->assertOk()
+            ->assertSee('How would you like to pay?')
+            ->assertSee('Pay online')
+            ->assertSee('Pay at venue')
+            ->assertSee('Card')
+            ->assertSee('GCash')
+            ->assertSee('QR Ph')
+            ->assertSee('name="payment_option"', false)
+            ->assertDontSee('Not available right now.');
+    }
+
+    public function test_player_can_choose_online_payment_while_manual_remains_the_default(): void
+    {
+        $this->enablePayMongo();
+        config()->set('payments.default', 'manual');
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+
+        $booking = $this->createHold($player, $venue, $resource, [
+            'payment_option' => PlayerPaymentOption::Online->value,
+        ]);
+
+        $this->assertSame(PaymentMode::HostedCheckout, $booking->payment_mode);
+        $this->assertSame('paymongo', $booking->payment->provider);
+        $this->assertSame(PaymentMode::HostedCheckout, $booking->payment->mode);
+    }
+
+    public function test_player_can_choose_pay_at_venue_even_when_paymongo_is_the_default(): void
+    {
+        $this->enablePayMongo();
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+
+        $booking = $this->createHold($player, $venue, $resource, [
+            'payment_option' => PlayerPaymentOption::PayAtVenue->value,
+            'payment_provider' => 'paymongo',
+            'payment_mode' => PaymentMode::HostedCheckout->value,
+        ]);
+
+        $this->assertSame(PaymentMode::PayAtVenue, $booking->payment_mode);
+        $this->assertSame('manual', $booking->payment->provider);
+        $this->assertSame(PaymentMode::PayAtVenue, $booking->payment->mode);
+    }
+
+    public function test_online_choice_is_rejected_when_secure_checkout_is_not_ready(): void
+    {
+        $this->enablePayMongo();
+        config()->set('payments.default', 'manual');
+        config()->set('payments.providers.paymongo.webhook_secret', '');
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+
+        $this->actingAs($player)->post(route('player.bookings.store', $venue->slug), [
+            'resource_id' => $resource->getKey(),
+            'booking_date' => now('Asia/Manila')->addDays(7)->toDateString(),
+            'start_time' => '09:00',
+            'duration_minutes' => 60,
+            'payment_option' => PlayerPaymentOption::Online->value,
+            'customer_name' => 'Pat Player',
+            'terms' => '1',
+        ])->assertSessionHasErrors('payment_option');
+
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('payments', 0);
+    }
+
+    public function test_unknown_player_payment_choice_is_rejected(): void
+    {
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+
+        $this->actingAs($player)->post(route('player.bookings.store', $venue->slug), [
+            'resource_id' => $resource->getKey(),
+            'booking_date' => now('Asia/Manila')->addDays(7)->toDateString(),
+            'start_time' => '09:00',
+            'duration_minutes' => 60,
+            'payment_option' => 'free_payment',
+            'customer_name' => 'Pat Player',
+            'terms' => '1',
+        ])->assertSessionHasErrors('payment_option');
+
+        $this->assertDatabaseCount('bookings', 0);
+        $this->assertDatabaseCount('payments', 0);
+    }
 
     public function test_payment_attempt_uses_booking_snapshot_and_ignores_browser_amount(): void
     {
@@ -163,6 +264,7 @@ class PaymentFlowTest extends TestCase
 
     public function test_current_paymongo_v2_webhook_shape_is_verified_and_idempotent(): void
     {
+        Notification::fake();
         $this->enablePayMongo();
         Http::fake([
             'https://api.paymongo.test/v2/checkout_sessions' => Http::response([
@@ -173,7 +275,7 @@ class PaymentFlowTest extends TestCase
             ]),
         ]);
 
-        [, $venue, $resource] = $this->setupInventory();
+        [, $venue, $resource, $owner] = $this->setupInventory();
         $player = User::factory()->create();
         $booking = $this->createHold($player, $venue, $resource);
         $this->actingAs($player)->post(route('player.bookings.checkout', $booking->reference));
@@ -186,6 +288,10 @@ class PaymentFlowTest extends TestCase
         $this->assertSame(PaymentStatus::Paid, $payment->refresh()->status);
         $this->assertSame(BookingStatus::Confirmed, $booking->refresh()->status);
         $this->assertSame('qrph', $payment->transitions()->whereNotNull('external_event_id')->sole()->metadata['paymongo_payment_method']);
+        $this->assertNotNull($booking->owner_confirmation_notified_at);
+        Notification::assertSentToTimes($owner, OwnerBookingConfirmedNotification::class, 1);
+        Notification::assertSentTo($owner, fn (OwnerBookingConfirmedNotification $notification): bool => $notification->paymentLabel === 'Paid online'
+            && $notification->bookingReference === $booking->reference);
     }
 
     public function test_paymongo_configuration_rejects_a_secret_key_from_the_wrong_mode(): void
@@ -541,6 +647,7 @@ class PaymentFlowTest extends TestCase
     private function enablePayMongo(): void
     {
         config()->set('payments.default', 'paymongo');
+        config()->set('payments.online_provider', 'paymongo');
         config()->set('payments.providers.paymongo.enabled', true);
         config()->set('payments.providers.paymongo.mode', 'test');
         config()->set('payments.providers.paymongo.api_base_url', 'https://api.paymongo.test');

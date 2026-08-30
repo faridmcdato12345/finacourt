@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\PlayerPaymentOption;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePlayerHoldRequest extends FormRequest
 {
@@ -23,6 +25,7 @@ class StorePlayerHoldRequest extends FormRequest
                 'integer',
                 'between:15,'.config('booking.maximum_player_booking_minutes'),
             ],
+            'payment_option' => ['nullable', Rule::enum(PlayerPaymentOption::class)],
             'campaign' => ['nullable', 'string', 'max:40'],
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:40'],

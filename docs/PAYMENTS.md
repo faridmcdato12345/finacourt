@@ -1,9 +1,11 @@
 # FinACourt payments
 
-FinACourt uses a server-side payment provider registry. The active provider is
-selected with `PAYMENT_PROVIDER`, so the platform can switch between
-pay-at-venue/manual tracking and an online hosted checkout provider without
-changing booking code.
+FinACourt uses a server-side payment provider registry. Marketplace players see
+two choices on the reservation review page: **Pay online** and **Pay at venue**.
+The server maps those business choices to configured providers; the browser
+cannot choose an arbitrary provider key. `PAYMENT_PROVIDER` remains the safe
+fallback for older/internal booking calls, while `PAYMENT_ONLINE_PROVIDER`
+selects the hosted provider used by the player-facing online choice.
 
 ## Available providers
 
@@ -22,7 +24,8 @@ booking paid.
 Recommended environment values:
 
 ```dotenv
-PAYMENT_PROVIDER=paymongo
+PAYMENT_PROVIDER=manual
+PAYMENT_ONLINE_PROVIDER=paymongo
 PAYMONGO_ENABLED=true
 PAYMONGO_MODE=test
 PAYMONGO_SECRET_KEY=sk_test_xxx
@@ -31,6 +34,18 @@ PAYMONGO_PAYMENT_METHOD_TYPES=card,gcash,qrph
 PAYMONGO_SEND_EMAIL_RECEIPT=true
 PAYMONGO_PASS_ON_FEES=false
 ```
+
+The online card is enabled only when the configured hosted provider is
+registered and fully ready. For PayMongo this includes a mode-matching secret
+key, webhook signing secret, HTTPS API URL, and at least one configured payment
+method. If any requirement is missing, players can still choose **Pay at
+venue**, while both the page and server reject an online attempt.
+
+After choosing online, the player first creates the normal temporary court
+hold. The private booking page then shows **Continue to secure checkout** and
+redirects to PayMongo, where the player chooses among the account's configured
+card/e-wallet methods. Choosing pay at venue creates the same server-authorized
+hold but uses the manual provider and never opens hosted checkout.
 
 The webhook URL to register in PayMongo is:
 
@@ -72,6 +87,24 @@ a later product policy explicitly adds one.
 When PayMongo hosted checkout is active, checkout line items are separated into
 the venue court price and the FinACourt service fee. Webhook reconciliation still
 matches the trusted player-total snapshot.
+
+## Court-owner booking emails
+
+The same confirmed-booking hook covers both player payment choices:
+
+- **Pay at venue:** the owner email is queued when the player confirms the held booking.
+- **Pay online:** the owner email is queued only after a valid PayMongo webhook marks the payment paid and confirms the booking. A browser success redirect is never authoritative.
+
+The message goes to users with the owner role in the booking's organization,
+not to staff or another tenant. It snapshots the booking reference, venue,
+court, player contact details, local date/time, payment choice, and booking
+total before entering the database `emails` queue. Booking-level locking and a
+handoff timestamp make retries and duplicate webhooks idempotent.
+
+Local development defaults to `MAIL_MAILER=log`; inspect
+`storage/logs/laravel.log`. Production must configure a real Laravel mail
+transport and supervise the Docker-equivalent `queue:work
+--queue=emails,default` process.
 
 ## Court-owner payouts
 
@@ -163,14 +196,20 @@ Official references:
   Hosted payment success remains webhook-authoritative, while external full
   refunds can only be recorded by a platform administrator with a reference.
 
-## Switching providers
+## Provider configuration
 
-To switch back to manual payment:
+To make PayMongo available as the online choice while retaining pay at venue:
 
 ```dotenv
 PAYMENT_PROVIDER=manual
-PAYMONGO_ENABLED=false
+PAYMENT_ONLINE_PROVIDER=paymongo
+PAYMONGO_ENABLED=true
 ```
+
+To disable online payment, set `PAYMONGO_ENABLED=false`. Pay at venue remains
+available. `PAYMENT_PROVIDER` controls only the fallback when a legacy/internal
+caller does not supply the new player choice; the reservation form always sends
+the player's explicit selection.
 
 After changing `.env`, refresh Laravel config:
 

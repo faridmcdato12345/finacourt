@@ -146,7 +146,7 @@ Expected:
 2. Verify the cover/gallery uses uploaded venue photos when present.
 3. Verify name, address, sports, amenities, opening hours, courts, settings, and real rates are present.
 4. Verify unpublished or inactive resources are absent.
-5. Verify the map appears only when both coordinates were saved and confirmed.
+5. Verify the map appears once both coordinates are present. Click the map and drag the pin; confirm both map numbers update before saving.
 6. Verify map attribution and Get directions are visible when map data is eligible.
 7. Verify only platform-published reviews affect the rating and review list.
 8. Verify the live availability section changes when a different court is selected.
@@ -650,18 +650,21 @@ Expected public behavior:
 
 ## H2. Notifications and reminders
 
-1. Confirm a player booking and verify one confirmation notice appears.
-2. Refresh/repeat the confirmation action. Verify the notice is not duplicated.
-3. Mark a payment paid and verify one payment notice.
-4. For a booking roughly `BOOKING_REMINDER_HOURS` away, run:
+1. Confirm a **Pay at venue** player booking and verify the player gets one confirmation notice and the venue owner gets one email.
+2. Confirm a separate **Pay online** booking through a valid signed PayMongo webhook and verify the venue owner gets one email only after the trusted payment transition confirms the booking. The success return page alone must not send it.
+3. Refresh/repeat the pay-at-venue confirmation and replay the same webhook. Verify neither owner email is duplicated.
+4. Verify staff users and an owner from another venue account do not receive the email.
+5. With the local `MAIL_MAILER=log`, inspect `storage/logs/laravel.log`. For inbox delivery, configure a real mail transport in `.env`, clear configuration, and restart the queue worker.
+6. Mark a payment paid and verify one player payment notice.
+7. For a booking roughly `BOOKING_REMINDER_HOURS` away, run:
 
 ```bash
 docker compose exec app php artisan bookings:send-reminders
 ```
 
-5. Run it again and verify the reminder is not duplicated.
-6. Verify reminder/transaction notices do not depend on marketing opt-in.
-7. Verify the UI truthfully uses database notices when no web-push provider is configured.
+8. Run it again and verify the reminder is not duplicated.
+9. Verify reminder/transaction notices do not depend on marketing opt-in.
+10. Verify the UI truthfully uses database notices when no web-push provider is configured.
 
 ## H3. Responsive and accessibility review
 
@@ -761,7 +764,7 @@ The pilot acceptance passes only when the booking, payment, attribution, tenant,
 
 ## Known configuration-dependent checks
 
-- Hosted payment checkout/webhooks require `PAYMENT_PROVIDER=paymongo`, valid PayMongo keys, enabled payment methods, and the signed webhook endpoint. Without those settings, manual/pay-at-venue fallback is the correct result.
+- The **Pay online** card requires `PAYMENT_ONLINE_PROVIDER=paymongo`, `PAYMONGO_ENABLED=true`, valid PayMongo keys, enabled payment methods, and the signed webhook endpoint. Without those settings, the online card must be disabled and pay at venue must remain usable.
 - Google Places and Business Profile stages require approved credentials, OAuth, policy compliance, and owner authorization. The no-Google fallback is the correct result when absent.
 - Web push requires a configured gateway. Database notifications are the current reliable fallback.
 - The unclaimed directory requires legitimate provenance. An empty directory is preferable to fabricated public data.

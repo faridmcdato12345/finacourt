@@ -208,6 +208,12 @@ class CustomerReactivationTest extends TestCase
     {
         $player = User::factory()->create();
 
+        $this->actingAs($player)
+            ->get(route('player.preferences.edit'))
+            ->assertOk()
+            ->assertSee('Notification preferences')
+            ->assertSee('noindex,nofollow', false);
+
         $this->actingAs($player)->put(route('player.preferences.update'), [
             'marketing_opt_in' => '1',
             'in_app_marketing_enabled' => '1',

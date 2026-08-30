@@ -1,7 +1,10 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import AppSelect from './AppSelect.vue';
+import DraggableVenueMap from './DraggableVenueMap.vue';
 import FormError from './FormError.vue';
+import { detectCurrentCoordinates, locationErrorMessage } from '../lib/geolocation';
+import { normalizeMapCoordinates } from '../lib/venue-map';
 
 const props = defineProps({
     form: Object,
@@ -10,26 +13,21 @@ const props = defineProps({
     locationParents: { type: Array, default: () => [] },
     submitLabel: String,
     existingState: Object,
-    mapEmbedBaseUrl: String,
+    mapTileUrl: String,
     allowPhotoUpload: { type: Boolean, default: false },
 });
 
 defineEmits(['submit']);
 
-const mapPreviewUrl = computed(() => {
-    const latitude = Number(props.form.latitude);
-    const longitude = Number(props.form.longitude);
-    if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || props.form.latitude === '' || props.form.longitude === '') return null;
-
-    const bbox = [longitude - 0.009, latitude - 0.006, longitude + 0.009, latitude + 0.006].join(',');
-    const query = new URLSearchParams({ bbox, layer: 'mapnik', marker: `${latitude},${longitude}` });
-    return `${props.mapEmbedBaseUrl}?${query.toString()}`;
-});
+const hasMapCoordinates = computed(() => normalizeMapCoordinates(props.form.latitude, props.form.longitude) !== null);
 
 const photoErrors = computed(() => Object.entries(props.form.errors).filter(([key]) => key.startsWith('photos.')));
 const cityMunicipalities = ref([]);
 const locationOptionsLoading = ref(false);
 const locationOptionsError = ref('');
+const detectingLocation = ref(false);
+const detectedLocationMessage = ref('');
+const detectedLocationError = ref('');
 let locationRequest = 0;
 
 watch(
@@ -70,6 +68,37 @@ watch(
 
 function selectPhotos(event) {
     props.form.photos = Array.from(event.target.files || []);
+}
+
+async function useCurrentLocation() {
+    detectingLocation.value = true;
+    detectedLocationMessage.value = '';
+    detectedLocationError.value = '';
+
+    try {
+        const coordinates = await detectCurrentCoordinates(
+            typeof navigator === 'undefined' ? null : navigator.geolocation,
+        );
+
+        props.form.latitude = coordinates.latitude;
+        props.form.longitude = coordinates.longitude;
+        detectedLocationMessage.value = coordinates.accuracy === null
+            ? 'Location found. Check that the pin points to the venue entrance.'
+            : `Location found within about ${coordinates.accuracy} metres. Check that the pin points to the venue entrance.`;
+    } catch (error) {
+        detectedLocationError.value = locationErrorMessage(error);
+    } finally {
+        detectingLocation.value = false;
+    }
+}
+
+function updateCoordinatesFromMap(coordinates) {
+    props.form.latitude = coordinates.latitude;
+    props.form.longitude = coordinates.longitude;
+    detectedLocationError.value = '';
+    detectedLocationMessage.value = coordinates.action === 'drag'
+        ? 'Pin moved. These map numbers now point to the new position.'
+        : 'Pin placed. These map numbers now point to the spot you selected.';
 }
 </script>
 
@@ -147,6 +176,28 @@ function selectPhotos(event) {
                     <FormError :message="form.errors.psgc_city_municipality_code" />
                     <p v-if="locationOptionsError" class="mt-2 text-sm text-red-600" role="alert">{{ locationOptionsError }}</p>
                 </div>
+                <div class="sm:col-span-2 rounded-2xl border border-court-100 bg-court-50 p-4">
+                    <div class="sm:flex sm:items-center sm:justify-between sm:gap-5">
+                        <div>
+                            <p class="font-semibold text-court-950">At the venue right now?</p>
+                            <p class="mt-1 text-sm leading-6 text-court-800">Let your phone or computer place the map pin for you. Your browser will ask for permission first.</p>
+                        </div>
+                        <button
+                            type="button"
+                            :disabled="detectingLocation"
+                            class="mt-4 inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-court-700 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-court-800 disabled:cursor-wait disabled:opacity-70 sm:mt-0"
+                            @click="useCurrentLocation"
+                        >
+                            <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <circle cx="12" cy="12" r="3" />
+                                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+                            </svg>
+                            {{ detectingLocation ? 'Finding your location…' : 'Use my current location' }}
+                        </button>
+                    </div>
+                    <p v-if="detectedLocationMessage" class="mt-3 text-sm font-medium text-court-800" role="status">{{ detectedLocationMessage }}</p>
+                    <p v-if="detectedLocationError" class="mt-3 text-sm font-medium text-red-700" role="alert">{{ detectedLocationError }}</p>
+                </div>
                 <div>
                     <label for="latitude" class="mb-2 block text-sm font-medium text-slate-800">Latitude <span class="font-normal text-slate-400">(optional)</span></label>
                     <input id="latitude" v-model="form.latitude" type="number" step="0.0000001" min="-90" max="90" class="w-full rounded-xl border border-slate-300 px-4 py-3 shadow-sm focus:border-court-600" />
@@ -158,12 +209,16 @@ function selectPhotos(event) {
                     <FormError :message="form.errors.longitude" />
                 </div>
                 <div class="sm:col-span-2">
-                    <p class="mb-3 text-xs leading-5 text-slate-500">Enter both map numbers when you know them, then check that the pin points to the venue entrance.</p>
-                    <div v-if="mapPreviewUrl" class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                        <iframe :src="mapPreviewUrl" title="Venue map pin preview" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" class="h-72 w-full border-0"></iframe>
-                        <p class="border-t border-slate-200 px-4 py-2 text-[11px] text-slate-500">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" class="font-semibold text-court-700">OpenStreetMap contributors</a></p>
+                    <p class="mb-3 text-sm font-medium leading-6 text-slate-600">Drag the green pin to the venue entrance, or click the exact spot on the map. The map numbers update automatically.</p>
+                    <div v-if="hasMapCoordinates" class="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+                        <DraggableVenueMap
+                            :latitude="form.latitude"
+                            :longitude="form.longitude"
+                            :tile-url="mapTileUrl"
+                            @change="updateCoordinatesFromMap"
+                        />
                     </div>
-                    <p v-else class="rounded-xl bg-slate-50 px-4 py-5 text-sm text-slate-500">The map preview appears after both map numbers are entered.</p>
+                    <p v-else class="rounded-xl bg-slate-50 px-4 py-5 text-sm text-slate-500">Use your current location or enter both map numbers to show the movable pin.</p>
                 </div>
             </div>
         </section>

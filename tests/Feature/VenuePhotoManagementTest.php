@@ -126,6 +126,22 @@ class VenuePhotoManagementTest extends TestCase
 
         $coverUrl = Storage::disk('public')->url($photos->first()->storage_path);
 
+        $this->actingAs($owner)
+            ->get(route('owner.venues.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Venues/Index')
+                ->where('venues.0.cover_photo.url', $coverUrl)
+                ->where('venues.0.cover_photo.alt_text', $venue->name.' venue photo'));
+
+        $this->actingAs($owner)
+            ->get(route('owner.dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Dashboard')
+                ->where('inventory.cover_photo.url', $coverUrl)
+                ->where('inventory.cover_photo.alt_text', $venue->name.' venue photo'));
+
         $this->get(route('marketplace.venues.show', $venue->slug))
             ->assertOk()
             ->assertSee($coverUrl, false)

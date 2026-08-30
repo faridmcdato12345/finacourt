@@ -85,6 +85,35 @@ services:
       db:
         condition: service_healthy
 
+  queue:
+    build:
+      context: .
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    command: php artisan queue:work --queue=emails,default --sleep=3 --tries=3 --backoff=10 --timeout=90 --max-time=3600
+    restart: unless-stopped
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_KEY: ${APP_KEY:-}
+      APP_URL: http://localhost:${APP_PORT:-8000}
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: ${DB_DATABASE:-court_marketplace}
+      DB_USERNAME: ${DB_USERNAME:-court}
+      DB_PASSWORD: ${DB_PASSWORD:-court_secret}
+      CACHE_STORE: database
+      QUEUE_CONNECTION: database
+      SESSION_DRIVER: database
+    volumes:
+      - .:/var/www/html
+      - composer_vendor:/var/www/html/vendor
+    depends_on:
+      db:
+        condition: service_healthy
+
   web:
     image: nginx:1.27-alpine
     ports:

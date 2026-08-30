@@ -43,7 +43,8 @@ class PilotHardeningTest extends TestCase
             ->assertHeader('X-Request-ID', 'pilot-request-1234')
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
-            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
         $this->assertStringContainsString('no-store', (string) $ready->headers->get('Cache-Control'));
 
         $private = $this->get(route('login'));
@@ -51,6 +52,7 @@ class PilotHardeningTest extends TestCase
         $csp = (string) $private->headers->get('Content-Security-Policy');
         $this->assertStringContainsString("default-src 'self'", $csp);
         $this->assertStringContainsString("object-src 'none'", $csp);
+        $this->assertStringContainsString("img-src 'self' data: https://tile.openstreetmap.org", $csp);
         $this->assertMatchesRegularExpression("~script-src 'self' 'nonce-[A-Za-z0-9]+'~", $csp);
 
         preg_match("/'nonce-([^']+)'/", $csp, $matches);

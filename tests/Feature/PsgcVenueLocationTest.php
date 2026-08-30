@@ -26,6 +26,7 @@ class PsgcVenueLocationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Owner/Venues/Create')
+                ->where('mapTileUrl', 'https://tile.openstreetmap.org/{z}/{x}/{y}.png')
                 ->has('locationParents', 2)
                 ->where('locationParents.0.code', '1102400000')
                 ->where('locationParents.1.code', '1206300000'));

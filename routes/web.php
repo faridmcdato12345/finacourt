@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\Auth\SocialAuthenticationController;
+use App\Http\Controllers\Auth\SocialOwnerSetupController;
 use App\Http\Controllers\Marketplace\DealsController;
 use App\Http\Controllers\Marketplace\DiscoveryController;
 use App\Http\Controllers\Marketplace\HomeController;
@@ -129,6 +131,15 @@ Route::middleware('guest')->group(function () {
         ->name('player.register');
     Route::post('/player/register', [PlayerRegisteredUserController::class, 'store'])
         ->middleware('throttle:6,1');
+    Route::get('/auth/{audience}/{provider}/redirect', [SocialAuthenticationController::class, 'redirect'])
+        ->whereIn('audience', ['owner', 'player'])
+        ->whereIn('provider', ['google', 'facebook', 'apple'])
+        ->middleware('throttle:social-login')
+        ->name('social.redirect');
+    Route::match(['get', 'post'], '/auth/{provider}/callback', [SocialAuthenticationController::class, 'callback'])
+        ->whereIn('provider', ['google', 'facebook', 'apple'])
+        ->middleware('throttle:social-login')
+        ->name('social.callback');
 });
 
 Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
@@ -136,6 +147,11 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->name('logout');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/owner/social/setup', [SocialOwnerSetupController::class, 'create'])
+        ->name('owner.social-setup.create');
+    Route::post('/owner/social/setup', [SocialOwnerSetupController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('owner.social-setup.store');
     Route::get('/email/verify', fn () => view('auth.verify-email', [
         'seo' => [
             'title' => 'Verify your account email',

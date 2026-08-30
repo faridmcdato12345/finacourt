@@ -12,6 +12,8 @@ use App\Bookings\CreateBooking;
 use App\Enums\AcquisitionSource;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
+use App\Enums\PaymentMode;
+use App\Enums\PlayerPaymentOption;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePlayerHoldRequest;
 use App\Marketplace\MarketplaceQuery;
@@ -82,7 +84,13 @@ class BookingController extends Controller
         }
 
         $returnUrl = $request->getRequestUri();
-        $paymentProvider = $payments->default();
+        $defaultPaymentProvider = $payments->default();
+        $onlinePaymentProvider = $payments->online();
+        $onlinePaymentAvailable = $onlinePaymentProvider?->supportsHostedCheckout() === true;
+        $defaultPaymentOption = $onlinePaymentAvailable
+            && $defaultPaymentProvider->mode() === PaymentMode::HostedCheckout
+                ? PlayerPaymentOption::Online
+                : PlayerPaymentOption::PayAtVenue;
 
         return view('player.bookings.create', [
             'venue' => $venue,
@@ -96,8 +104,9 @@ class BookingController extends Controller
             'campaign' => $validated['campaign'] ?? null,
             'availabilityError' => $availabilityError,
             'returnUrl' => $returnUrl,
-            'paymentModeLabel' => $paymentProvider->mode()->label(),
-            'hostedCheckoutAvailable' => $paymentProvider->supportsHostedCheckout(),
+            'defaultPaymentOption' => $defaultPaymentOption->value,
+            'onlinePaymentAvailable' => $onlinePaymentAvailable,
+            'onlinePaymentMethods' => $this->onlinePaymentMethods($onlinePaymentProvider?->key()),
             ...$this->seo('Review your reservation', route('player.bookings.create', [
                 'venueSlug' => $venue->slug,
                 ...$validated,
@@ -112,6 +121,7 @@ class BookingController extends Controller
         CreateBooking $createBooking,
         TrafficAttribution $attribution,
         AnalyticsRecorder $analytics,
+        PaymentProviderRegistry $payments,
     ): RedirectResponse {
         $validated = $request->validated();
         $venue = $marketplace->venue($venueSlug);
@@ -120,6 +130,22 @@ class BookingController extends Controller
         if (! $resource) {
             throw ValidationException::withMessages([
                 'resource_id' => 'The selected resource is not available at this venue.',
+            ]);
+        }
+
+        $paymentOption = isset($validated['payment_option'])
+            ? PlayerPaymentOption::from($validated['payment_option'])
+            : null;
+        $paymentProvider = $paymentOption === null
+            ? $payments->default()
+            : $payments->forPlayerOption($paymentOption);
+
+        if (
+            $paymentProvider === null
+            || ($paymentOption === PlayerPaymentOption::Online && ! $paymentProvider->supportsHostedCheckout())
+        ) {
+            throw ValidationException::withMessages([
+                'payment_option' => 'Online payment is not available right now. Choose pay at venue instead.',
             ]);
         }
 
@@ -149,6 +175,7 @@ class BookingController extends Controller
                 'customer_phone' => $validated['customer_phone'] ?? null,
                 'notes' => null,
                 'create_payment' => true,
+                'payment_provider' => $paymentProvider->key(),
                 'campaign' => $validated['campaign'] ?? null,
             ],
             $request->user(),
@@ -170,7 +197,7 @@ class BookingController extends Controller
             ->with([
                 'venue:id,name,slug,city',
                 'resource:id,name,sport_id',
-                'resource.sport:id,name',
+                'resource.sport:id,name,slug',
                 'payment:payments.id,payments.booking_id,payments.status,payments.requires_review',
             ])
             ->orderByDesc('start_at')
@@ -303,6 +330,27 @@ class BookingController extends Controller
             ->format('H:i');
     }
 
+    /** @return array<int, string> */
+    private function onlinePaymentMethods(?string $providerKey): array
+    {
+        if ($providerKey === null) {
+            return [];
+        }
+
+        return collect(config("payments.providers.{$providerKey}.payment_method_types", []))
+            ->map(fn (string $method): string => match (strtolower($method)) {
+                'card' => 'Card',
+                'gcash' => 'GCash',
+                'qrph' => 'QR Ph',
+                'paymaya', 'maya' => 'Maya',
+                'grab_pay', 'grabpay' => 'GrabPay',
+                default => str($method)->headline()->toString(),
+            })
+            ->unique()
+            ->values()
+            ->all();
+    }
+
     private function playerBooking(Request $request, string $reference): Booking
     {
         return Booking::query()
@@ -310,8 +358,9 @@ class BookingController extends Controller
             ->where('player_user_id', $request->user()->getKey())
             ->with([
                 'venue:id,name,slug,city,province,address',
+                'venue.photos:id,venue_id,storage_path,alt_text,is_primary,sort_order',
                 'resource:id,name,sport_id',
-                'resource.sport:id,name',
+                'resource.sport:id,name,slug',
                 'payment:payments.id,payments.booking_id,payments.reference,payments.provider,payments.status,payments.mode,payments.amount,payments.venue_amount,payments.platform_service_fee_amount,payments.refunded_amount,payments.currency,payments.requires_review,payments.review_reason,payments.paid_at,payments.refunded_at',
                 'review:id,booking_id,rating,body,status,moderation_note,created_at,published_at',
             ])

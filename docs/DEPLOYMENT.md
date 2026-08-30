@@ -12,9 +12,10 @@ This document is the production boundary for the controlled MVP pilot. The root 
 | Database | MySQL 8.4 with InnoDB and UTC database timestamps |
 | Frontend build | Node.js 22 and `npm ci` during build only |
 | Scheduler | One supervised `php artisan schedule:work` process, or cron invoking `schedule:run` every minute |
-| Queue / Redis | Not required by the current code; no queued job is dispatched |
+| Queue | One supervised database-queue worker for the `emails,default` queues |
+| Redis | Not required; the current queue, cache, and sessions use MySQL |
 
-At runtime the required services are the PHP application, web server, MySQL, and scheduler. Node is a build-time dependency. The current database notification channel writes synchronously. If a hosted payment or web-push adapter later dispatches jobs, add and supervise a queue worker before enabling that adapter.
+At runtime the required services are the PHP application, web server, MySQL, scheduler, and queue worker. Node is a build-time dependency. Player database notices remain synchronous, while court-owner booking emails are queued after the booking/payment transaction commits. A production process manager must keep exactly the intended worker count alive and restart workers during deployment.
 
 ## Required production environment
 
@@ -35,11 +36,12 @@ Never copy local values or committed examples verbatim into production. Store se
 | `SESSION_HTTP_ONLY` | `true` |
 | `SESSION_SAME_SITE` | `lax`; reassess only for a documented cross-site flow |
 | `CACHE_STORE` | `database` unless a managed cache is intentionally introduced |
-| `QUEUE_CONNECTION` | `sync` is sufficient today; `database` requires a worker before queued work is added |
+| `QUEUE_CONNECTION` | `database`; run and supervise the `emails,default` worker |
 | `LOG_CHANNEL` / `LOG_STACK` | Container-friendly `stack` / `stderr` |
 | `LOG_LEVEL` | `warning` for the pilot, adjusted temporarily during diagnosis |
 | `SLOW_REQUEST_MS` | Start at `1500`; tune from observed latency |
-| `PAYMENT_PROVIDER` | `manual` for pay-at-venue, or `paymongo` after PayMongo test/live credentials and webhooks are configured |
+| `PAYMENT_PROVIDER` | Safe fallback provider for legacy/internal booking calls; keep `manual` when the player-facing form offers both choices |
+| `PAYMENT_ONLINE_PROVIDER` | Hosted provider behind the player's **Pay online** choice; currently `paymongo` |
 | `PAYMONGO_ENABLED` | `true` only when PayMongo checkout should be registered as an available online provider |
 | `PAYMONGO_MODE` | `test` or `live`; must match the PayMongo keys and webhook endpoint mode |
 | `PAYMONGO_SECRET_KEY` | PayMongo secret API key from the Dashboard; never expose to the browser or source control |
@@ -63,10 +65,40 @@ Never copy local values or committed examples verbatim into production. Store se
 | `GOOGLE_MAPS_API_KEY` | Leave empty until a reviewed server-side Places adapter and restricted key exist |
 | `GOOGLE_BUSINESS_PROFILE_ENABLED` | Keep `false`; OAuth/profile management is intentionally not implemented |
 | `GOOGLE_BUSINESS_PROFILE_CLIENT_ID` / `GOOGLE_BUSINESS_PROFILE_CLIENT_SECRET` / `GOOGLE_BUSINESS_PROFILE_REDIRECT_URI` | Leave empty until Stage C access, consent, encrypted token storage, and revocation are implemented |
+| `MAP_TILE_URL` | Leaflet-compatible tile template for the owner pin editor; default is OpenStreetMap |
+| `MAP_TILE_ORIGIN` | Exact tile origin allowed by the content security policy; must match `MAP_TILE_URL` |
+| `MAP_EMBED_BASE_URL` / `MAP_PUBLIC_BASE_URL` / `MAP_FRAME_ORIGIN` | Public venue map and directions hosts; defaults are OpenStreetMap |
+| `SOCIAL_AUTH_GOOGLE_ENABLED` / `SOCIAL_AUTH_FACEBOOK_ENABLED` / `SOCIAL_AUTH_APPLE_ENABLED` | Enable each login provider only after its complete credentials and exact HTTPS callback are configured |
+| `GOOGLE_AUTH_*` / `FACEBOOK_AUTH_*` | OAuth web client ID, secret, and exact callback; store secrets only in the deployment secret manager |
+| `APPLE_AUTH_*` | Apple Services ID and callback plus either a client secret or team/key/private-key signing values; mount the `.p8` key read-only rather than committing it |
 | `PILOT_DEMO_SEED` | `false` |
-| `MAIL_*` | A real transactional provider only when an email notification channel is implemented |
+| `MAIL_*` | A real transactional provider and monitored sender identity; `log` is development-only and does not deliver owner booking emails |
 
 Provider-specific webhook secrets do not exist for the manual provider. The PayMongo adapter loads its API and webhook secrets from the environment, verifies the raw request body, uses the payment reference as its checkout idempotency key, and exposes `/webhooks/payments/paymongo` as its webhook URL.
+
+### Google, Facebook, and Apple sign-in
+
+FinACourt offers the same optional provider sign-in on owner and player login/registration pages. “iPhone login” is implemented as **Sign in with Apple**. Password login remains the fallback, and a button is shown only when its provider is enabled with complete credentials.
+
+Provider consoles must use the exact canonical HTTPS callbacks:
+
+```text
+https://your-domain.example/auth/google/callback
+https://your-domain.example/auth/facebook/callback
+https://your-domain.example/auth/apple/callback
+```
+
+Google needs an OAuth web client; Facebook needs a Facebook Login app and email permission; Apple needs a Services ID plus either a generated client secret or team ID, key ID, and private `.p8` key. Prefer a read-only secret mount for the Apple key and set `APPLE_AUTH_PRIVATE_KEY` to its container path. Local Apple tests normally require a trusted HTTPS development tunnel.
+
+After changing `.env`, clear/rebuild cached configuration inside Docker:
+
+```bash
+docker compose run --rm --no-deps app php artisan optimize:clear
+```
+
+The `social_accounts` table stores only the provider, stable provider user ID, and provider email; access/refresh tokens are not retained. A provider identity links to an existing password user only when the provider explicitly confirms the matching email was verified. New social owners must name their court business before an owner organization and membership are created.
+
+OAuth state remains enabled. Apple uses `form_post`, so the exact Apple callback is CSRF-exempt but still state-validated. A separate 10-minute encrypted, Secure, HttpOnly, `SameSite=None` cookie carries only state/navigation data across Apple's POST and is deleted at callback. It contains no provider token or credential.
 
 ## Build and release
 
@@ -111,7 +143,7 @@ During release:
 1. Put the application in maintenance mode only if the deployment cannot provide rolling replacement.
 2. Deploy the application and static build from the same revision.
 3. Run `php artisan migrate --force` exactly once, then idempotently import the bundled PSGC reference catalog with `php artisan db:seed --class=Database\\Seeders\\PsgcLocationSeeder --force`.
-4. Start/restart PHP, web, and the single scheduler process.
+4. Start/restart PHP, web, the single scheduler process, and the supervised queue worker.
 5. Clear/rebuild framework caches with `php artisan optimize`.
 6. Disable maintenance mode.
 
@@ -123,6 +155,15 @@ After release:
 - Owner login, one advisory availability read, and a non-destructive test booking in approved pilot inventory work.
 - Response headers include `X-Request-ID`, `X-Content-Type-Options`, `Referrer-Policy`, and production CSP; private pages include `X-Robots-Tag`.
 - Scheduler logs show `bookings:send-reminders` execution without overlapping instances.
+- Queue logs show a live worker consuming `emails,default`; inspect and alert on `failed_jobs`.
+
+The Compose-equivalent production worker command is:
+
+```bash
+php artisan queue:work --queue=emails,default --sleep=3 --tries=3 --backoff=10 --timeout=90
+```
+
+Run `php artisan queue:restart` during a rolling release after the new code is available. The owner-confirmation notification is handed off only after commit and may be retried from `failed_jobs`; its booking-level handoff marker prevents a second confirmation request or duplicate payment webhook from scheduling another copy.
 
 ## Rollback
 

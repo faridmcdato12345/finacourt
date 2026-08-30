@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Player\Auth;
 
+use App\Auth\SocialProviderRegistry;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,11 +13,14 @@ use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
 {
-    public function create(Request $request): View
+    public function create(Request $request, SocialProviderRegistry $providers): View
     {
         $this->rememberReturnUrl($request);
 
-        return view('player.auth.login', $this->viewData('Player sign in'));
+        return view('player.auth.login', [
+            ...$this->viewData('Player sign in'),
+            'socialProviders' => $providers->available('player', $request->query('return')),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse

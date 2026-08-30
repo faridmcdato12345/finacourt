@@ -29,9 +29,12 @@ use App\Visibility\NullBusinessProfileGateway;
 use App\Visibility\NullPlacesProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use SocialiteProviders\Apple\Provider as AppleProvider;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -68,6 +71,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(function (SocialiteWasCalled $event): void {
+            $event->extendSocialite('apple', AppleProvider::class);
+        });
+
         Gate::policy(Organization::class, OrganizationPolicy::class);
         Gate::policy(Promotion::class, PromotionPolicy::class);
         Gate::policy(ReactivationCampaign::class, ReactivationCampaignPolicy::class);
@@ -82,6 +89,8 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(5)->by($email.'|'.$request->ip());
         });
+        RateLimiter::for('social-login', fn (Request $request) => Limit::perMinute(20)
+            ->by($request->ip()));
 
         RateLimiter::for('player-booking', fn (Request $request) => Limit::perMinute(10)
             ->by(($request->user()?->getKey() ?? 'guest').'|'.$request->ip()));

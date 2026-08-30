@@ -16,6 +16,10 @@ Platform booking service-fee update: 2026-08-28
 Court-owner settlement update: 2026-08-29
 Court-owner payout-request and PayMongo alignment update: 2026-08-29
 Player booking-duration update: 2026-08-29
+Player payment-choice update: 2026-08-29
+Player experience polish update: 2026-08-29
+Social sign-in update: 2026-08-30
+Court-owner booking-email update: 2026-08-30
 Scope: the original audit was read-only; this document now also records completed Phases 11–18 and their verification.
 
 ## Executive assessment
@@ -38,7 +42,15 @@ Phase 17 is complete. It adds an on-demand deterministic recommendation engine o
 
 Phase 18 is complete. It adds a separate non-transactional venue directory with row-level provenance and rights attestation, public unclaimed/closed/claimed states, corrections/removal reporting, a real-owner claim request, independent ownership proof, a safety hold, audited conversion into an unpublished tenant venue, a separate marketplace review/revocation gate, and privacy-minimized pre-claim profile analytics. No fake owner, password, organization, membership, court, price, photo, review, availability, booking, or verification badge is created.
 
-Online card/e-wallet checkout is now implemented through a configurable PayMongo Hosted Checkout adapter. The default remains manual/pay-at-venue until the platform owner sets PayMongo credentials and `PAYMENT_PROVIDER=paymongo`. Browser return URLs remain non-authoritative; paid bookings still require a verified, signed provider webhook.
+Online card/e-wallet checkout is implemented through a configurable PayMongo Hosted Checkout adapter. The reservation review now presents explicit **Pay online** and **Pay at venue** cards. The server maps the online choice through `PAYMENT_ONLINE_PROVIDER`, rejects incomplete hosted configuration, ignores browser provider/mode fields, and preserves manual fallback behavior. Browser return URLs remain non-authoritative; paid bookings still require a verified, signed provider webhook.
+
+The public marketplace and private player pages now share an accessible player-experience layer without changing owner or platform workspaces. It adds active navigation states, a mobile play dock, progressive section/card reveals, richer selection feedback, subtle sports-themed motion, and a short confirmed-booking celebration. Player booking history is presented as a personal playbook with game-pass cards, while booking details use a photo-backed game pass, friendly status guidance, and clearer share/review/cancellation sections. All important content remains server-rendered and visible without JavaScript, and `prefers-reduced-motion` disables nonessential animation.
+
+Optional Google, Facebook, and Sign in with Apple authentication is implemented for both player and court-owner entry points. Provider identities use a minimal `social_accounts` link without retained OAuth tokens; existing accounts are auto-linked only after a provider-verified email match. New social owners must explicitly name their court business before an owner organization/membership is created, preserving tenant isolation. Password authentication remains available and unconfigured providers remain hidden.
+
+Court-owner booking confirmation email is implemented around the existing state machine. Pay-at-venue confirmation and trusted PayMongo paid transitions call the same notifier; only a genuinely `confirmed` booking is eligible. Owner memberships in the booking organization receive an immutable queued summary after commit, while staff and unrelated tenants are excluded. Row locking plus `owner_confirmation_notified_at` prevents rapid repeats and duplicate webhooks from scheduling duplicate messages. Local delivery uses the log mailer unless a real transport is configured. Docker verification covers the owner-email, player-notification, payment, reservation, booking-engine, and concurrency suites: 60 tests pass, including duplicate confirmation/webhook and cross-tenant recipient checks; the migration also rolls back and reapplies cleanly in the isolated test database.
+
+Social sign-in verification completed through Docker: the full backend suite passes with 262 tests / 2,348 assertions, the frontend suite passes with 4 tests, the production Vite build succeeds, targeted Pint checks pass, Composer reports no known security advisories, and the `social_accounts` migration was rolled back and reapplied successfully. Live provider callbacks still require platform-owned OAuth credentials and exact provider-console redirect configuration; no credentials are committed.
 
 Platform booking service-fee configuration is now implemented as a targeted payment/monetization extension. Platform administrators can create and activate one current FinACourt booking-fee rule from `/platform/payments`. Player marketplace bookings store separate immutable snapshots for court price, FinACourt service fee, and player total; owner-entered manual/walk-in bookings keep a zero service fee by default. PayMongo checkout sends the court price and FinACourt service fee as separate line items while still reconciling against the trusted player-total snapshot.
 
@@ -57,10 +69,10 @@ The prerequisite public-boundary defect found by the alignment audit is also res
 | 3 — Booking engine and availability | Existing foundation / completed | A shared transactional creation action, resource locking, server-authoritative interval checks, expiring holds, operating-hour/slot enforcement, price snapshots, cancellation, manual bookings, and concurrency tests exist. |
 | 4 — Public marketplace and SEO | Existing foundation / completed | Server-rendered Blade pages, discovery filters, public venue pages, city/sport routes, canonical/meta/structured data, sitemap, maps, reviews, and public availability exist. The social-proof boundary is fixed; Phase 15 removes unsupported generic `InStock` claims from structured data. |
 | 5 — Player reservation flow | Existing foundation / completed | Guest browsing, player authentication, same-day consecutive multi-slot selection within operating hours, hold/confirm flow, history/detail/share/cancel paths, and server-side tamper protection exist. The former arbitrary four-hour player limit was removed; a configurable one-day safety ceiling remains. |
-| 6 — Payments | Existing foundation / completed with configurable online checkout, platform service fee, and manual owner settlements | Payment model and audit transitions, provider contracts, manual/pay-at-venue fallback, current PayMongo v2 Hosted Checkout adapter, platform-admin service-fee rules, separate court-price/player-total snapshots, verified/idempotent webhook processing, amount/reference checks, booking confirmation logic, encrypted owner payout destinations, court-earnings ledger, owner payout requests, refund adjustments, manual payout states, audit events, and CSV statements exist. The active provider is environment-selected; live processing still requires valid PayMongo credentials, enabled account payment methods, HTTPS webhook setup, external payout operations, and live-mode smoke testing. PayMongo split payment is not enabled without approved merchant relationships. |
+| 6 — Payments | Existing foundation / completed with configurable online checkout, player payment choice, platform service fee, and manual owner settlements | Payment model and audit transitions, provider contracts, explicit online/pay-at-venue selection, current PayMongo v2 Hosted Checkout adapter, platform-admin service-fee rules, separate court-price/player-total snapshots, verified/idempotent webhook processing, amount/reference checks, booking confirmation logic, encrypted owner payout destinations, court-earnings ledger, owner payout requests, refund adjustments, manual payout states, audit events, and CSV statements exist. The online provider is environment-selected and server-resolved; live processing still requires valid PayMongo credentials, enabled account payment methods, HTTPS webhook setup, external payout operations, and live-mode smoke testing. PayMongo split payment is not enabled without approved merchant relationships. |
 | 7 — Promotions | Existing foundation / completed as Promotions v1 | Tenant-scoped venue/resource/time-window promotions, discount calculation, campaign tokens, public discovery, booking attribution and snapshots, owner CRUD/preview, and counters exist. Phase 12 extends this foundation in place. |
 | 8 — Analytics and attribution | Existing foundation / completed for MVP | Privacy-conscious events, owner reports, platform acquisition reporting, traffic attribution, booking/revenue/promotion metrics, filters, and tests exist. Phase 11 extends this foundation rather than replacing it. |
-| 9 — PWA, notifications, performance, UX | Existing foundation / completed for MVP | Manifest, service worker, safe cache boundaries, offline page, database notifications, reminder scheduler, responsive UI, and production build exist. Real web push is represented only by an interface/null adapter. |
+| 9 — PWA, notifications, performance, UX | Existing foundation / completed for MVP | Manifest, service worker, safe cache boundaries, offline page, player database notifications, owner booking-confirmation email, reminder scheduler, responsive UI, and production build exist. Owner email uses a supervised database queue; real web push is represented only by an interface/null adapter. |
 | 10 — Pilot readiness and hardening | Existing foundation / completed with documented limitations | Security headers, rate limits, CSRF/webhook boundary, indexes, demo guard, deployment/QA documentation, readiness route, and an end-to-end pilot test exist. Deployment remains an application template rather than a production topology. |
 | 11 — Demand intelligence | **Completed** | Search events have normalized/indexed intent and outcome fields, legacy backfill, owner privacy thresholds and geography boundaries, platform/owner demand dashboards, current/prior-period aggregation, demo exclusion, and regression tests. |
 | 12 — Promotions v2 | **Completed** | Existing campaigns remain valid; goals, safe lifecycle states, normalized exact slots, empty-slot suggestions, privacy-safe audience buckets, stable slot tokens, and marketplace exposure hooks are implemented and regression tested. |
@@ -151,11 +163,12 @@ The development topology is Docker-first:
 | `db` | MySQL 8.4 with a named `mysql_data` volume |
 | `node` | Node 22 / Vite development server and frontend command runtime |
 | `scheduler` | `php artisan schedule:work`; currently runs booking reminders hourly |
+| `queue` | Database worker for retryable `emails,default` queued notifications |
 | `test` profile | PHP test runner using the separate `court_marketplace_test` database on `db`, guarded by `tests/TestCase.php` |
 
 Composer vendor and Node modules also use named volumes. The PHP entrypoint installs dependencies when absent, prepares storage, and creates the storage link. Nginx applies upload limits, security response headers, and static-asset caching. `.dockerignore`, `.env.example`, and documented Compose commands are present. Redis is not required. The application selects database-backed cache, sessions, and queue storage.
 
-There is no queue worker because no current class implements queued work. Any Phase 11+ design that introduces queued aggregation or delivery must add and verify a Compose worker and choose after-commit dispatch deliberately (`queue.after_commit` is currently false).
+The queue worker was added for `OwnerBookingConfirmedNotification`, which explicitly uses after-commit dispatch even though the global `queue.after_commit` setting remains false. Redis is not required because queue storage is database-backed. Production must supervise the worker and configure a real mail transport; the development `log` mailer only records the message.
 
 Operational observations:
 
@@ -445,6 +458,24 @@ The feature suite protects:
 - Existing booking conflicts, holds, promotion pricing, acquisition attribution, payment redirects, and webhook state transitions were extended in place rather than redesigned. No environment variable, queue worker, Redis service, or new payment provider was added.
 
 ## Verification performed
+
+### Player experience polish
+
+- Shared player shell covers the homepage, court discovery, venue/deal pages, player authentication, reservation review, booking history/details, and notification preferences without changing owner/platform layouts.
+- Booking history and detail pages now use a playful playbook/game-pass presentation while preserving player ownership, payment state, secure signed sharing, reviews, and cancellation behavior; the focused player-reservation suite passed with **13 tests and 109 assertions**.
+- Full Docker backend suite: **249 tests passed, 2,257 assertions**.
+- Player/public/payment/PWA regression runs: **59 tests passed, 460 assertions**; the confirmed-booking presentation has a direct regression assertion.
+- Repository-wide Pint check passed for **405 files**; frontend component tests passed (**2 tests**), and the production Vite build passed with **3,056 modules transformed**.
+- The motion layer uses progressive enhancement and an explicit reduced-motion fallback. No dependency, environment variable, database migration, service-worker cache rule, booking rule, or payment rule changed.
+
+### Player payment choice
+
+- Reservation review now presents explicit **Pay online** and **Pay at venue** cards. The selected option is mapped to a trusted provider on the server; browser-supplied provider and payment-mode values are ignored.
+- Focused payment, player-reservation, and platform-fee run: **42 tests passed, 303 assertions**, covering both payment choices, provider override protection, incomplete hosted-checkout configuration, invalid choices, PayMongo checkout, signed webhooks, service-fee snapshots, and existing reservation behavior.
+- Full Docker backend suite: **248 tests passed, 2,236 assertions**.
+- Repository-wide Pint check passed for **405 files**; `docker compose config -q` and `git diff --check` passed.
+- Frontend component tests passed (**2 tests**), and the production build passed with **3,056 modules transformed**.
+- No migration was required. The current local environment intentionally reports online checkout as unavailable until the PayMongo webhook secret and remaining production-safe credentials are configured.
 
 ### Court-owner settlements
 

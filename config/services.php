@@ -35,4 +35,26 @@ return [
         ],
     ],
 
+    'google' => [
+        'client_id' => env('GOOGLE_AUTH_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_AUTH_CLIENT_SECRET'),
+        'redirect' => env('GOOGLE_AUTH_REDIRECT_URI', env('APP_URL').'/auth/google/callback'),
+    ],
+
+    'facebook' => [
+        'client_id' => env('FACEBOOK_AUTH_CLIENT_ID'),
+        'client_secret' => env('FACEBOOK_AUTH_CLIENT_SECRET'),
+        'redirect' => env('FACEBOOK_AUTH_REDIRECT_URI', env('APP_URL').'/auth/facebook/callback'),
+    ],
+
+    'apple' => [
+        'client_id' => env('APPLE_AUTH_CLIENT_ID'),
+        'client_secret' => env('APPLE_AUTH_CLIENT_SECRET'),
+        'redirect' => env('APPLE_AUTH_REDIRECT_URI', env('APP_URL').'/auth/apple/callback'),
+        'key_id' => env('APPLE_AUTH_KEY_ID'),
+        'team_id' => env('APPLE_AUTH_TEAM_ID'),
+        'private_key' => env('APPLE_AUTH_PRIVATE_KEY'),
+        'passphrase' => env('APPLE_AUTH_PRIVATE_KEY_PASSPHRASE'),
+    ],
+
 ];

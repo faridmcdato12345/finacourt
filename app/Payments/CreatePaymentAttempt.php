@@ -7,6 +7,7 @@ use App\Enums\PaymentStatus;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\User;
+use App\Payments\Contracts\PaymentProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -14,14 +15,14 @@ class CreatePaymentAttempt
 {
     public function __construct(private readonly PaymentProviderRegistry $providers) {}
 
-    public function mode(): PaymentMode
+    public function mode(?string $providerKey = null): PaymentMode
     {
-        return $this->providers->default()->mode();
+        return $this->provider($providerKey)->mode();
     }
 
-    public function handle(Booking $booking, ?User $creator = null): Payment
+    public function handle(Booking $booking, ?User $creator = null, ?string $providerKey = null): Payment
     {
-        $provider = $this->providers->default();
+        $provider = $this->provider($providerKey);
 
         if ($provider->mode() === PaymentMode::HostedCheckout && ! $provider->supportsHostedCheckout()) {
             throw ValidationException::withMessages([
@@ -52,6 +53,18 @@ class CreatePaymentAttempt
         ]);
 
         return $payment;
+    }
+
+    private function provider(?string $providerKey): PaymentProvider
+    {
+        if ($providerKey === null) {
+            return $this->providers->default();
+        }
+
+        return $this->providers->find($providerKey)
+            ?? throw ValidationException::withMessages([
+                'payment' => 'The selected payment method is not available.',
+            ]);
     }
 
     private function reference(): string

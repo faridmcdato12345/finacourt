@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Player\Auth;
 
+use App\Auth\SocialProviderRegistry;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
@@ -14,7 +15,7 @@ use Illuminate\View\View;
 
 class RegisteredUserController extends Controller
 {
-    public function create(Request $request): View
+    public function create(Request $request, SocialProviderRegistry $providers): View
     {
         $this->rememberReturnUrl($request);
 
@@ -27,6 +28,7 @@ class RegisteredUserController extends Controller
                 'type' => 'website',
             ],
             'structuredData' => [],
+            'socialProviders' => $providers->available('player', $request->query('return')),
         ]);
     }
 

@@ -32,7 +32,10 @@ class VenueController extends Controller
         Gate::authorize('viewAny', [Venue::class, $context->organization()]);
 
         $paginator = $context->organization()->venues()
-            ->with('sports:id,name')
+            ->with([
+                'sports:id,name',
+                'photos:id,venue_id,storage_path,alt_text,sort_order,is_primary',
+            ])
             ->withExists('claimedDirectoryListings as requires_platform_review')
             ->withCount([
                 'resources',
@@ -42,19 +45,27 @@ class VenueController extends Controller
             ->paginate(20)
             ->withQueryString();
         $venues = $paginator->getCollection()
-            ->map(fn (Venue $venue) => [
-                'id' => $venue->getKey(),
-                'name' => $venue->name,
-                'slug' => $venue->slug,
-                'city' => $venue->city,
-                'province' => $venue->province,
-                'is_published' => $venue->is_published,
-                'is_verified' => $venue->verified_at !== null,
-                'requires_platform_review' => (bool) $venue->requires_platform_review,
-                'sports' => $venue->sports->pluck('name'),
-                'resources_count' => $venue->resources_count,
-                'active_resources_count' => $venue->active_resources_count,
-            ]);
+            ->map(function (Venue $venue): array {
+                $coverPhoto = $venue->photos->first();
+
+                return [
+                    'id' => $venue->getKey(),
+                    'name' => $venue->name,
+                    'slug' => $venue->slug,
+                    'city' => $venue->city,
+                    'province' => $venue->province,
+                    'is_published' => $venue->is_published,
+                    'is_verified' => $venue->verified_at !== null,
+                    'requires_platform_review' => (bool) $venue->requires_platform_review,
+                    'sports' => $venue->sports->pluck('name'),
+                    'resources_count' => $venue->resources_count,
+                    'active_resources_count' => $venue->active_resources_count,
+                    'cover_photo' => $coverPhoto ? [
+                        'url' => Storage::disk('public')->url($coverPhoto->storage_path),
+                        'alt_text' => $coverPhoto->alt_text ?: $venue->name.' venue photo',
+                    ] : null,
+                ];
+            });
 
         return Inertia::render('Owner/Venues/Index', [
             'venues' => $venues,
@@ -341,7 +352,7 @@ class VenueController extends Controller
         return $data;
     }
 
-    /** @return array{sports: mixed, amenities: mixed, locationParents: mixed, mapEmbedBaseUrl: string} */
+    /** @return array{sports: mixed, amenities: mixed, locationParents: mixed, mapTileUrl: string} */
     private function catalogOptions(): array
     {
         return [
@@ -358,7 +369,7 @@ class VenueController extends Controller
                     'level' => $location->level,
                     'label' => $location->name.' — '.ucfirst($location->level),
                 ]),
-            'mapEmbedBaseUrl' => (string) config('maps.embed_base_url'),
+            'mapTileUrl' => (string) config('maps.tile_url'),
         ];
     }
 }

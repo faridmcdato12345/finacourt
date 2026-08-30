@@ -39,4 +39,19 @@ class MarketingPreferenceController extends Controller
             ? 'Comeback messages are enabled for the channels you selected.'
             : 'You are unsubscribed from marketing messages. Booking and payment updates remain enabled.');
     }
+
+    /** @return array{seo: array<string, string>, structuredData: array<never>} */
+    private function seo(string $title, string $canonical): array
+    {
+        return [
+            'seo' => [
+                'title' => $title,
+                'description' => 'Choose which optional FinACourt player messages you want to receive.',
+                'canonical' => $canonical,
+                'robots' => 'noindex,nofollow',
+                'type' => 'website',
+            ],
+            'structuredData' => [],
+        ];
+    }
 }

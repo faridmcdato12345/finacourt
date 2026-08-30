@@ -6,6 +6,11 @@
         $coverPhotoUrl = $coverPhoto
             ? Illuminate\Support\Facades\Storage::disk('public')->url($coverPhoto->storage_path)
             : null;
+        $selectedPaymentOption = old('payment_option', $defaultPaymentOption);
+
+        if (! $onlinePaymentAvailable && $selectedPaymentOption === 'online') {
+            $selectedPaymentOption = 'pay_at_venue';
+        }
     @endphp
 
     <section class="border-b border-slate-200 bg-white"><div class="page-shell max-w-6xl py-8 sm:py-10"><a href="{{ route('marketplace.venues.show', array_filter(['venueSlug' => $venue->slug, 'resource' => $resource->id, 'date' => $date, 'duration' => $duration, 'campaign' => $campaign])) }}#availability" class="text-sm font-semibold text-court-700">← Change time</a><div class="mt-6 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p class="eyebrow">Booking details</p><h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Review before we hold your court</h1><p class="mt-2 text-sm text-slate-500">The server will validate availability and price again when you continue.</p></div><ol class="flex items-center gap-2 text-xs font-semibold"><li class="flex items-center gap-2 text-court-700"><span class="grid size-7 place-items-center rounded-full bg-court-700 text-white">1</span>Details</li><li class="h-px w-7 bg-slate-200"></li><li class="flex items-center gap-2 text-slate-400"><span class="grid size-7 place-items-center rounded-full border border-slate-300">2</span>Confirm</li></ol></div></div></section>
@@ -27,6 +32,59 @@
                         <p class="eyebrow">Player details</p><h2 class="mt-2 text-xl font-semibold">Who is this booking for?</h2><p class="mt-2 text-sm text-slate-500">Reservation updates will be associated with {{ auth()->user()->email }}.</p>
                         @if ($errors->any())<div class="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ $errors->first() }}</div>@endif
                         <div class="mt-6 grid gap-5 sm:grid-cols-2"><label class="block"><span class="text-sm font-medium">Booking name</span><input name="customer_name" value="{{ old('customer_name', auth()->user()->name) }}" autocomplete="name" required class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label><label class="block"><span class="text-sm font-medium">Phone <span class="font-normal text-slate-400">optional</span></span><input name="customer_phone" value="{{ old('customer_phone') }}" autocomplete="tel" class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label></div>
+                        <fieldset class="mt-7">
+                            <legend class="text-base font-semibold text-slate-950">How would you like to pay?</legend>
+                            <p class="mt-1 text-sm leading-6 text-slate-500">Choose how you want to complete this reservation after the court is held.</p>
+                            <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                                <label class="relative block @if (! $onlinePaymentAvailable) cursor-not-allowed @else cursor-pointer @endif">
+                                    <input
+                                        name="payment_option"
+                                        type="radio"
+                                        value="online"
+                                        required
+                                        @checked($selectedPaymentOption === 'online')
+                                        @disabled(! $onlinePaymentAvailable)
+                                        class="peer sr-only"
+                                    >
+                                    <span class="flex h-full min-h-40 flex-col rounded-2xl border border-slate-200 bg-white p-5 transition peer-checked:border-court-600 peer-checked:bg-court-50 peer-checked:ring-2 peer-checked:ring-court-200 peer-focus-visible:ring-2 peer-focus-visible:ring-court-500 peer-disabled:bg-slate-50 peer-disabled:opacity-65">
+                                        <span>
+                                            <span class="grid size-11 place-items-center rounded-xl bg-court-100 text-court-800">
+                                                <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/></svg>
+                                            </span>
+                                        </span>
+                                        <strong class="mt-4 text-base text-slate-950">Pay online</strong>
+                                        @if ($onlinePaymentAvailable)
+                                            <span class="mt-1 text-sm leading-6 text-slate-600">Pay securely after your time is held. Your booking is confirmed only after payment is verified.</span>
+                                            @if ($onlinePaymentMethods)
+                                                <span class="mt-3 flex flex-wrap gap-1.5">
+                                                    @foreach ($onlinePaymentMethods as $method)
+                                                        <span class="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-court-800 ring-1 ring-court-200">{{ $method }}</span>
+                                                    @endforeach
+                                                </span>
+                                            @endif
+                                        @else
+                                            <span class="mt-1 text-sm leading-6 text-slate-500">Not available right now. FinACourt still needs a complete secure-payment setup.</span>
+                                        @endif
+                                    </span>
+                                    <span aria-hidden="true" class="absolute right-5 top-5 grid size-6 place-items-center rounded-full border border-slate-300 text-transparent transition peer-checked:border-court-700 peer-checked:bg-court-700 peer-checked:text-white">✓</span>
+                                </label>
+
+                                <label class="relative block cursor-pointer">
+                                    <input name="payment_option" type="radio" value="pay_at_venue" required @checked($selectedPaymentOption === 'pay_at_venue') class="peer sr-only">
+                                    <span class="flex h-full min-h-40 flex-col rounded-2xl border border-slate-200 bg-white p-5 transition peer-checked:border-court-600 peer-checked:bg-court-50 peer-checked:ring-2 peer-checked:ring-court-200 peer-focus-visible:ring-2 peer-focus-visible:ring-court-500">
+                                        <span>
+                                            <span class="grid size-11 place-items-center rounded-xl bg-amber-50 text-amber-800">
+                                                <svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 10h16M6 10V7l6-3 6 3v3M6 10v8M10 10v8M14 10v8M18 10v8M4 20h16"/></svg>
+                                            </span>
+                                        </span>
+                                        <strong class="mt-4 text-base text-slate-950">Pay at venue</strong>
+                                        <span class="mt-1 text-sm leading-6 text-slate-600">Reserve the court now and pay the displayed total directly when you arrive.</span>
+                                        <span class="mt-auto pt-3 text-xs font-semibold text-slate-500">No online payment will be collected.</span>
+                                    </span>
+                                    <span aria-hidden="true" class="absolute right-5 top-5 grid size-6 place-items-center rounded-full border border-slate-300 text-transparent transition peer-checked:border-court-700 peer-checked:bg-court-700 peer-checked:text-white">✓</span>
+                                </label>
+                            </div>
+                        </fieldset>
                         <label class="mt-6 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><input name="terms" type="checkbox" value="1" required class="mt-1 rounded border-slate-300"><span>I understand this creates a {{ config('booking.hold_minutes') }}-minute hold. FinACourt will check the court and payment status again before confirming.</span></label>
                         <button data-loading-label="Securing your hold…" class="mt-6 min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Hold this time for {{ config('booking.hold_minutes') }} minutes</button>
                     </form>
@@ -54,7 +112,7 @@
                 </div>
                 <div class="flex justify-between gap-5">
                     <dt class="text-slate-400">Payment</dt>
-                    <dd class="text-right font-medium">{{ $paymentModeLabel }}@if ($hostedCheckoutAvailable)<span class="block text-xs font-normal text-slate-400">Cards and e-wallets supported</span>@endif</dd>
+                    <dd class="text-right font-medium">Choose below<span class="block text-xs font-normal text-slate-400">Online or at venue</span></dd>
                 </div>
             </dl>
             @if ($promotion)

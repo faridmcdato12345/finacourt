@@ -7,7 +7,7 @@
         $end = $booking->end_at->setTimezone($booking->timezone);
     @endphp
     <section class="mx-auto max-w-xl px-5 py-12 sm:px-8 sm:py-20">
-        <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg">
+        <div data-player-card class="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg">
             <div class="bg-slate-950 p-6 text-white sm:p-8"><p class="text-sm font-semibold text-court-300">Shared reservation</p><h1 class="mt-2 text-3xl font-semibold tracking-tight">{{ $booking->venue->name }}</h1><p class="mt-3 text-sm text-slate-400">Reference {{ $booking->reference }}</p></div>
             <div class="p-6 sm:p-8">
                 <span class="rounded-full bg-court-50 px-3 py-1.5 text-sm font-semibold text-court-800">{{ $status->label() }}</span>

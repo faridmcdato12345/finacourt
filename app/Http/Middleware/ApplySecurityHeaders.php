@@ -20,13 +20,18 @@ class ApplySecurityHeaders
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('X-XSS-Protection', '0');
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-        $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        // Venue owners can deliberately request their current position on
+        // FinACourt pages. Keep camera/microphone disabled and prevent any
+        // third-party frame from receiving geolocation access.
+        $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self)');
 
         if ($this->isPrivate($request)) {
             $response->headers->set('X-Robots-Tag', 'noindex, nofollow, noarchive');
         }
 
         if ((bool) config('security.content_security_policy')) {
+            $mapTileOrigin = trim((string) config('maps.tile_origin'));
+
             $response->headers->set('Content-Security-Policy', implode('; ', [
                 "default-src 'self'",
                 "base-uri 'self'",
@@ -35,7 +40,7 @@ class ApplySecurityHeaders
                 "form-action 'self'",
                 "frame-ancestors 'self'",
                 "frame-src 'self' ".config('maps.frame_origin'),
-                "img-src 'self' data:",
+                "img-src 'self' data:".($mapTileOrigin !== '' ? " {$mapTileOrigin}" : ''),
                 "manifest-src 'self'",
                 "object-src 'none'",
                 "script-src 'self' 'nonce-{$nonce}'",

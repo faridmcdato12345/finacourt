@@ -2,9 +2,14 @@
 
 namespace App\Notifications;
 
+use App\Enums\BookingStatus;
+use App\Enums\MembershipRole;
+use App\Enums\PaymentMode;
 use App\Models\Booking;
+use App\Models\User;
 use App\Notifications\Contracts\WebPushGateway;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 
 class BookingNotifier
 {
@@ -12,22 +17,27 @@ class BookingNotifier
 
     public function confirmed(Booking $booking): void
     {
-        if ($booking->player_user_id === null || $booking->confirmation_notified_at !== null) {
+        if ($booking->player_user_id === null || $booking->status !== BookingStatus::Confirmed) {
             return;
         }
 
-        $booking->loadMissing(['player', 'venue', 'resource']);
-        $start = $booking->start_at->setTimezone($booking->timezone);
-        $payload = [
-            'kind' => 'booking_confirmed',
-            'title' => 'Reservation confirmed',
-            'message' => "{$booking->venue->name} · {$booking->resource->name} on {$start->format('M j')} at {$start->format('H:i')}.",
-            'url' => route('player.bookings.show', $booking->reference),
-            'booking_reference' => $booking->reference,
-        ];
+        $booking->loadMissing(['player', 'venue', 'resource', 'organization']);
 
-        $this->deliver($booking, $payload);
-        $booking->forceFill(['confirmation_notified_at' => now()])->saveQuietly();
+        if ($booking->confirmation_notified_at === null) {
+            $start = $booking->start_at->setTimezone($booking->timezone);
+            $payload = [
+                'kind' => 'booking_confirmed',
+                'title' => 'Reservation confirmed',
+                'message' => "{$booking->venue->name} · {$booking->resource->name} on {$start->format('M j')} at {$start->format('H:i')}.",
+                'url' => route('player.bookings.show', $booking->reference),
+                'booking_reference' => $booking->reference,
+            ];
+
+            $this->deliver($booking, $payload);
+            $booking->forceFill(['confirmation_notified_at' => now()])->saveQuietly();
+        }
+
+        $this->notifyOwnersOfConfirmation($booking);
     }
 
     public function paymentReceived(Booking $booking): void
@@ -87,5 +97,50 @@ class BookingNotifier
                 report($exception);
             }
         });
+    }
+
+    private function notifyOwnersOfConfirmation(Booking $booking): void
+    {
+        if ($booking->owner_confirmation_notified_at !== null) {
+            return;
+        }
+
+        $owners = User::query()
+            ->whereNotNull('email')
+            ->whereHas('memberships', fn ($query) => $query
+                ->where('organization_id', $booking->organization_id)
+                ->where('role', MembershipRole::Owner))
+            ->get();
+
+        if ($owners->isEmpty()) {
+            return;
+        }
+
+        $start = $booking->start_at->setTimezone($booking->timezone);
+        $end = $booking->end_at->setTimezone($booking->timezone);
+        $paymentLabel = $booking->payment_mode === PaymentMode::HostedCheckout
+            ? 'Paid online'
+            : 'Pay at the venue';
+
+        Notification::send($owners, new OwnerBookingConfirmedNotification(
+            bookingReference: $booking->reference,
+            organizationName: $booking->organization->name,
+            venueName: $booking->venue->name,
+            courtName: $booking->resource->name,
+            playerName: $booking->customer_name,
+            playerEmail: $booking->customer_email,
+            playerPhone: $booking->customer_phone,
+            date: $start->format('D, M j, Y'),
+            time: $start->format('H:i').'–'.$end->format('H:i'),
+            timezone: $booking->timezone,
+            paymentLabel: $paymentLabel,
+            bookingValue: $booking->currency.' '.number_format((float) $booking->total_amount, 2),
+            ownerBookingUrl: route('owner.bookings.index', ['date' => $start->toDateString()]),
+        ));
+
+        // Confirmation callers hold the booking row lock. Recording the queue
+        // handoff inside that transaction prevents player retries or duplicate
+        // provider webhooks from scheduling the same owner email twice.
+        $booking->forceFill(['owner_confirmation_notified_at' => now()])->saveQuietly();
     }
 }

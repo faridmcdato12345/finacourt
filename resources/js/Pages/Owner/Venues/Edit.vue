@@ -4,7 +4,7 @@ import VenueForm from '../../../Components/VenueForm.vue';
 import VenuePhotoManager from '../../../Components/VenuePhotoManager.vue';
 import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
 
-const props = defineProps({ venue: Object, sports: Array, amenities: Array, locationParents: Array, mapEmbedBaseUrl: String });
+const props = defineProps({ venue: Object, sports: Array, amenities: Array, locationParents: Array, mapTileUrl: String });
 
 const form = useForm({
     name: props.venue.name,
@@ -45,7 +45,7 @@ function destroyVenue() {
             <p class="mt-2 text-slate-600">Update photos, location, sports, facilities, contact details, and whether players can see it.</p>
             <div class="mt-8 space-y-7">
                 <VenuePhotoManager :venue="venue" />
-                <VenueForm :form="form" :sports="sports" :amenities="amenities" :location-parents="locationParents" :existing-state="venue" :map-embed-base-url="mapEmbedBaseUrl" submit-label="Save venue" @submit="submit" />
+                <VenueForm :form="form" :sports="sports" :amenities="amenities" :location-parents="locationParents" :existing-state="venue" :map-tile-url="mapTileUrl" submit-label="Save venue" @submit="submit" />
             </div>
 
             <section class="mt-10 rounded-2xl border border-red-200 bg-red-50 p-6">

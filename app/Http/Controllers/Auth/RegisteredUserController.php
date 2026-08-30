@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\SocialProviderRegistry;
 use App\Enums\MembershipRole;
 use App\Http\Controllers\Controller;
 use App\Models\Membership;
@@ -20,9 +21,11 @@ use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
-    public function create(): Response
+    public function create(SocialProviderRegistry $providers): Response
     {
-        return Inertia::render('Auth/Register');
+        return Inertia::render('Auth/Register', [
+            'socialProviders' => $providers->available('owner'),
+        ]);
     }
 
     public function store(Request $request, PartnerRegistrationAttributor $partnerAttribution): RedirectResponse

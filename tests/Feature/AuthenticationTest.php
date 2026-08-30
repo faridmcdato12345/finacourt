@@ -22,6 +22,17 @@ class AuthenticationTest extends TestCase
             ->assertSee('"component":"Auth\\/Register"', false);
     }
 
+    public function test_public_header_gives_players_and_court_owners_clear_login_paths(): void
+    {
+        $this->get(route('marketplace.home'))
+            ->assertOk()
+            ->assertSee('Player log in')
+            ->assertSee('Owner log in')
+            ->assertSee('href="'.route('player.login').'"', false)
+            ->assertSee('href="'.route('login').'"', false)
+            ->assertSee('List your courts');
+    }
+
     public function test_owner_can_register_with_a_new_organization(): void
     {
         $response = $this->post('/register', [

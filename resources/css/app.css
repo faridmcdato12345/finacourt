@@ -251,6 +251,350 @@ button:disabled,
     @apply pointer-events-none cursor-not-allowed;
 }
 
+/* Player-facing motion and interaction layer. Owner/platform workspaces use separate layouts. */
+.player-experience {
+    background:
+        radial-gradient(circle at 8% 18%, rgb(180 237 207 / 0.24), transparent 22rem),
+        radial-gradient(circle at 92% 46%, rgb(254 215 170 / 0.2), transparent 24rem),
+        #f7f8f6;
+}
+
+.player-header {
+    overflow: hidden;
+    box-shadow: 0 8px 30px rgb(15 23 42 / 0.035);
+}
+
+.player-header::after {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    content: '';
+    background: linear-gradient(90deg, transparent 0%, var(--color-court-400) 40%, #f59e0b 52%, transparent 100%);
+    opacity: 0.7;
+    transform: translateX(-125%);
+    animation: player-rally-line 9s ease-in-out infinite;
+}
+
+.player-logo img {
+    box-shadow: 0 8px 20px rgb(20 109 74 / 0.16);
+    transition: transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 300ms ease;
+}
+
+.player-logo:hover img {
+    box-shadow: 0 10px 24px rgb(20 109 74 / 0.25);
+    transform: rotate(-5deg) scale(1.06);
+}
+
+.player-nav-link {
+    position: relative;
+}
+
+.player-nav-link::after {
+    position: absolute;
+    right: 0.7rem;
+    bottom: 0.18rem;
+    left: 0.7rem;
+    height: 2px;
+    content: '';
+    border-radius: 9999px;
+    background: var(--color-court-500);
+    transform: scaleX(0);
+    transform-origin: center;
+    transition: transform 220ms ease;
+}
+
+.player-nav-link:hover::after,
+.player-nav-link[aria-current='page']::after {
+    transform: scaleX(1);
+}
+
+.player-nav-link[aria-current='page'] {
+    @apply bg-court-50 text-court-800;
+}
+
+.player-main {
+    position: relative;
+    isolation: isolate;
+}
+
+.player-mobile-dock {
+    position: fixed;
+    right: 0.8rem;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    left: 0.8rem;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.2rem;
+    max-width: 27rem;
+    margin-inline: auto;
+    padding: 0.4rem;
+    border: 1px solid rgb(255 255 255 / 0.75);
+    border-radius: 1.4rem;
+    background: rgb(8 41 30 / 0.94);
+    box-shadow: 0 20px 45px rgb(8 41 30 / 0.28);
+    backdrop-filter: blur(18px);
+}
+
+.player-mobile-dock a {
+    @apply flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-semibold text-court-100;
+    min-height: 3.35rem;
+}
+
+.player-mobile-dock a[aria-current='page'] {
+    @apply bg-white text-court-800;
+    box-shadow: 0 7px 18px rgb(8 41 30 / 0.18);
+}
+
+.player-mobile-dock a:active {
+    transform: scale(0.96);
+}
+
+.player-experience[data-player-motion='ready'] .player-reveal {
+    opacity: 0;
+    translate: 0 1rem;
+    transition:
+        opacity 520ms ease var(--player-reveal-delay, 0ms),
+        translate 620ms cubic-bezier(0.16, 1, 0.3, 1) var(--player-reveal-delay, 0ms);
+}
+
+.player-experience[data-player-motion='ready'] .player-reveal.is-visible {
+    opacity: 1;
+    translate: 0 0;
+}
+
+.player-reveal-delay-0 { --player-reveal-delay: 0ms; }
+.player-reveal-delay-1 { --player-reveal-delay: 65ms; }
+.player-reveal-delay-2 { --player-reveal-delay: 130ms; }
+.player-reveal-delay-3 { --player-reveal-delay: 195ms; }
+
+.player-card-motion {
+    transition:
+        translate 260ms cubic-bezier(0.16, 1, 0.3, 1),
+        border-color 260ms ease,
+        box-shadow 260ms ease;
+}
+
+.player-experience main :is(a, button)[class~='bg-court-700'] {
+    position: relative;
+    overflow: hidden;
+    transform: translateZ(0);
+    transition:
+        transform 180ms ease,
+        background-color 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.player-experience main :is(a, button)[class~='bg-court-700']::after {
+    position: absolute;
+    top: -70%;
+    bottom: -70%;
+    left: -35%;
+    width: 22%;
+    content: '';
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.42), transparent);
+    transform: translateX(-260%) rotate(12deg);
+    transition: transform 600ms ease;
+}
+
+.player-experience main :is(a, button)[class~='bg-court-700']:hover::after {
+    transform: translateX(700%) rotate(12deg);
+}
+
+.player-experience main :is(a, button)[class~='bg-court-700']:active {
+    transform: scale(0.98);
+}
+
+.player-experience input.peer:checked + span {
+    animation: player-choice-pop 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.player-experience [data-slot-picker][data-enhanced='true'] [data-slot][aria-pressed='true'] {
+    animation: player-slot-pop 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.player-experience .court-visual::before {
+    animation: player-court-breathe 5s ease-in-out infinite;
+}
+
+[data-player-hero] h1 span {
+    background: linear-gradient(100deg, var(--color-court-700), var(--color-court-400), var(--color-court-800));
+    background-size: 180% auto;
+    color: transparent;
+    background-clip: text;
+    animation: player-title-shift 7s ease-in-out infinite;
+}
+
+[data-sport-chip] > span:first-child {
+    transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-sport-chip]:hover > span:first-child {
+    transform: rotate(-9deg) scale(1.1);
+}
+
+[data-featured-deal] > div:last-child > span:first-child {
+    animation: player-deal-float 3.6s ease-in-out infinite;
+}
+
+[data-booking-celebration] {
+    position: relative;
+    overflow: hidden;
+}
+
+[data-player-bookings-hero] .court-visual::after,
+[data-player-game-pass-hero] .court-visual::after {
+    animation: player-hero-orbit 10s ease-in-out infinite alternate;
+}
+
+[data-player-booking-card] .court-visual + div {
+    transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-player-booking-card]:hover .court-visual + div {
+    transform: scale(1.08) rotate(-2deg);
+}
+
+[data-player-booking-card] {
+    position: relative;
+}
+
+[data-player-booking-card]::after {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    content: '';
+    background: linear-gradient(90deg, var(--color-court-300), var(--color-court-600), #f59e0b);
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 350ms ease;
+}
+
+[data-player-booking-card]:hover::after {
+    transform: scaleX(1);
+}
+
+[data-player-game-ticket] {
+    transform: rotate(1deg);
+    animation: player-ticket-float 4.5s ease-in-out infinite;
+}
+
+[data-player-hold-card] {
+    box-shadow: 0 0 0 0 rgb(245 158 11 / 0);
+    animation: player-hold-glow 2.8s ease-in-out infinite;
+}
+
+.player-experience details[open] summary span {
+    display: inline-block;
+    transform: rotate(45deg);
+}
+
+.player-confetti {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.player-confetti span {
+    position: absolute;
+    top: -1rem;
+    width: 0.45rem;
+    height: 0.85rem;
+    border-radius: 9999px;
+    background: var(--confetti-color, var(--color-court-500));
+    opacity: 0;
+    animation: player-confetti-fall 2.4s ease-out var(--confetti-delay, 0ms) 1 both;
+}
+
+.player-confetti span:nth-child(1) { left: 8%; --confetti-delay: 80ms; --confetti-color: #f59e0b; }
+.player-confetti span:nth-child(2) { left: 24%; --confetti-delay: 240ms; --confetti-color: #24aa70; }
+.player-confetti span:nth-child(3) { left: 43%; --confetti-delay: 30ms; --confetti-color: #60a5fa; }
+.player-confetti span:nth-child(4) { left: 64%; --confetti-delay: 300ms; --confetti-color: #fbbf24; }
+.player-confetti span:nth-child(5) { left: 82%; --confetti-delay: 150ms; --confetti-color: #4ac78d; }
+.player-confetti span:nth-child(6) { left: 94%; --confetti-delay: 380ms; --confetti-color: #fb7185; }
+
+@media (hover: hover) and (pointer: fine) {
+    .player-card-motion:hover {
+        border-color: var(--color-court-200);
+        box-shadow: 0 22px 50px rgb(8 41 30 / 0.11);
+        translate: 0 -0.25rem;
+    }
+}
+
+@media (max-width: 639px) {
+    .player-experience {
+        padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+    }
+
+    .player-experience footer {
+        padding-bottom: 1rem;
+    }
+}
+
+@media (min-width: 640px) {
+    .player-mobile-dock {
+        display: none;
+    }
+}
+
+@keyframes player-rally-line {
+    0%, 62% { transform: translateX(-125%); }
+    78%, 100% { transform: translateX(125%); }
+}
+
+@keyframes player-choice-pop {
+    0% { transform: scale(0.985); }
+    60% { transform: scale(1.012); }
+    100% { transform: scale(1); }
+}
+
+@keyframes player-slot-pop {
+    0% { transform: scale(0.96); }
+    70% { transform: scale(1.025); }
+    100% { transform: scale(1); }
+}
+
+@keyframes player-court-breathe {
+    0%, 100% { opacity: 0.72; }
+    50% { opacity: 1; }
+}
+
+@keyframes player-title-shift {
+    0%, 100% { background-position: 0% center; }
+    50% { background-position: 100% center; }
+}
+
+@keyframes player-deal-float {
+    0%, 100% { transform: rotate(-8deg) translateY(0); }
+    50% { transform: rotate(-4deg) translateY(-0.28rem); }
+}
+
+@keyframes player-confetti-fall {
+    0% { opacity: 0; transform: translateY(-1rem) rotate(0deg); }
+    12% { opacity: 0.9; }
+    100% { opacity: 0; transform: translateY(9rem) rotate(420deg); }
+}
+
+@keyframes player-hero-orbit {
+    from { transform: rotate(-10deg) translateX(-1rem); }
+    to { transform: rotate(-5deg) translateX(1.5rem); }
+}
+
+@keyframes player-ticket-float {
+    0%, 100% { transform: rotate(1deg) translateY(0); }
+    50% { transform: rotate(-0.3deg) translateY(-0.25rem); }
+}
+
+@keyframes player-hold-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgb(245 158 11 / 0); }
+    50% { box-shadow: 0 0 0 5px rgb(245 158 11 / 0.08); }
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
