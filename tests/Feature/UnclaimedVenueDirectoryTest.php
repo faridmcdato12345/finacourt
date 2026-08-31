@@ -2,6 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Directory\VenueClaimInvitationService;
+use App\Directory\VenueDirectoryManager;
 use App\Enums\AnalyticsEventType;
 use App\Enums\DirectoryClaimStatus;
 use App\Enums\DirectoryListingStatus;
@@ -16,6 +18,7 @@ use App\Models\PsgcLocation;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
+use App\Models\VenueClaimInvitation;
 use App\Models\VenueClaimRequest;
 use App\Models\VenueDirectoryListing;
 use App\Notifications\VenueClaimVerificationCode;
@@ -74,6 +77,106 @@ class UnclaimedVenueDirectoryTest extends TestCase
                 ->where('listing.slug', $listing->slug));
     }
 
+    public function test_only_platform_admin_can_create_a_hashed_private_owner_link(): void
+    {
+        $listing = VenueDirectoryListing::factory()->published()->create();
+        [$owner, $organization] = $this->ownerWithOrganization();
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->post(route('platform.directory.claim-invitations.store', $listing))
+            ->assertForbidden();
+
+        $admin = User::factory()->platformAdmin()->create();
+        $response = $this->actingAs($admin)
+            ->post(route('platform.directory.claim-invitations.store', $listing))
+            ->assertOk()
+            ->assertSessionMissing('claim_invitation')
+            ->assertJsonStructure(['status', 'invitation' => ['id', 'expires_at'], 'claim_invitation' => ['url', 'expires_at']]);
+
+        $invitation = VenueClaimInvitation::query()->sole();
+        $url = $response->json('claim_invitation.url');
+        $token = basename((string) parse_url($url, PHP_URL_PATH));
+
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $token);
+        $this->assertSame(VenueClaimInvitation::hashToken($token), $invitation->getRawOriginal('token_hash'));
+        $this->assertNotSame($token, $invitation->getRawOriginal('token_hash'));
+        $this->assertTrue($invitation->expires_at->isFuture());
+        $this->assertDatabaseHas('venue_directory_audits', [
+            'venue_directory_listing_id' => $listing->getKey(),
+            'event_type' => 'claim_invitation_created',
+        ]);
+    }
+
+    public function test_replacing_expiring_and_revoking_private_links_blocks_old_secrets(): void
+    {
+        config(['directory.claim_invitation_hours' => 1]);
+        $listing = VenueDirectoryListing::factory()->published()->create();
+        $admin = User::factory()->platformAdmin()->create();
+        [$owner, $organization] = $this->ownerWithOrganization();
+        $service = app(VenueClaimInvitationService::class);
+
+        $expiredToken = $service->issue($listing, $admin)['token'];
+        $this->travel(2)->hours();
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('owner.directory-claims.invitations.create', $expiredToken))
+            ->assertNotFound();
+
+        $replacedToken = $service->issue($listing, $admin)['token'];
+        $current = $service->issue($listing, $admin);
+
+        $this->get(route('owner.directory-claims.invitations.create', $replacedToken))
+            ->assertNotFound();
+        $this->get(route('owner.directory-claims.invitations.create', $current['token']))
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->delete(route('platform.directory.claim-invitations.destroy', [$listing, $current['invitation']]))
+            ->assertRedirect();
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('owner.directory-claims.invitations.create', $current['token']))
+            ->assertNotFound();
+    }
+
+    public function test_hiding_a_listing_revokes_its_private_owner_link(): void
+    {
+        $listing = VenueDirectoryListing::factory()->published()->create();
+        $admin = User::factory()->platformAdmin()->create();
+        [$owner, $organization] = $this->ownerWithOrganization();
+        $issued = app(VenueClaimInvitationService::class)->issue($listing, $admin);
+
+        app(VenueDirectoryManager::class)->markClosed(
+            $listing,
+            $admin,
+            'The venue asked us to hide this directory record while details are checked.',
+        );
+
+        $this->assertNotNull($issued['invitation']->fresh()->revoked_at);
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('owner.directory-claims.invitations.create', $issued['token']))
+            ->assertNotFound();
+    }
+
+    public function test_new_owner_registration_returns_to_the_private_venue_link(): void
+    {
+        $listing = VenueDirectoryListing::factory()->published()->create();
+        $token = $this->claimInvitationToken($listing);
+        $invitationUrl = route('owner.directory-claims.invitations.create', $token);
+
+        $this->get($invitationUrl)->assertRedirect(route('login'));
+        $this->post(route('register'), [
+            'name' => 'Invited Owner',
+            'email' => 'invited-owner@example.com',
+            'organization_name' => 'Invited Owner Courts',
+            'password' => 'secure-password',
+            'password_confirmation' => 'secure-password',
+        ])->assertRedirect($invitationUrl);
+    }
+
     public function test_admin_verification_publication_and_edits_follow_the_audited_state_machine(): void
     {
         $admin = User::factory()->platformAdmin()->create();
@@ -130,10 +233,13 @@ class UnclaimedVenueDirectoryTest extends TestCase
             ->assertSee('This venue is not bookable on FinACourt yet')
             ->assertDontSee('Private registry notes must remain private.')
             ->assertDontSee('Private administrator verification notes.')
+            ->assertDontSee('Request an ownership review')
+            ->assertDontSee('Request ownership review')
             ->assertDontSee('Book now')
             ->assertDontSee('Verified venue');
 
         $this->get(route('marketplace.directory.show', $draft->slug))->assertNotFound();
+        $this->get("/owner/directory/{$listing->slug}/claim")->assertNotFound();
 
         $event = AnalyticsEvent::query()->where('venue_directory_listing_id', $listing->getKey())->sole();
         $this->assertSame(AnalyticsEventType::VenueProfileView, $event->event_type);
@@ -179,22 +285,24 @@ class UnclaimedVenueDirectoryTest extends TestCase
     {
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport);
+        $invitationToken = $this->claimInvitationToken($listing);
         [$owner, $organization] = $this->ownerWithOrganization();
         $otherOrganization = Organization::factory()->create();
         $payload = $this->claimPayload() + ['organization_id' => $otherOrganization->getKey()];
 
-        $this->get(route('owner.directory-claims.create', $listing))->assertRedirect(route('login'));
+        $this->get(route('owner.directory-claims.invitations.create', $invitationToken))
+            ->assertRedirect(route('login'));
 
         $staff = User::factory()->create();
         Membership::factory()->for($staff)->for($organization)->create(['role' => MembershipRole::Staff]);
         $this->actingAs($staff)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->get(route('owner.directory-claims.create', $listing))
+            ->get(route('owner.directory-claims.invitations.create', $invitationToken))
             ->assertForbidden();
 
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->post(route('owner.directory-claims.store', $listing), $payload)
+            ->post(route('owner.directory-claims.invitations.store', $invitationToken), $payload)
             ->assertRedirect(route('owner.directory-claims.index'));
 
         $claim = VenueClaimRequest::query()->sole();
@@ -202,9 +310,13 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->assertSame($owner->getKey(), $claim->requester_user_id);
         $this->assertSame(DirectoryClaimStatus::Pending, $claim->status);
         $this->assertSame(0, Venue::query()->count());
+        $invitation = VenueClaimInvitation::query()->sole();
+        $this->assertSame($owner->getKey(), $invitation->used_by_user_id);
+        $this->assertSame($claim->getKey(), $invitation->venue_claim_request_id);
+        $this->assertNotNull($invitation->used_at);
 
-        $this->post(route('owner.directory-claims.store', $listing), $this->claimPayload())
-            ->assertSessionHasErrors('listing');
+        $this->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload())
+            ->assertNotFound();
         $this->assertSame(1, VenueClaimRequest::query()->count());
     }
 
@@ -212,13 +324,14 @@ class UnclaimedVenueDirectoryTest extends TestCase
     {
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport);
+        $invitationToken = $this->claimInvitationToken($listing);
         $owner = User::factory()->unverified()->create();
         $organization = Organization::factory()->create();
         Membership::factory()->owner()->for($owner)->for($organization)->create();
 
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->get(route('owner.directory-claims.create', $listing))
+            ->get(route('owner.directory-claims.invitations.create', $invitationToken))
             ->assertRedirect(route('verification.notice'));
 
         $this->assertSame(0, VenueClaimRequest::query()->count());
@@ -229,11 +342,12 @@ class UnclaimedVenueDirectoryTest extends TestCase
         Notification::fake();
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport, ['email' => 'frontdesk@venue.example']);
+        $invitationToken = $this->claimInvitationToken($listing);
         [$owner, $organization] = $this->ownerWithOrganization();
 
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->post(route('owner.directory-claims.store', $listing), $this->claimPayload())
+            ->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload())
             ->assertRedirect(route('owner.directory-claims.index'));
 
         $claim = VenueClaimRequest::query()->sole();
@@ -274,11 +388,12 @@ class UnclaimedVenueDirectoryTest extends TestCase
         config(['directory.claim_verification_max_attempts' => 3]);
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport, ['email' => 'manager@venue.example']);
+        $invitationToken = $this->claimInvitationToken($listing);
         [$owner, $organization] = $this->ownerWithOrganization();
 
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->post(route('owner.directory-claims.store', $listing), $this->claimPayload());
+            ->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload());
         $claim = VenueClaimRequest::query()->sole();
 
         [$otherOwner, $otherOrganization] = $this->ownerWithOrganization();
@@ -310,12 +425,13 @@ class UnclaimedVenueDirectoryTest extends TestCase
     {
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport);
+        $invitationToken = $this->claimInvitationToken($listing);
         [$owner, $organization] = $this->ownerWithOrganization();
         $admin = User::factory()->platformAdmin()->create();
 
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->post(route('owner.directory-claims.store', $listing), $this->claimPayload());
+            ->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload());
         $claim = VenueClaimRequest::query()->sole();
 
         $this->actingAs($admin)
@@ -359,13 +475,14 @@ class UnclaimedVenueDirectoryTest extends TestCase
             'longitude' => '120.9842195',
             'coordinates_verified_at' => now(),
         ]);
+        $invitationToken = $this->claimInvitationToken($listing);
         [$owner, $organization] = $this->ownerWithOrganization();
         $admin = User::factory()->platformAdmin()->create();
 
         $this->get(route('marketplace.directory.show', $listing->slug))->assertOk();
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->post(route('owner.directory-claims.store', $listing), $this->claimPayload());
+            ->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload());
         $claim = VenueClaimRequest::query()->sole();
         $usersBefore = User::query()->count();
 
@@ -423,12 +540,13 @@ class UnclaimedVenueDirectoryTest extends TestCase
             'city' => 'Davao City',
             'city_slug' => 'davao-city',
         ]);
+        $invitationToken = $this->claimInvitationToken($listing);
         [$owner, $organization] = $this->ownerWithOrganization();
         $admin = User::factory()->platformAdmin()->create();
 
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->post(route('owner.directory-claims.store', $listing), $this->claimPayload());
+            ->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload());
         $claim = VenueClaimRequest::query()->sole();
         $this->verifyClaimProofAndFinishSafetyHold($claim, $admin);
         $this->actingAs($admin)->post(route('platform.directory.claims.approve', $claim), [
@@ -473,12 +591,13 @@ class UnclaimedVenueDirectoryTest extends TestCase
     {
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport);
+        $firstInvitationToken = $this->claimInvitationToken($listing);
         [$owner, $organization] = $this->ownerWithOrganization();
         $admin = User::factory()->platformAdmin()->create();
 
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->post(route('owner.directory-claims.store', $listing), $this->claimPayload());
+            ->post(route('owner.directory-claims.invitations.store', $firstInvitationToken), $this->claimPayload());
         $claim = VenueClaimRequest::query()->sole();
 
         $this->actingAs($admin)
@@ -487,9 +606,10 @@ class UnclaimedVenueDirectoryTest extends TestCase
             ]);
         $this->assertSame(DirectoryClaimStatus::Rejected, $claim->fresh()->status);
 
+        $secondInvitationToken = $this->claimInvitationToken($listing, $admin);
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
-            ->post(route('owner.directory-claims.store', $listing), $this->claimPayload())
+            ->post(route('owner.directory-claims.invitations.store', $secondInvitationToken), $this->claimPayload())
             ->assertRedirect(route('owner.directory-claims.index'));
         $second = VenueClaimRequest::query()->latest('id')->firstOrFail();
         $this->delete(route('owner.directory-claims.cancel', $second))->assertRedirect();
@@ -538,6 +658,15 @@ class UnclaimedVenueDirectoryTest extends TestCase
         Membership::factory()->owner()->for($owner)->for($organization)->create();
 
         return [$owner, $organization];
+    }
+
+    private function claimInvitationToken(
+        VenueDirectoryListing $listing,
+        ?User $administrator = null,
+    ): string {
+        $administrator ??= User::factory()->platformAdmin()->create();
+
+        return app(VenueClaimInvitationService::class)->issue($listing, $administrator)['token'];
     }
 
     private function publishedListing(Sport $sport, array $attributes = []): VenueDirectoryListing

@@ -54,9 +54,9 @@ docker compose down
 | `node` | Node 22 and Vite development server | `node` |
 | `test` | One-off PHP test runner using the isolated MySQL test database | `test` |
 | `scheduler` | Laravel scheduler for idempotent booking reminders | `scheduler` |
-| `queue` | Laravel database-queue worker for retryable transactional email | `queue` |
+| `queue` | Laravel database-queue worker for transactional email and retryable Google profile discovery | `queue` |
 
-Redis remains unnecessary. The database-backed `queue` service sends retryable court-owner confirmation emails after a booking transaction commits. The scheduler is required only for reminders; booking holds and availability remain logically correct without either background process.
+Redis remains unnecessary. The database-backed `queue` service sends retryable court-owner confirmation emails after a booking transaction commits and performs Google Business Profile discovery outside the OAuth callback. The scheduler is required only for reminders; booking holds and availability remain logically correct without either background process.
 
 ## Tests and quality checks
 
@@ -119,7 +119,7 @@ The owner venue editor and platform directory editor use dependent Philippine St
 
 Newly created venues receive a complete default operating-hours week, which can then be configured from the venue page. Claimed state is recorded when an owner creates a venue; verification remains an explicit platform-controlled field.
 
-Directory ownership requests use a stricter boundary. The requester must be the current tenant owner with a verified account email, but that account email and any contact typed into the form are not ownership proof. FinACourt either sends a short-lived code to the venue email independently sourced for the public directory, or a platform administrator records an official-phone/domain-email/document/in-person check. Approval remains locked for a 24-hour safety hold. The resulting venue is private and unverified; after the owner adds active inventory and requests publication, a separate platform marketplace review is required. A platform administrator can revoke that review and unpublish the venue immediately if a credible dispute appears. Production email challenges require a real Laravel mail transport; local development keeps `MAIL_MAILER=log` by default.
+Directory ownership requests use a stricter boundary. Public directory pages do not contain a claim button or form. A platform administrator first checks a venue contact, creates a single-use private invitation, and manually sends it to the likely owner. The random secret is stored only as a hash, expires after `DIRECTORY_CLAIM_INVITATION_HOURS` (seven days by default), can be replaced/revoked, and is stopped when the listing is edited or hidden. The invitation only starts review: the requester must still be the current tenant owner with a verified account email, and neither the link, that account email, nor any contact typed into the form is ownership proof. FinACourt either sends a short-lived code to the venue email independently sourced for the public directory, or a platform administrator records an official-phone/domain-email/document/in-person check. Approval remains locked for a 24-hour safety hold. The resulting venue is private and unverified; after the owner adds active inventory and requests publication, a separate platform marketplace review is required. A platform administrator can revoke that review and unpublish the venue immediately if a credible dispute appears. Production email challenges require a real Laravel mail transport; local development keeps `MAIL_MAILER=log` by default.
 
 Booking targets use the `resources` table and `CourtResource` model. Resources support court/field/studio/lane/other types, indoor/outdoor/covered settings, active state, sport, PHP base hourly pricing, and a booking increment. A resource can only use a sport offered by its venue. Sport and amenity catalogs are seeded centrally and related to venues through pivot tables.
 

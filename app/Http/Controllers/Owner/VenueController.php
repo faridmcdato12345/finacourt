@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Owner;
 
 use App\Enums\Weekday;
+use App\Google\BusinessProfile\GoogleBusinessProfilePanel;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreVenueRequest;
 use App\Http\Requests\UpdateVenueRequest;
@@ -214,10 +215,18 @@ class VenueController extends Controller
         ]);
     }
 
-    public function edit(Venue $venue): Response
+    public function edit(Venue $venue, GoogleBusinessProfilePanel $googleBusinessProfile): Response
     {
         Gate::authorize('update', $venue);
-        $venue->load('sports:id', 'amenities:id', 'photos');
+        $venue->load(
+            'sports:id,name,is_active',
+            'amenities:id',
+            'photos',
+            'resources:id,venue_id,sport_id,is_active',
+            'resources.sport:id,name,is_active',
+            'operatingHours:id,venue_id,day_of_week,is_closed,opens_at,closes_at',
+            'googleBusinessProfileConnection',
+        );
         $requiresPlatformReview = $venue->claimedDirectoryListings()->exists();
 
         return Inertia::render('Owner/Venues/Edit', [
@@ -252,6 +261,7 @@ class VenueController extends Controller
                 'is_verified' => $venue->verified_at !== null,
                 'requires_platform_review' => $requiresPlatformReview,
             ],
+            'googleBusinessProfile' => $googleBusinessProfile->forVenue($venue),
         ]);
     }
 

@@ -2,9 +2,10 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import VenueForm from '../../../Components/VenueForm.vue';
 import VenuePhotoManager from '../../../Components/VenuePhotoManager.vue';
+import GoogleBusinessProfilePanel from '../../../Components/GoogleBusinessProfilePanel.vue';
 import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
 
-const props = defineProps({ venue: Object, sports: Array, amenities: Array, locationParents: Array, mapTileUrl: String });
+const props = defineProps({ venue: Object, sports: Array, amenities: Array, locationParents: Array, mapTileUrl: String, googleBusinessProfile: Object });
 
 const form = useForm({
     name: props.venue.name,
@@ -46,6 +47,7 @@ function destroyVenue() {
             <div class="mt-8 space-y-7">
                 <VenuePhotoManager :venue="venue" />
                 <VenueForm :form="form" :sports="sports" :amenities="amenities" :location-parents="locationParents" :existing-state="venue" :map-tile-url="mapTileUrl" submit-label="Save venue" @submit="submit" />
+                <GoogleBusinessProfilePanel :profile="googleBusinessProfile" />
             </div>
 
             <section class="mt-10 rounded-2xl border border-red-200 bg-red-50 p-6">

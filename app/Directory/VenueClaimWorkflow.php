@@ -10,6 +10,7 @@ use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\User;
 use App\Models\Venue;
+use App\Models\VenueClaimInvitation;
 use App\Models\VenueClaimRequest;
 use App\Models\VenueDirectoryListing;
 use App\Support\VenueSlug;
@@ -25,8 +26,8 @@ class VenueClaimWorkflow
     ) {}
 
     /** @param array{relationship_to_venue: string, verification_contact: string, evidence_details: string} $data */
-    public function request(
-        VenueDirectoryListing $listing,
+    public function requestFromInvitation(
+        string $invitationToken,
         User $requester,
         Organization $organization,
         Membership $membership,
@@ -38,8 +39,17 @@ class VenueClaimWorkflow
             abort(403, 'Only the account owner can request to add this venue.');
         }
 
-        return DB::transaction(function () use ($listing, $requester, $organization, $data): VenueClaimRequest {
-            $locked = VenueDirectoryListing::query()->lockForUpdate()->findOrFail($listing->getKey());
+        return DB::transaction(function () use ($invitationToken, $requester, $organization, $data): VenueClaimRequest {
+            $invitation = VenueClaimInvitation::query()
+                ->where('token_hash', VenueClaimInvitation::hashToken($invitationToken))
+                ->lockForUpdate()
+                ->first();
+
+            abort_unless($invitation?->isUsable(), 404, 'This private venue link is invalid or has expired.');
+
+            $locked = VenueDirectoryListing::query()
+                ->lockForUpdate()
+                ->findOrFail($invitation->venue_directory_listing_id);
 
             if (! $locked->isClaimable()) {
                 throw ValidationException::withMessages([
@@ -60,9 +70,18 @@ class VenueClaimWorkflow
                 'active_claim_key' => hash('sha256', "venue-directory-claim:{$locked->getKey()}"),
                 ...$data,
             ]);
+            $invitation->update([
+                'used_by_user_id' => $requester->getKey(),
+                'venue_claim_request_id' => $claim->getKey(),
+                'used_at' => now('UTC'),
+            ]);
             $this->audit->record($locked, 'claim_requested', $requester, $claim, [
                 'organization_id' => $organization->getKey(),
                 'relationship' => $data['relationship_to_venue'],
+                'invitation_id' => $invitation->getKey(),
+            ]);
+            $this->audit->record($locked, 'claim_invitation_used', $requester, $claim, [
+                'invitation_id' => $invitation->getKey(),
             ]);
 
             return $claim;

@@ -127,6 +127,12 @@ class VenueDirectoryListing extends Model
         return $this->hasMany(VenueClaimRequest::class);
     }
 
+    /** @return HasMany<VenueClaimInvitation, $this> */
+    public function claimInvitations(): HasMany
+    {
+        return $this->hasMany(VenueClaimInvitation::class);
+    }
+
     /** @return HasMany<VenueDirectoryReport, $this> */
     public function reports(): HasMany
     {

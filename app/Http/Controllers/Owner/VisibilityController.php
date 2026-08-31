@@ -8,6 +8,7 @@ use App\Tenancy\TenantContext;
 use App\Visibility\Contracts\BusinessProfileGateway;
 use App\Visibility\Contracts\PlacesProvider;
 use App\Visibility\GoogleDirections;
+use App\Visibility\VenuePublicUrl;
 use App\Visibility\VisibilityScore;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -21,6 +22,7 @@ class VisibilityController extends Controller
         GoogleDirections $directions,
         PlacesProvider $places,
         BusinessProfileGateway $businessProfiles,
+        VenuePublicUrl $publicUrls,
     ): Response {
         $organization = $context->organization();
         Gate::authorize('viewAny', [Venue::class, $organization]);
@@ -33,14 +35,15 @@ class VisibilityController extends Controller
                 'photos:id,venue_id,is_primary',
                 'visibilityLinks.promotion:id,title',
                 'promotions:id,organization_id,venue_id,title,is_public',
+                'googleBusinessProfileConnection',
             ])
             ->orderBy('name')
             ->get()
-            ->map(function (Venue $venue) use ($scores, $directions, $businessProfiles): array {
+            ->map(function (Venue $venue) use ($scores, $directions, $businessProfiles, $publicUrls): array {
                 $report = $scores->forVenue($venue);
                 $publicReady = collect($report['checks'])->firstWhere('code', 'marketplace')['complete'];
                 $bookingReady = collect($report['checks'])->firstWhere('code', 'booking')['complete'];
-                $publicUrl = $publicReady ? route('marketplace.venues.show', $venue->slug) : null;
+                $publicUrl = $publicReady ? $publicUrls->canonical($venue) : null;
                 $bookingUrl = $bookingReady ? $publicUrl.'#availability' : null;
 
                 return [
@@ -58,11 +61,7 @@ class VisibilityController extends Controller
                     'hours_status' => $venue->operatingHours->count() === 7 ? 'Configured' : 'Incomplete',
                     'public_url' => $publicUrl,
                     'booking_url' => $bookingUrl,
-                    'google_booking_url' => $bookingUrl ? route('marketplace.venues.show', [
-                        'venueSlug' => $venue->slug,
-                        'utm_source' => 'google',
-                        'utm_medium' => 'business-profile',
-                    ]).'#availability' : null,
+                    'google_booking_url' => $bookingUrl ? $publicUrls->googleBooking($venue) : null,
                     'directions_url' => $directions->forVenue($venue),
                     'place_id_status' => $venue->google_place_id_verified_at
                         ? 'Google place saved'

@@ -46,7 +46,11 @@ class SocialAuthenticationTest extends TestCase
 
     public function test_unconfigured_provider_is_not_shown_and_cannot_be_started(): void
     {
-        config(['social_auth.providers.google.enabled' => false]);
+        config([
+            'social_auth.providers.google.enabled' => false,
+            'social_auth.providers.facebook.enabled' => false,
+            'social_auth.providers.apple.enabled' => false,
+        ]);
 
         $this->get(route('login'))
             ->assertInertia(fn (Assert $page) => $page->where('socialProviders', []));

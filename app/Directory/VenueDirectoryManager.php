@@ -71,6 +71,7 @@ class VenueDirectoryManager
                 $changedFields[] = 'status';
             }
 
+            $revokedInvitationCount = $this->revokeOpenClaimInvitations($locked);
             $locked->update($attributes);
             $locked->sports()->sync($sportIds);
             $this->syncHours($locked, $hours);
@@ -83,6 +84,7 @@ class VenueDirectoryManager
                     'rights_confirmed_by_user_id' => $administrator->getKey(),
                 ],
                 'sport_ids' => $sportIds,
+                'private_owner_links_stopped' => $revokedInvitationCount,
             ]);
 
             return $locked->fresh(['sports', 'hours']);
@@ -140,10 +142,12 @@ class VenueDirectoryManager
                 'status' => DirectoryListingStatus::Closed,
                 'closed_at' => now('UTC'),
             ]);
+            $revokedInvitationCount = $this->revokeOpenClaimInvitations($locked);
             $this->audit->record($locked, 'listing_marked_closed', $administrator, changes: [
                 'from' => $from,
                 'to' => DirectoryListingStatus::Closed->value,
                 'reason' => Str::limit($reason, 500),
+                'private_owner_links_stopped' => $revokedInvitationCount,
             ]);
         });
     }
@@ -155,10 +159,12 @@ class VenueDirectoryManager
             $this->guardEditable($locked);
             $from = $locked->status->value;
             $locked->update(['status' => DirectoryListingStatus::Removed]);
+            $revokedInvitationCount = $this->revokeOpenClaimInvitations($locked);
             $this->audit->record($locked, 'listing_removed', $administrator, changes: [
                 'from' => $from,
                 'to' => DirectoryListingStatus::Removed->value,
                 'reason' => Str::limit($reason, 500),
+                'private_owner_links_stopped' => $revokedInvitationCount,
             ]);
         });
     }
@@ -244,6 +250,19 @@ class VenueDirectoryManager
                 'listing' => 'This venue can no longer be changed from the public guide.',
             ]);
         }
+    }
+
+    private function revokeOpenClaimInvitations(VenueDirectoryListing $listing): int
+    {
+        $now = now('UTC');
+
+        return $listing->claimInvitations()
+            ->whereNull('used_at')
+            ->whereNull('revoked_at')
+            ->update([
+                'revoked_at' => $now,
+                'updated_at' => $now,
+            ]);
     }
 
     private function directoryKey(string $name, string $address, string $city): string

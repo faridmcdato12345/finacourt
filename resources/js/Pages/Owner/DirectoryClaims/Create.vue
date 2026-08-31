@@ -3,7 +3,12 @@ import { Head, Link, useForm } from '@inertiajs/vue3';
 import AppSelect from '../../../Components/AppSelect.vue';
 import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
 
-const props = defineProps({ listing: Object, organization: Object });
+const props = defineProps({
+    listing: Object,
+    organization: Object,
+    invitationToken: String,
+    invitationExpiresAt: String,
+});
 const form = useForm({ relationship_to_venue: 'owner', verification_contact: '', evidence_details: '' });
 const relationships = [
     { value: 'owner', label: 'I own this venue' },
@@ -12,14 +17,14 @@ const relationships = [
 ];
 
 function submit() {
-    form.post(`/owner/directory/${props.listing.slug}/claim`);
+    form.post(`/owner/venue-invitations/${props.invitationToken}`);
 }
 </script>
 
 <template>
     <Head :title="`Add ${listing.name}`" />
     <OwnerLayout>
-        <div class="mx-auto max-w-3xl"><Link href="/owner/directory-claims" class="text-sm font-semibold text-court-700">← Your venue requests</Link><div class="mt-5"><p class="eyebrow">Claim a venue</p><h1 class="mt-2 text-3xl font-semibold tracking-tight">Request access to {{ listing.name }}</h1><p class="mt-3 text-sm leading-6 text-slate-600">This form only starts a check. FinACourt must confirm your connection before adding this venue to <strong>{{ organization.name }}</strong>. Players cannot book it until FinACourt approves the venue details too.</p></div>
+        <div class="mx-auto max-w-3xl"><Link href="/owner/directory-claims" class="text-sm font-semibold text-court-700">← Your venue requests</Link><div class="mt-5"><p class="eyebrow">Private venue invitation</p><h1 class="mt-2 text-3xl font-semibold tracking-tight">Request access to {{ listing.name }}</h1><p class="mt-3 text-sm leading-6 text-slate-600">FinACourt sent this private link to start a check for <strong>{{ organization.name }}</strong>. The link works once and expires {{ invitationExpiresAt }}. It does not prove ownership by itself, and players cannot book the venue until FinACourt completes the ownership and venue checks.</p></div>
 
             <div class="app-card mt-7 p-6"><p class="text-sm font-semibold">{{ listing.address }}</p><p class="mt-1 text-sm text-slate-500">{{ listing.city }}, {{ listing.province }}</p><div class="mt-3 flex flex-wrap gap-2"><span v-for="sport in listing.sports" :key="sport" class="rounded-full bg-court-50 px-3 py-1 text-xs font-medium text-court-800">{{ sport }}</span></div></div>
 

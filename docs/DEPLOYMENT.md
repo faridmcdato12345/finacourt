@@ -37,6 +37,7 @@ Never copy local values or committed examples verbatim into production. Store se
 | `SESSION_SAME_SITE` | `lax`; reassess only for a documented cross-site flow |
 | `CACHE_STORE` | `database` unless a managed cache is intentionally introduced |
 | `QUEUE_CONNECTION` | `database`; run and supervise the `emails,default` worker |
+| `DIRECTORY_CLAIM_INVITATION_HOURS` | Lifetime of a private venue-owner invitation; default `168` (seven days), minimum `1` |
 | `LOG_CHANNEL` / `LOG_STACK` | Container-friendly `stack` / `stderr` |
 | `LOG_LEVEL` | `warning` for the pilot, adjusted temporarily during diagnosis |
 | `SLOW_REQUEST_MS` | Start at `1500`; tune from observed latency |
@@ -63,8 +64,9 @@ Never copy local values or committed examples verbatim into production. Store se
 | `REACTIVATION_SUGGESTION_HORIZON_DAYS` | Bounded upcoming-slot search; default `28` |
 | `GOOGLE_PLACES_ENABLED` | Keep `false`; Phase 15 ships a disabled provider boundary, not a live Places adapter |
 | `GOOGLE_MAPS_API_KEY` | Leave empty until a reviewed server-side Places adapter and restricted key exist |
-| `GOOGLE_BUSINESS_PROFILE_ENABLED` | Keep `false`; OAuth/profile management is intentionally not implemented |
-| `GOOGLE_BUSINESS_PROFILE_CLIENT_ID` / `GOOGLE_BUSINESS_PROFILE_CLIENT_SECRET` / `GOOGLE_BUSINESS_PROFILE_REDIRECT_URI` | Leave empty until Stage C access, consent, encrypted token storage, and revocation are implemented |
+| `GOOGLE_BUSINESS_PROFILE_ENABLED` | Keep `false` until Google has approved this Cloud project and production OAuth review is complete; `true` enables owner-authorized read-only account/location discovery only |
+| `GOOGLE_BUSINESS_PROFILE_CLIENT_ID` / `GOOGLE_BUSINESS_PROFILE_CLIENT_SECRET` | Dedicated Business Profile OAuth web-client credentials; do not reuse social-login credentials |
+| `GOOGLE_BUSINESS_PROFILE_REDIRECT_URI` | Exact HTTPS callback registered with Google: `${APP_URL}/owner/google-business-profile/callback` |
 | `MAP_TILE_URL` | Leaflet-compatible tile template for the owner pin editor; default is OpenStreetMap |
 | `MAP_TILE_ORIGIN` | Exact tile origin allowed by the content security policy; must match `MAP_TILE_URL` |
 | `MAP_EMBED_BASE_URL` / `MAP_PUBLIC_BASE_URL` / `MAP_FRAME_ORIGIN` | Public venue map and directions hosts; defaults are OpenStreetMap |
@@ -155,7 +157,7 @@ After release:
 - Owner login, one advisory availability read, and a non-destructive test booking in approved pilot inventory work.
 - Response headers include `X-Request-ID`, `X-Content-Type-Options`, `Referrer-Policy`, and production CSP; private pages include `X-Robots-Tag`.
 - Scheduler logs show `bookings:send-reminders` execution without overlapping instances.
-- Queue logs show a live worker consuming `emails,default`; inspect and alert on `failed_jobs`.
+- Queue logs show a live worker consuming `emails,default`; inspect and alert on `failed_jobs`. The `default` queue handles retryable Google Business Profile discovery in addition to other background work.
 
 The Compose-equivalent production worker command is:
 
@@ -163,7 +165,7 @@ The Compose-equivalent production worker command is:
 php artisan queue:work --queue=emails,default --sleep=3 --tries=3 --backoff=10 --timeout=90
 ```
 
-Run `php artisan queue:restart` during a rolling release after the new code is available. The owner-confirmation notification is handed off only after commit and may be retried from `failed_jobs`; its booking-level handoff marker prevents a second confirmation request or duplicate payment webhook from scheduling another copy.
+Run `php artisan queue:restart` during a rolling release after the new code is available. The owner-confirmation notification is handed off only after commit and may be retried from `failed_jobs`; its booking-level handoff marker prevents a second confirmation request or duplicate payment webhook from scheduling another copy. Google profile discovery is also dispatched only after commit and uses queue-level backoff plus an opaque generation so stale jobs cannot overwrite a newer owner authorization.
 
 ## Rollback
 

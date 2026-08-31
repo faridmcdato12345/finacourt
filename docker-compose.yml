@@ -48,6 +48,7 @@ services:
       QUEUE_CONNECTION: sync
       SESSION_DRIVER: array
       MAIL_MAILER: array
+      GOOGLE_BUSINESS_PROFILE_ENABLED: "false"
       BCRYPT_ROUNDS: 4
     volumes:
       - .:/var/www/html

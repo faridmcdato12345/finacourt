@@ -66,7 +66,7 @@ class RegisteredUserController extends Controller
         $request->session()->regenerate();
         $request->session()->put('tenant.organization_id', $organization->getKey());
 
-        return redirect()->route('owner.dashboard');
+        return redirect()->intended(route('owner.dashboard'));
     }
 
     private function uniqueSlug(string $name): string

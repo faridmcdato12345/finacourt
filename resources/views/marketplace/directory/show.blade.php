@@ -55,10 +55,6 @@
                     @if ($listing->source_url)<a href="{{ $listing->source_url }}" rel="nofollow noopener" target="_blank" class="mt-4 inline-flex text-sm font-semibold text-court-700">See the public source ↗</a>@endif
                 </section>
 
-                @if ($listing->isClaimable())
-                    <section class="rounded-3xl bg-court-950 p-6 text-white shadow-sm"><p class="text-xs font-semibold uppercase tracking-wider text-court-200">Connected to this venue?</p><h2 class="mt-2 text-xl font-semibold">Request an ownership review</h2><p class="mt-3 text-sm leading-6 text-court-100">A request does not give anyone control of this venue. FinACourt independently checks an existing venue contact or business evidence, allows time for disputes, and reviews the completed venue again before it can accept bookings.</p><a href="{{ route('owner.directory-claims.create', $listing) }}" class="mt-5 block rounded-xl bg-white px-4 py-3 text-center text-sm font-semibold text-court-900">Request ownership review</a></section>
-                @endif
-
                 <details class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                     <summary class="cursor-pointer font-semibold">Something not right?</summary>
                     <form method="post" action="{{ route('marketplace.directory.report', $listing) }}" class="mt-5 space-y-4">@csrf

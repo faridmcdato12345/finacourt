@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Google\BusinessProfile\Contracts\GoogleBusinessProfileClient;
+use App\Google\BusinessProfile\GoogleBusinessProfileHttpClient;
+use App\Google\BusinessProfile\NullGoogleBusinessProfileClient;
 use App\Models\Booking;
 use App\Models\CourtResource;
 use App\Models\Organization;
@@ -25,8 +28,8 @@ use App\Policies\VenueReviewPolicy;
 use App\Tenancy\TenantContext;
 use App\Visibility\Contracts\BusinessProfileGateway;
 use App\Visibility\Contracts\PlacesProvider;
-use App\Visibility\NullBusinessProfileGateway;
 use App\Visibility\NullPlacesProvider;
+use App\Visibility\StoredBusinessProfileGateway;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
@@ -45,11 +48,20 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->scoped(TenantContext::class, fn () => new TenantContext);
         $this->app->singleton(WebPushGateway::class, NullWebPushGateway::class);
-        // Google integrations are intentionally disabled until a policy-
-        // approved provider is configured. Normal venue onboarding never
-        // depends on either boundary.
+        // Google remains optional. Venue onboarding and booking never depend
+        // on either provider boundary being configured or reachable.
         $this->app->singleton(PlacesProvider::class, NullPlacesProvider::class);
-        $this->app->singleton(BusinessProfileGateway::class, NullBusinessProfileGateway::class);
+        $this->app->singleton(GoogleBusinessProfileClient::class, function () {
+            $configured = (bool) config('google.business_profile.enabled')
+                && filled(config('google.business_profile.client_id'))
+                && filled(config('google.business_profile.client_secret'))
+                && filled(config('google.business_profile.redirect_uri'));
+
+            return $configured
+                ? new GoogleBusinessProfileHttpClient
+                : new NullGoogleBusinessProfileClient;
+        });
+        $this->app->singleton(BusinessProfileGateway::class, StoredBusinessProfileGateway::class);
         $this->app->singleton(ManualPaymentProvider::class);
         $this->app->singleton(PayMongoPaymentProvider::class);
         $this->app->singleton(PaymentProviderRegistry::class, function ($app) {
@@ -91,6 +103,8 @@ class AppServiceProvider extends ServiceProvider
         });
         RateLimiter::for('social-login', fn (Request $request) => Limit::perMinute(20)
             ->by($request->ip()));
+        RateLimiter::for('google-business-profile', fn (Request $request) => Limit::perHour(12)
+            ->by(($request->user()?->getKey() ?? 'guest').'|'.$request->ip()));
 
         RateLimiter::for('player-booking', fn (Request $request) => Limit::perMinute(10)
             ->by(($request->user()?->getKey() ?? 'guest').'|'.$request->ip()));

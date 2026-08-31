@@ -25,4 +25,7 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
-/docs
+/docs/*
+!/docs/integrations/
+/docs/integrations/*
+!/docs/integrations/google-business-profile.md

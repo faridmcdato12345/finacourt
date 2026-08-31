@@ -609,7 +609,7 @@ Expected public behavior:
 
 - The page is clearly an unclaimed directory entry.
 - It does not show live availability, transactional booking, fake verified-partner badges, invented prices, ratings, or reviews.
-- Source/last-checked context and Claim this venue are understandable.
+- Source/last-checked context is understandable, and no public ownership-request button or form appears.
 
 ## G2. Public correction and removal
 
@@ -621,16 +621,18 @@ Expected public behavior:
 
 ## G3. Owner claim
 
-1. Sign in as the real `owner@example.com` account.
-2. Open the public directory listing and choose Claim this venue.
-3. Select the owner's organization and enter relationship, verification contact, and evidence details.
-4. Try changing the organization ID to Northside in browser tools. Expect authorization failure.
-5. Submit the claim.
-6. Submit a duplicate pending claim. Expect rejection.
-7. As admin, inspect the claim evidence and approve only if the relationship is genuinely verified.
-8. Verify the claimed venue is attached to the correct tenant as unpublished and unverified, ready for owner configuration.
-9. Verify the directory listing changes to claimed state and retains its audit/provenance history.
-10. Verify approval did not create fake owner credentials or live availability.
+1. While logged out, open the public directory listing and verify there is no ownership-request link.
+2. As admin, open that listing from `/platform/directory`, find **Private owner invitation**, and create a private link.
+3. Copy the one-time displayed link. Confirm that refreshing hides the secret and shows only the active expiry; replace it if a fresh secret is needed.
+4. Send the link only through a venue email, official phone conversation, or official social account you checked. Do not post it publicly.
+5. Open the link as the real `owner@example.com` account. Also test a logged-out browser: sign in or register and verify it returns to the invitation.
+6. Enter the relationship, verification contact, and supporting details, then submit. A staff account must be denied.
+7. Verify the same link cannot be used again and a second pending request cannot be created.
+8. Create another invitation on a test listing, then replace/revoke it as admin. The old URL must return not found. Hiding or editing a listing must also stop its unused link.
+9. As admin, inspect the request, independently confirm venue control, and wait through the safety period. The invitation and written answers alone are not proof.
+10. Approve only after the existing proof gate passes. Verify the venue is attached to the correct tenant as unpublished and unverified, ready for owner configuration.
+11. Verify the directory listing changes to claimed state and retains invitation/request/proof audit history.
+12. Verify approval did not create fake owner credentials or live availability.
 
 ---
 

@@ -65,7 +65,7 @@ class SocialOwnerSetupController extends Controller
         $request->session()->forget('social_auth.owner_setup_required');
         $request->session()->put('tenant.organization_id', $organization->getKey());
 
-        return redirect()->route('owner.dashboard');
+        return redirect()->intended(route('owner.dashboard'));
     }
 
     private function uniqueSlug(string $name): string

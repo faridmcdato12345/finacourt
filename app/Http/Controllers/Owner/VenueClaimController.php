@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Owner;
 
+use App\Directory\VenueClaimInvitationService;
 use App\Directory\VenueClaimProofService;
 use App\Directory\VenueClaimWorkflow;
 use App\Enums\DirectoryClaimStatus;
@@ -11,7 +12,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreVenueClaimRequest;
 use App\Models\Membership;
 use App\Models\VenueClaimRequest;
-use App\Models\VenueDirectoryListing;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -51,11 +51,14 @@ class VenueClaimController extends Controller
         return Inertia::render('Owner/DirectoryClaims/Index', ['claims' => $claims]);
     }
 
-    public function create(VenueDirectoryListing $directoryListing, TenantContext $context): Response
-    {
+    public function create(
+        string $invitationToken,
+        TenantContext $context,
+        VenueClaimInvitationService $invitations,
+    ): Response {
         $this->authorizeOwner($context);
-        abort_unless($directoryListing->isClaimable(), 404);
-        $directoryListing->load('sports:id,name');
+        $invitation = $invitations->resolveUsable($invitationToken);
+        $directoryListing = $invitation->listing;
 
         return Inertia::render('Owner/DirectoryClaims/Create', [
             'listing' => [
@@ -63,19 +66,24 @@ class VenueClaimController extends Controller
                 'sports' => $directoryListing->sports->pluck('name'),
             ],
             'organization' => $context->organization()->only(['id', 'name']),
+            'invitationToken' => $invitationToken,
+            'invitationExpiresAt' => $invitation->expires_at->format('M j, Y H:i'),
         ]);
     }
 
     public function store(
         StoreVenueClaimRequest $request,
-        VenueDirectoryListing $directoryListing,
+        string $invitationToken,
         TenantContext $context,
+        VenueClaimInvitationService $invitations,
         VenueClaimWorkflow $workflow,
         VenueClaimProofService $proofs,
     ): RedirectResponse {
         $membership = $this->authorizeOwner($context);
-        $claim = $workflow->request(
-            $directoryListing,
+        $invitation = $invitations->resolveUsable($invitationToken);
+        $directoryListing = $invitation->listing;
+        $claim = $workflow->requestFromInvitation(
+            $invitationToken,
             $request->user(),
             $context->organization(),
             $membership,

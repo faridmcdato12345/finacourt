@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'organization_id',
@@ -122,6 +123,18 @@ class Venue extends Model
     public function visibilityLinks(): HasMany
     {
         return $this->hasMany(VisibilityLink::class);
+    }
+
+    /** @return HasOne<GoogleBusinessProfileConnection, $this> */
+    public function googleBusinessProfileConnection(): HasOne
+    {
+        return $this->hasOne(GoogleBusinessProfileConnection::class);
+    }
+
+    /** @return HasMany<GoogleBusinessProfileAudit, $this> */
+    public function googleBusinessProfileAudits(): HasMany
+    {
+        return $this->hasMany(GoogleBusinessProfileAudit::class);
     }
 
     /** @return HasMany<SalesLead, $this> */

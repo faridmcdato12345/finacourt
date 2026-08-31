@@ -22,6 +22,7 @@ use App\Http\Controllers\Owner\BookingAvailabilityController;
 use App\Http\Controllers\Owner\BookingController;
 use App\Http\Controllers\Owner\CourtResourceController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
+use App\Http\Controllers\Owner\GoogleBusinessProfileController;
 use App\Http\Controllers\Owner\GrowthRecommendationController as OwnerGrowthRecommendationController;
 use App\Http\Controllers\Owner\GrowthRecommendationStateController as OwnerGrowthRecommendationStateController;
 use App\Http\Controllers\Owner\OperatingHoursController;
@@ -208,6 +209,9 @@ Route::post('/venues/{venueSlug}/holds', [PlayerBookingController::class, 'store
     ->name('player.bookings.store');
 
 Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:authenticated'])->group(function () {
+    Route::get('/google-business-profile/callback', [GoogleBusinessProfileController::class, 'callback'])
+        ->middleware('throttle:google-business-profile')
+        ->name('google-business-profile.callback');
     Route::get('/dashboard', OwnerDashboardController::class)->name('dashboard');
     Route::get('/analytics', OwnerAnalyticsController::class)->name('analytics');
     Route::get('/growth', OwnerGrowthRecommendationController::class)->name('growth.index');
@@ -219,12 +223,14 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:
         ->name('growth.state.destroy');
     Route::get('/visibility', OwnerVisibilityController::class)->name('visibility.index');
     Route::get('/directory-claims', [VenueClaimController::class, 'index'])->name('directory-claims.index');
-    Route::get('/directory/{directoryListing}/claim', [VenueClaimController::class, 'create'])
+    Route::get('/venue-invitations/{invitationToken}', [VenueClaimController::class, 'create'])
+        ->where('invitationToken', '[a-f0-9]{64}')
         ->middleware('verified')
-        ->name('directory-claims.create');
-    Route::post('/directory/{directoryListing}/claim', [VenueClaimController::class, 'store'])
+        ->name('directory-claims.invitations.create');
+    Route::post('/venue-invitations/{invitationToken}', [VenueClaimController::class, 'store'])
+        ->where('invitationToken', '[a-f0-9]{64}')
         ->middleware(['verified', 'throttle:directory-claim'])
-        ->name('directory-claims.store');
+        ->name('directory-claims.invitations.store');
     Route::post('/directory-claims/{claim}/proof/email', [VenueClaimController::class, 'resendEmailCode'])
         ->middleware(['verified', 'throttle:directory-claim'])
         ->name('directory-claims.proof.email');
@@ -270,6 +276,19 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:
         ->name('venues.visibility-links.store');
     Route::post('/venues/{venue}/google-place', [VenuePlaceController::class, 'store'])
         ->name('venues.google-place.store');
+    Route::post('/venues/{venue}/google-business-profile/connect', [GoogleBusinessProfileController::class, 'connect'])
+        ->middleware('throttle:google-business-profile')
+        ->name('venues.google-business-profile.connect');
+    Route::post('/venues/{venue}/google-business-profile/retry', [GoogleBusinessProfileController::class, 'retry'])
+        ->middleware('throttle:google-business-profile')
+        ->name('venues.google-business-profile.retry');
+    Route::post('/venues/{venue}/google-business-profile/candidates/{candidateKey}', [GoogleBusinessProfileController::class, 'confirm'])
+        ->where('candidateKey', '[a-f0-9]{64}')
+        ->middleware('throttle:google-business-profile')
+        ->name('venues.google-business-profile.confirm');
+    Route::delete('/venues/{venue}/google-business-profile', [GoogleBusinessProfileController::class, 'disconnect'])
+        ->middleware('throttle:google-business-profile')
+        ->name('venues.google-business-profile.disconnect');
     Route::patch('/venues/{venue}/photos/{photo}', [VenuePhotoController::class, 'update'])
         ->name('venues.photos.update');
     Route::delete('/venues/{venue}/photos/{photo}', [VenuePhotoController::class, 'destroy'])
@@ -328,6 +347,8 @@ Route::prefix('platform')->name('platform.')->middleware(['auth', 'platform.admi
     Route::post('/directory/{directoryListing}/publish', [PlatformVenueDirectoryController::class, 'publish'])->name('directory.publish');
     Route::post('/directory/{directoryListing}/close', [PlatformVenueDirectoryController::class, 'close'])->name('directory.close');
     Route::post('/directory/{directoryListing}/remove', [PlatformVenueDirectoryController::class, 'remove'])->name('directory.remove');
+    Route::post('/directory/{directoryListing}/claim-invitations', [PlatformVenueDirectoryController::class, 'issueClaimInvitation'])->name('directory.claim-invitations.store');
+    Route::delete('/directory/{directoryListing}/claim-invitations/{invitation}', [PlatformVenueDirectoryController::class, 'revokeClaimInvitation'])->name('directory.claim-invitations.destroy');
     Route::post('/directory/claims/{claim}/approve', [PlatformVenueDirectoryController::class, 'approveClaim'])->name('directory.claims.approve');
     Route::post('/directory/claims/{claim}/reject', [PlatformVenueDirectoryController::class, 'rejectClaim'])->name('directory.claims.reject');
     Route::post('/directory/claims/{claim}/verify-proof', [PlatformVenueDirectoryController::class, 'verifyClaimProof'])->name('directory.claims.verify-proof');

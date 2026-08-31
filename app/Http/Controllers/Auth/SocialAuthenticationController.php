@@ -125,7 +125,7 @@ class SocialAuthenticationController extends Controller
         if ($membership !== null) {
             $request->session()->put('tenant.organization_id', $membership->organization_id);
 
-            return redirect()->route('owner.dashboard');
+            return redirect()->intended(route('owner.dashboard'));
         }
 
         $request->session()->put('social_auth.owner_setup_required', true);

@@ -22,17 +22,11 @@ The default `NullPlacesProvider` is not available and never changes a venue. No 
 
 Only the Place ID is treated as durable Google data. Google documents Place IDs as storable identifiers and recommends refreshing IDs older than 12 months. A future provider must review current Places storage/attribution rules before persisting any additional response fields.
 
-### Stage C — intentionally disabled
+### Stage C — authorization and discovery foundation complete; mutations disabled
 
-`BusinessProfileGateway` is registered to `NullBusinessProfileGateway`. There is no OAuth route, token table, account/location matching, booking-URL mutation, or profile synchronization. Setting an environment flag alone cannot enable nonexistent behavior.
+The venue edit page now includes an optional Google panel. After explicit consent, an approved/configured project can use `business.manage` to list only accounts and locations the signed-in owner already manages. Tokens are encrypted, OAuth state is hashed/expiring/user-venue-tenant bound, matching is conservative, profile choice is explicit, duplicate location links are blocked, reconnect preserves the existing link until a replacement is confirmed, and disconnect/revoke plus audit behavior are implemented. Platform administrators can see token-free status/error summaries on the protected platform overview.
 
-Stage C requires all of the following before implementation:
-
-1. Approved Google Business Profile API access and current policy verification.
-2. Production OAuth client credentials and reviewed redirect origins.
-3. Explicit owner authorization and per-field synchronization consent.
-4. Encrypted refresh-token storage, tenant-bound state/nonces, disconnect and revocation behavior, and audit logs.
-5. Tests against the current official API contract.
+Creating, claiming, verifying, editing, or synchronizing Google profiles remains intentionally disabled. Environment values can enable only the implemented read-only discovery flow; they cannot enable profile mutation. See [Google Business Profile connection](integrations/google-business-profile.md) for setup, security, matching, failure behavior, and the future sync boundary.
 
 Reactivation marketing consent is never reused as Google authorization.
 
@@ -62,7 +56,7 @@ The score measures profile readiness only. It is not a Google or marketplace ran
 - Tokens are opaque ULIDs and are campaign identifiers, not authentication secrets.
 - QR SVGs are generated inside the application; no venue URL or player activity is sent to a third-party QR service.
 - Place IDs are not accepted in ordinary venue mass assignment. Only `ConfirmVenuePlace` can set them from a configured provider result after owner confirmation.
-- OAuth tokens are not stored because Stage C is not implemented. When implemented, they must be encrypted at rest and must never reach Vue/browser props.
+- Business Profile OAuth tokens are encrypted at rest, hidden from model serialization, never passed to Vue, and cleared on local disconnect. This is separate from optional Google sign-in.
 - QR reports expose only an aggregate visit count. They contain no player name, email, phone number, raw browsing history, IP address, or exact personal location.
 
 ## Environment placeholders
@@ -75,14 +69,14 @@ GOOGLE_MAPS_API_KEY=
 GOOGLE_BUSINESS_PROFILE_ENABLED=false
 GOOGLE_BUSINESS_PROFILE_CLIENT_ID=
 GOOGLE_BUSINESS_PROFILE_CLIENT_SECRET=
-GOOGLE_BUSINESS_PROFILE_REDIRECT_URI=
+GOOGLE_BUSINESS_PROFILE_REDIRECT_URI="${APP_URL}/owner/google-business-profile/callback"
 ```
 
-These values document the future boundary; the Phase 15 null providers remain active until reviewed concrete provider adapters are added. Google Maps directions URLs require no API key.
+Business Profile remains disabled by default. Enable it only after Google approves the Cloud project and the production OAuth consent/redirect configuration is reviewed. Places remains a null provider. Google Maps directions URLs require no API key.
 
 ## Limitations
 
-- There is no live Places picker, Google map, Business Profile connection, Google profile read/write, or Google performance metric import. Owners can accurately place their saved venue pin with the interactive OpenStreetMap map without a Google account or API key.
+- There is no live Places picker, Google profile creation/verification/mutation/sync, or Google performance metric import. Owners can accurately place their saved venue pin with the interactive OpenStreetMap map without a Google account or API key.
 - A copied Google-tagged booking URL records only visits that keep that marker or have an identifiable Google referrer. It does not claim complete Google attribution.
 - Stable link visit counters are aggregate scans/visits, not unique people.
 - Place ID refresh is not scheduled because the live Places provider is disabled.

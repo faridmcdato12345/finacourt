@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Platform;
 
+use App\Directory\VenueClaimInvitationService;
 use App\Directory\VenueClaimProofService;
 use App\Directory\VenueClaimWorkflow;
 use App\Directory\VenueDirectoryAudit;
@@ -16,9 +17,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\SaveVenueDirectoryListingRequest;
 use App\Models\PsgcLocation;
 use App\Models\Sport;
+use App\Models\VenueClaimInvitation;
 use App\Models\VenueClaimRequest;
 use App\Models\VenueDirectoryListing;
 use App\Models\VenueDirectoryReport;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -127,6 +130,8 @@ class VenueDirectoryController extends Controller
                 ->withCount(['resources as active_resources_count' => fn ($query) => $query->marketplace()]),
         ]);
 
+        $activeInvitation = $directoryListing->claimInvitations()->usable()->latest('id')->first();
+
         return Inertia::render('Platform/Directory/Edit', [
             ...$this->formOptions(),
             'listing' => [
@@ -151,6 +156,11 @@ class VenueDirectoryController extends Controller
                     'closes_at' => $hour->closes_at ? substr($hour->closes_at, 0, 5) : null,
                 ]),
                 'last_verified_at' => $directoryListing->last_verified_at?->format('M j, Y H:i'),
+                'is_claimable' => $directoryListing->isClaimable(),
+                'active_claim_invitation' => $activeInvitation ? [
+                    'id' => $activeInvitation->getKey(),
+                    'expires_at' => $activeInvitation->expires_at->format('M j, Y H:i'),
+                ] : null,
                 'claimed_venue' => $directoryListing->claimedVenue ? [
                     'id' => $directoryListing->claimedVenue->getKey(),
                     'name' => $directoryListing->claimedVenue->name,
@@ -209,6 +219,38 @@ class VenueDirectoryController extends Controller
         $manager->remove($directoryListing, $request->user(), $validated['reason']);
 
         return redirect()->route('platform.directory.index')->with('status', 'The venue was hidden from the public guide.');
+    }
+
+    public function issueClaimInvitation(
+        Request $request,
+        VenueDirectoryListing $directoryListing,
+        VenueClaimInvitationService $invitations,
+    ): JsonResponse {
+        $issued = $invitations->issue($directoryListing, $request->user());
+        $invitation = $issued['invitation'];
+
+        return response()->json([
+            'status' => 'Private owner link created. Copy it now and send it only to the venue owner through a contact you trust.',
+            'invitation' => [
+                'id' => $invitation->getKey(),
+                'expires_at' => $invitation->expires_at->format('M j, Y H:i'),
+            ],
+            'claim_invitation' => [
+                'url' => route('owner.directory-claims.invitations.create', $issued['token']),
+                'expires_at' => $invitation->expires_at->format('M j, Y H:i'),
+            ],
+        ]);
+    }
+
+    public function revokeClaimInvitation(
+        Request $request,
+        VenueDirectoryListing $directoryListing,
+        VenueClaimInvitation $invitation,
+        VenueClaimInvitationService $invitations,
+    ): RedirectResponse {
+        $invitations->revoke($directoryListing, $invitation, $request->user());
+
+        return back()->with('status', 'The private owner link no longer works.');
     }
 
     public function approveClaim(Request $request, VenueClaimRequest $claim, VenueClaimWorkflow $workflow): RedirectResponse
