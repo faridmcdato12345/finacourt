@@ -15,6 +15,11 @@ mkdir -p \
 chmod -R ug+rwX storage bootstrap/cache
 
 if [ -z "${APP_KEY:-}" ]; then
+    if [ "${APP_ENV:-local}" = "production" ]; then
+        echo "APP_KEY is required when APP_ENV=production" >&2
+        exit 1
+    fi
+
     APP_KEY="$(php artisan key:generate --show --no-ansi)"
     export APP_KEY
 fi

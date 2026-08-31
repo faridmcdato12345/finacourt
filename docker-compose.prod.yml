@@ -1,0 +1,140 @@
+# Production deployment for a single FinACourt host.
+#
+# Create an ignored .env.production, then always pass it to Compose:
+# docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml up -d --build
+#
+# The web port binds to loopback by default so an existing host reverse proxy
+# can terminate HTTPS. Do not expose the database port publicly.
+
+x-app-environment: &app-environment
+  APP_ENV: production
+  APP_DEBUG: "false"
+  DB_CONNECTION: mysql
+  DB_HOST: db
+  DB_PORT: 3306
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+  SESSION_DRIVER: database
+  SESSION_SECURE_COOKIE: "true"
+  SECURITY_CSP_ENABLED: "true"
+  PILOT_DEMO_SEED: "false"
+  LOG_CHANNEL: stack
+  LOG_STACK: stderr
+
+x-app-runtime: &app-runtime
+  image: ${FINACOURT_APP_IMAGE:-finacourt-app:latest}
+  env_file:
+    - ${FINACOURT_ENV_FILE:-.env.production}
+  environment: *app-environment
+  restart: unless-stopped
+  volumes:
+    - public_uploads:/var/www/html/storage/app/public
+  depends_on:
+    db:
+      condition: service_healthy
+  networks:
+    - finacourt
+
+services:
+  app:
+    <<: *app-runtime
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: app
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    command:
+      - sh
+      - -lc
+      - |
+        test -n "$${APP_KEY:-}" || { echo "APP_KEY is required" >&2; exit 1; }
+        php artisan optimize
+        exec php-fpm
+    healthcheck:
+      test: ["CMD-SHELL", "php-fpm -t >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  queue:
+    <<: *app-runtime
+    command:
+      - sh
+      - -lc
+      - |
+        test -n "$${APP_KEY:-}" || { echo "APP_KEY is required" >&2; exit 1; }
+        php artisan optimize
+        exec php artisan queue:work --queue=emails,default --sleep=3 --tries=3 --backoff=10 --timeout=90 --max-time=3600
+    stop_grace_period: 2m
+
+  scheduler:
+    <<: *app-runtime
+    command:
+      - sh
+      - -lc
+      - |
+        test -n "$${APP_KEY:-}" || { echo "APP_KEY is required" >&2; exit 1; }
+        php artisan optimize
+        exec php artisan schedule:work
+    stop_grace_period: 1m
+
+  web:
+    image: ${FINACOURT_WEB_IMAGE:-finacourt-web:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: web
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    restart: unless-stopped
+    ports:
+      - "${FINACOURT_BIND_ADDRESS:-127.0.0.1}:${FINACOURT_HTTP_PORT:-8000}:80"
+    volumes:
+      - public_uploads:/var/www/html/storage/app/public:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - finacourt
+
+  db:
+    image: mysql:8.4
+    env_file:
+      - ${FINACOURT_ENV_FILE:-.env.production}
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:?Set DB_DATABASE in .env.production}
+      MYSQL_USER: ${DB_USERNAME:?Set DB_USERNAME in .env.production}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.production}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env.production}
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - finacourt
+
+networks:
+  finacourt:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  public_uploads:

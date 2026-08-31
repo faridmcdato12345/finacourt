@@ -106,6 +106,27 @@ OAuth state remains enabled. Apple uses `form_post`, so the exact Apple callback
 
 All build commands run in containers. A production image/pipeline should install immutable dependencies and copy the generated artifacts into the release image; it must not run the Vite development server.
 
+The repository includes `docker-compose.prod.yml` and `Dockerfile.production` for a single-host Docker deployment. They build immutable PHP/Nginx images, compile Vue assets during the image build, keep MySQL and public venue photos in named volumes, run one scheduler, and run the `emails,default` queue worker. The HTTP port binds to `127.0.0.1` by default for an existing host TLS reverse proxy; MySQL has no published host port.
+
+Create the ignored production environment file and replace every placeholder before the first deployment:
+
+```bash
+cp .env.production.example .env.production
+docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml config --quiet
+docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml build
+docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml up -d
+```
+
+Use a unique Compose project name and unused `FINACOURT_HTTP_PORT` when other applications run on the same server. Configure the host reverse proxy to send traffic to `127.0.0.1:FINACOURT_HTTP_PORT`, forward the original host/protocol/client headers, and list only that proxy's IP/CIDR in `TRUSTED_PROXIES`.
+
+Run release commands against the same project and environment file:
+
+```bash
+docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan migrate --force
+docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan db:seed --class=Database\\Seeders\\PsgcLocationSeeder --force
+docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan queue:restart
+```
+
 ```bash
 docker compose build app
 docker compose run --rm --no-deps app composer install --no-interaction
