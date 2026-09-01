@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class ProductionStagingSeeder extends Seeder
@@ -15,6 +14,8 @@ class ProductionStagingSeeder extends Seeder
         $this->call([
             PlatformAdminSeeder::class,
             PsgcLocationSeeder::class,
+            SportSeeder::class,
+            AmenitySeeder::class,
         ]);
     }
 }

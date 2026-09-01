@@ -124,8 +124,12 @@ Run release commands against the same project and environment file:
 ```bash
 docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan migrate --force
 docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan db:seed --class=Database\\Seeders\\PsgcLocationSeeder --force
+docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan db:seed --class=Database\\Seeders\\SportSeeder --force
+docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan db:seed --class=Database\\Seeders\\AmenitySeeder --force
 docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan queue:restart
 ```
+
+`SportSeeder` and `AmenitySeeder` provide the production catalog used by venue and court forms. They are safe to rerun: canonical records are updated and activated by slug, while additional custom records are left unchanged. `ProductionStagingSeeder` includes both catalogs for deployments that intentionally use the aggregate seeder.
 
 Create or promote the one real platform administrator separately from all demo data. Set `PLATFORM_ADMIN_NAME`, `PLATFORM_ADMIN_EMAIL`, and a unique `PLATFORM_ADMIN_PASSWORD` of at least 12 characters in the deployment secret environment, then run:
 
