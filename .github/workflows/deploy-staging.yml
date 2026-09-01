@@ -1,0 +1,77 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches:
+      - staging
+
+concurrency:
+  group: finacourt-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy staging
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh "$VPS_USER@$VPS_HOST" << 'EOF'
+            set -e
+
+            cd ~/apps/finacourt-staging
+
+            git fetch origin staging
+            git checkout staging
+            git reset --hard origin/staging
+
+            docker compose \
+              --env-file .env.staging \
+              -p finacourt-staging \
+              -f docker-compose.staging.yml \
+              build
+
+            docker compose \
+              --env-file .env.staging \
+              -p finacourt-staging \
+              -f docker-compose.staging.yml \
+              up -d --remove-orphans
+
+            docker exec finacourt-staging-app-1 \
+              php artisan migrate --force
+
+            docker exec finacourt-staging-app-1 \
+              php artisan optimize:clear
+
+            docker exec finacourt-staging-app-1 \
+              php artisan optimize
+
+            docker restart \
+              finacourt-staging-queue-1 \
+              finacourt-staging-scheduler-1
+
+            sleep 10
+
+            curl --fail \
+              --silent \
+              --show-error \
+              https://staging.finacourt.asia/up
+
+            echo "Staging deployment successful."
+          EOF
