@@ -127,6 +127,14 @@ docker compose --env-file .env.production -p finacourt -f docker-compose.prod.ym
 docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan queue:restart
 ```
 
+Create or promote the one real platform administrator separately from all demo data. Set `PLATFORM_ADMIN_NAME`, `PLATFORM_ADMIN_EMAIL`, and a unique `PLATFORM_ADMIN_PASSWORD` of at least 12 characters in the deployment secret environment, then run:
+
+```bash
+docker compose --env-file .env.production -p finacourt -f docker-compose.prod.yml exec app php artisan db:seed --class=Database\\Seeders\\PlatformAdminSeeder --force
+```
+
+The seeder marks the configured email as verified and grants platform access without creating an organization or tenant membership. It is safe to rerun: if the email already belongs to a user, it preserves that user's name and password while granting platform-administrator access. Remove `PLATFORM_ADMIN_PASSWORD` from the long-lived environment after initial account creation if your deployment process permits; it is not needed when promoting or reseeding an existing account.
+
 ```bash
 docker compose build app
 docker compose run --rm --no-deps app composer install --no-interaction
