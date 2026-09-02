@@ -72,6 +72,30 @@
         </section>
     @endif
 
+    <section id="google-data-use" class="border-b border-slate-200 bg-court-950 text-white">
+        <div class="page-shell py-12 sm:py-16">
+            <div class="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Your choice, your Google account</p>
+                    <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">When you choose to connect Google</h2>
+                    <p class="mt-4 max-w-xl text-sm leading-7 text-emerald-50/80">Google is optional on FinACourt. You can browse and book courts, or list and manage a venue, without connecting a Google account.</p>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <article class="rounded-2xl border border-white/15 bg-white/10 p-5">
+                        <h3 class="text-lg font-semibold">Sign in with Google</h3>
+                        <p class="mt-3 text-sm leading-6 text-emerald-50/80">If you choose Google when signing in, FinACourt uses your name, email address, and Google account identifier to create or find your FinACourt account. Google access tokens are not kept for ordinary sign-in.</p>
+                    </article>
+                    <article class="rounded-2xl border border-white/15 bg-white/10 p-5">
+                        <h3 class="text-lg font-semibold">Connect a venue profile</h3>
+                        <p class="mt-3 text-sm leading-6 text-emerald-50/80">A court owner may separately allow FinACourt to read Google Business Profiles that the account already manages. We use names, addresses, public phone numbers, hours, map positions, and profile identifiers only to find and connect the correct venue. This version does not create, edit, verify, or publish a Google profile.</p>
+                    </article>
+                    <p class="text-sm leading-6 text-emerald-50/80 sm:col-span-2">See exactly how access is stored, used, and removed in our <a href="{{ route('marketplace.privacy', [], false) }}#google-data" class="font-semibold text-white underline decoration-emerald-300 underline-offset-4 hover:text-emerald-200">Privacy Policy</a>.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <section class="page-shell py-14 sm:py-18">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div><p class="eyebrow">Popular courts</p><h2 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Courts ready to explore</h2><p class="mt-3 text-sm text-slate-500">Published venues with active, priced inventory.</p></div>
@@ -97,7 +121,7 @@
                 <button type="button" data-carousel-next aria-controls="popular-courts-carousel" aria-label="Show more courts" class="absolute right-0 top-1/2 z-10 hidden size-12 translate-x-1/3 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-[0_12px_35px_rgba(15,23,42,0.16)] hover:border-court-300 hover:bg-court-50 hover:text-court-800 sm:flex">@include('marketplace.partials.icon', ['name' => 'chevron-right', 'class' => 'size-5'])</button>
             </div>
         @else
-            <div class="app-card mt-8 px-6 py-14 text-center"><span class="mx-auto grid size-12 place-items-center rounded-2xl bg-court-50 text-court-700">@include('marketplace.partials.icon', ['name' => 'court', 'class' => 'size-6'])</span><h3 class="mt-4 text-lg font-semibold">Published venues are on the way</h3><p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Court owners can prepare inventory now while the first facilities are reviewed.</p><a href="{{ route('marketplace.for-owners') }}" class="mt-5 inline-block rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white">List your courts</a></div>
+            <div class="app-card mt-8 px-6 py-14 text-center"><span class="mx-auto grid size-12 place-items-center rounded-2xl bg-court-50 text-court-700">@include('marketplace.partials.icon', ['name' => 'court', 'class' => 'size-6'])</span><h3 class="mt-4 text-lg font-semibold">Published venues are on the way</h3><p class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">Court owners can prepare inventory now while the first facilities are reviewed.</p><a href="{{ route('register') }}" class="mt-5 inline-block rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white">List your courts</a></div>
         @endif
 
         @if ($featuredPromotion)

@@ -4,46 +4,48 @@ namespace App\Http\Controllers\Marketplace;
 
 use App\Http\Controllers\Controller;
 use App\Models\CourtResource;
+use App\Models\PlatformServiceFeeRule;
 use App\Models\Venue;
+use App\Payments\PlatformServiceFeeCalculator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\View\View;
 
 class OwnerAcquisitionController extends Controller
 {
-    public function show(): View
+    public function show(PlatformServiceFeeCalculator $serviceFees): View
     {
         return view('marketplace.owners', [
             'supply' => $this->publicSupply(),
-            'pilotPlan' => $this->pilotPlan(),
+            'pricing' => $this->ownerPricing($serviceFees),
             'seo' => [
-                'title' => 'Get more court bookings with FinACourt',
-                'description' => 'Put your courts online, let players book available times, offer simple deals, and see what helped bring each booking.',
+                'title' => 'Get more players and court bookings with FinACourt',
+                'description' => 'Help nearby players discover your venue, turn empty court hours into bookable deals, bring past customers back, and see what generated confirmed bookings.',
                 'canonical' => route('marketplace.for-owners'),
                 'robots' => 'index,follow',
                 'type' => 'website',
             ],
             'structuredData' => [$this->webPageSchema(
                 'FinACourt for court owners',
-                'Help players find your courts, book open times, come back again, and understand what brought each booking.',
+                'Help nearby players discover your venue, book open court times, return for another game, and understand what generated confirmed bookings.',
                 route('marketplace.for-owners'),
             )],
         ]);
     }
 
-    public function pricing(): View
+    public function pricing(PlatformServiceFeeCalculator $serviceFees): View
     {
         return view('marketplace.pricing', [
-            'pilotPlan' => $this->pilotPlan(),
+            'pricing' => $this->ownerPricing($serviceFees),
             'seo' => [
                 'title' => 'Pricing for court owners',
-                'description' => 'See the current FinACourt founding-venue pilot price, included owner tools, and transparent payment-fee boundaries.',
+                'description' => 'See how FinACourt separates the owner-set court price, player service fee, player total, and online court earnings without a monthly owner subscription.',
                 'canonical' => route('marketplace.pricing'),
                 'robots' => 'index,follow',
                 'type' => 'website',
             ],
             'structuredData' => [$this->webPageSchema(
                 'FinACourt owner pricing',
-                'Current public pricing and included tools for the founding-venue pilot.',
+                'Current transaction-based pricing and payment boundaries for FinACourt court owners.',
                 route('marketplace.pricing'),
             )],
         ]);
@@ -65,36 +67,37 @@ class OwnerAcquisitionController extends Controller
         ];
     }
 
-    /** @return array{name: string, monthly_fee: string, booking_fee: string, availability: string, features: array<int, string>, sales_email: string} */
-    private function pilotPlan(): array
+    /**
+     * @return array{
+     *   service_fee_active: bool,
+     *   service_fee_summary: string|null,
+     *   service_fee_minimum: string|null,
+     *   service_fee_maximum: string|null,
+     *   features: array<int, string>,
+     *   sales_email: string
+     * }
+     */
+    private function ownerPricing(PlatformServiceFeeCalculator $serviceFees): array
     {
-        $monthlyFeeCentavos = max(0, (int) config('owner_pricing.pilot.monthly_fee_centavos', 0));
-        $bookingFeeBasisPoints = max(0, (int) config('owner_pricing.pilot.booking_fee_basis_points', 0));
+        $rule = $serviceFees->activeRule('PHP');
 
         return [
-            'name' => (string) config('owner_pricing.pilot.name', 'Founding venue pilot'),
-            'monthly_fee' => $this->formatPesos($monthlyFeeCentavos),
-            'booking_fee' => $this->formatPercentage($bookingFeeBasisPoints),
-            'availability' => (string) config('owner_pricing.pilot.availability', 'Accepting pilot venues'),
-            'features' => array_values(config('owner_pricing.pilot.features', [])),
+            'service_fee_active' => $rule instanceof PlatformServiceFeeRule,
+            'service_fee_summary' => $rule?->summary(),
+            'service_fee_minimum' => $this->optionalMoney($rule?->minimum_fee_amount),
+            'service_fee_maximum' => $this->optionalMoney($rule?->maximum_fee_amount),
+            'features' => array_values(config('owner_pricing.features', [])),
             'sales_email' => (string) config('owner_pricing.sales_email', 'hello@example.com'),
         ];
     }
 
-    private function formatPesos(int $centavos): string
+    private function optionalMoney(mixed $amount): ?string
     {
-        $pesos = $centavos / 100;
-        $decimals = $centavos % 100 === 0 ? 0 : 2;
+        if ($amount === null || (float) $amount <= 0) {
+            return null;
+        }
 
-        return '₱'.number_format($pesos, $decimals);
-    }
-
-    private function formatPercentage(int $basisPoints): string
-    {
-        $percentage = $basisPoints / 100;
-        $decimals = $basisPoints % 100 === 0 ? 0 : ($basisPoints % 10 === 0 ? 1 : 2);
-
-        return number_format($percentage, $decimals).'%';
+        return '₱'.number_format((float) $amount, 2);
     }
 
     /** @return array<string, string> */

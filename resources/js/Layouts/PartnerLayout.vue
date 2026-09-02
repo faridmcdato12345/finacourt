@@ -1,6 +1,7 @@
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import LogoutForm from '../Components/LogoutForm.vue';
+import ThemeToggle from '../Components/ThemeToggle.vue';
 
 const page = usePage();
 </script>
@@ -17,6 +18,7 @@ const page = usePage();
                     <Link href="/partner/dashboard" class="rounded-lg px-2 py-2 text-court-100 hover:bg-white/10">Overview</Link>
                     <Link href="/partner/leads" class="rounded-lg px-2 py-2 text-court-100 hover:bg-white/10">Leads</Link>
                     <span class="hidden text-court-200 md:inline">{{ page.props.auth.user.name }}</span>
+                    <ThemeToggle />
                     <LogoutForm class="rounded-lg border border-white/20 px-3 py-2 font-semibold disabled:cursor-wait disabled:opacity-60" />
                 </nav>
             </div>

@@ -1,5 +1,6 @@
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
+import ThemeToggle from '../Components/ThemeToggle.vue';
 
 const page = usePage();
 </script>
@@ -14,6 +15,7 @@ const page = usePage();
                 </a>
 
                 <nav class="flex items-center gap-2 text-sm font-medium" aria-label="Primary navigation">
+                    <ThemeToggle />
                     <Link v-if="page.props.auth.user && !page.props.auth.user.is_platform_admin" href="/owner/dashboard" class="rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100">Dashboard</Link>
                     <Link v-else-if="page.props.auth.user?.is_platform_admin" href="/platform/dashboard" class="rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100">Platform</Link>
                     <template v-else>

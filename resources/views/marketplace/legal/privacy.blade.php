@@ -16,6 +16,7 @@
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">On this page</p>
                 <nav class="mt-4 space-y-3 text-sm text-slate-600" aria-label="Privacy policy sections">
                     <a class="block hover:text-court-700" href="#information-we-collect">Information we collect</a>
+                    <a class="block hover:text-court-700" href="#google-data">Google account data</a>
                     <a class="block hover:text-court-700" href="#how-we-use-information">How we use it</a>
                     <a class="block hover:text-court-700" href="#how-information-is-shared">How it is shared</a>
                     <a class="block hover:text-court-700" href="#payments">Payments</a>
@@ -45,8 +46,21 @@
                         </div>
                     </section>
 
+                    <section id="google-data" class="scroll-mt-28">
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">2. Google account and Business Profile data</h2>
+                        <p class="mt-4">Connecting Google is optional. FinACourt uses Google data only for the feature you choose:</p>
+                        <div class="mt-4 space-y-4">
+                            <p><strong class="text-slate-900">Google sign-in.</strong> If you choose to sign in with Google, FinACourt receives your name, email address, and Google account identifier. We use them to create, find, or link your FinACourt account and to protect the sign-in process. We do not retain Google access or refresh tokens for ordinary player or owner sign-in.</p>
+                            <p><strong class="text-slate-900">Google Business Profile connection.</strong> A court owner may separately authorize FinACourt to access Business Profiles that the selected Google account already manages. FinACourt reads business names, addresses, public phone numbers, opening hours, map positions, account and location identifiers, and matching results to help the owner select and connect the correct existing venue. The current integration does not create, verify, edit, or publish a Google Business Profile.</p>
+                            <p><strong class="text-slate-900">What we store.</strong> While a venue connection is active, FinACourt stores the selected Google account and location identifiers, profile matching details, connection status and audit history, and encrypted access and refresh tokens needed to complete or retry the owner-requested connection. These credentials are restricted to authorized server-side processes and are not shown to court owners, players, or unrelated venues.</p>
+                            <p><strong class="text-slate-900">Sharing and advertising.</strong> FinACourt does not sell Google user data or use Google Business Profile data for advertising. We disclose it only to infrastructure providers when needed to securely operate the connection, or when disclosure is required for the safety and legal reasons described below.</p>
+                            <p><strong class="text-slate-900">Limited use.</strong> FinACourt's use and transfer of information received from Google APIs follows the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener" class="font-semibold text-court-700 underline decoration-court-200 underline-offset-4">Google API Services User Data Policy</a>, including its Limited Use requirements.</p>
+                            <p><strong class="text-slate-900">Disconnecting Google.</strong> An authorized venue owner can disconnect Google from the venue workspace. FinACourt then asks Google to revoke the connection and removes the saved access and refresh tokens. Limited connection and audit records may remain where reasonably needed for security, dispute handling, and legal compliance. Disconnecting FinACourt does not delete or change the Google Business Profile.</p>
+                        </div>
+                    </section>
+
                     <section id="how-we-use-information" class="scroll-mt-28">
-                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">2. How we use information</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">3. How we use information</h2>
                         <p class="mt-4">We use information to:</p>
                         <ul class="mt-3 list-disc space-y-2 pl-6">
                             <li>create and protect accounts, organizations, permissions, and venue ownership;</li>
@@ -62,7 +76,7 @@
                     </section>
 
                     <section id="how-information-is-shared" class="scroll-mt-28">
-                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">3. How information is shared</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">4. How information is shared</h2>
                         <div class="mt-4 space-y-4">
                             <p><strong class="text-slate-900">With the venue you book.</strong> The relevant court owner and authorized staff receive the booking and customer details needed to provide the reservation, collect pay-at-venue amounts, communicate about the booking, and handle legitimate support.</p>
                             <p><strong class="text-slate-900">With service providers.</strong> We may use providers for hosting, email delivery, payment processing, maps, social sign-in, error monitoring, and other infrastructure. They receive only the information needed to perform their service and are subject to their own obligations and policies.</p>
@@ -74,13 +88,13 @@
                     </section>
 
                     <section id="payments" class="scroll-mt-28">
-                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">4. Payments and payout information</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">5. Payments and payout information</h2>
                         <p class="mt-4">Online checkout is hosted by the configured payment provider, currently PayMongo where enabled. The provider collects the card, wallet, or QR payment details required to complete checkout. FinACourt stores payment references, amount, currency, status, payment method summary, provider fees where reported, refund state, and verification history. FinACourt does not intentionally store full card numbers, card security codes, or a player's wallet password.</p>
                         <p class="mt-4">Owner payout profiles and requests are visible only to authorized owner and platform accounts. Sensitive payout values are masked in normal displays and are used to prepare or record legitimate court-owner settlements.</p>
                     </section>
 
                     <section id="analytics-and-location" class="scroll-mt-28">
-                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">5. Analytics, cookies, and location</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">6. Analytics, cookies, and location</h2>
                         <div class="mt-4 space-y-4">
                             <p>FinACourt uses essential cookies or similar browser storage for sign-in sessions, security protection, preferences, booking flow, anonymous session measurement, referral attribution, and PWA operation. Blocking essential storage may prevent sign-in or booking from working.</p>
                             <p>Marketplace analytics may record searched sport, city or area, requested date and time, price or setting filters, result count, whether availability existed, and the source that led to a booking. Owner reports are tenant-scoped and demand reports are aggregated before display.</p>
@@ -89,30 +103,30 @@
                     </section>
 
                     <section id="retention-and-security" class="scroll-mt-28">
-                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">6. Retention and security</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">7. Retention and security</h2>
                         <p class="mt-4">We keep information only for as long as reasonably needed to provide the service, preserve booking and payment history, resolve disputes, prevent fraud, maintain required audit records, and meet legal obligations. Retention periods vary by record type. Deleting an account may not erase records that must be preserved for confirmed bookings, payments, refunds, settlements, fraud prevention, or legal compliance.</p>
                         <p class="mt-4">We use measures such as encrypted transport, hashed passwords, access controls, tenant isolation, secure webhook verification, protected secrets, audit history, and restricted owner/platform permissions. No internet service can guarantee absolute security, so please use a unique password and contact us if you suspect unauthorized access.</p>
                     </section>
 
                     <section id="your-choices" class="scroll-mt-28">
-                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">7. Your choices and rights</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">8. Your choices and rights</h2>
                         <p class="mt-4">Depending on applicable law and the circumstances, you may ask to access, correct, update, export, object to, restrict, or delete personal information. You may withdraw marketing consent or change available notification preferences without stopping essential booking, security, or account messages.</p>
                         <p class="mt-4">Venue owners can update managed public venue details in their workspace. Anyone may report inaccurate public directory information. Venue ownership requests require independent verification and are not approved solely because someone submitted a request.</p>
                         <p class="mt-4">We may need to verify your identity and authority before fulfilling a privacy request. Some requests may be limited where retention or processing is required for contracts, security, other people's rights, or legal obligations.</p>
                     </section>
 
                     <section>
-                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">8. Children and guardians</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">9. Children and guardians</h2>
                         <p class="mt-4">A person who is not legally able to enter a binding booking or payment agreement should use FinACourt only with the involvement and permission of a parent or legal guardian. Please contact us if you believe a child provided personal information without appropriate permission.</p>
                     </section>
 
                     <section>
-                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">9. Changes to this policy</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">10. Changes to this policy</h2>
                         <p class="mt-4">We may update this policy when FinACourt changes or when legal requirements develop. We will update the effective date and provide additional notice when a material change requires it. Continued use after an update is subject to the revised policy, without limiting rights that cannot legally be waived.</p>
                     </section>
 
                     <section id="contact-us" class="scroll-mt-28 rounded-2xl bg-slate-50 p-5 sm:p-6">
-                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">10. Contact us</h2>
+                        <h2 class="text-2xl font-semibold tracking-tight text-slate-950">11. Contact us</h2>
                         <p class="mt-3">{{ $operatorName }} is responsible for this policy. For privacy questions or requests, email <a class="font-semibold text-court-700 underline decoration-court-200 underline-offset-4" href="mailto:{{ $contactEmail }}">{{ $contactEmail }}</a>.</p>
                         <p class="mt-3 text-sm">Please do not email passwords, card information, wallet credentials, or other highly sensitive payment details.</p>
                     </section>

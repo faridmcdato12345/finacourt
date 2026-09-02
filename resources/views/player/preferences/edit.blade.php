@@ -2,7 +2,7 @@
 
 @section('content')
     <section class="border-b border-slate-200 bg-white">
-        <div class="mx-auto max-w-3xl px-5 py-9 sm:px-8 sm:py-12"><a href="{{ route('player.bookings.index') }}" class="text-sm font-semibold text-court-700">← My bookings</a><h1 class="mt-5 text-4xl font-semibold tracking-tight">Notification preferences</h1><p class="mt-3 text-slate-500">Choose whether court owners you have booked with may send occasional comeback messages.</p></div>
+        <div class="mx-auto max-w-3xl px-5 py-9 sm:px-8 sm:py-12"><div class="flex flex-wrap items-center justify-between gap-3"><a href="{{ route('player.bookings.index') }}" class="text-sm font-semibold text-court-700">← My bookings</a><a href="{{ route('player.account.edit') }}" class="rounded-xl border border-court-200 bg-court-50 px-4 py-2.5 text-sm font-semibold text-court-800">Profile and password</a></div><h1 class="mt-5 text-4xl font-semibold tracking-tight">Notification preferences</h1><p class="mt-3 text-slate-500">Choose whether court owners you have booked with may send occasional comeback messages.</p></div>
     </section>
     <section class="mx-auto max-w-3xl px-5 py-8 sm:px-8 sm:py-10">
         @if (session('status'))<p role="status" class="mb-6 rounded-xl bg-court-50 px-4 py-3 text-sm font-medium text-court-800">{{ session('status') }}</p>@endif

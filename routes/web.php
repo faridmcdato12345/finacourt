@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\AccountPasswordResetController;
+use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\SocialAuthenticationController;
@@ -152,6 +154,13 @@ Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
 
+Route::get('/reset-password/{token}', [AccountPasswordResetController::class, 'create'])
+    ->middleware('throttle:6,1')
+    ->name('password.reset');
+Route::post('/reset-password', [AccountPasswordResetController::class, 'store'])
+    ->middleware('throttle:6,1')
+    ->name('password.store');
+
 Route::middleware('auth')->group(function () {
     Route::get('/owner/social/setup', [SocialOwnerSetupController::class, 'create'])
         ->name('owner.social-setup.create');
@@ -171,7 +180,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
         $request->fulfill();
 
-        return redirect()->intended(route('owner.dashboard'))
+        $user = $request->user();
+        $destination = $user->is_platform_admin
+            ? route('platform.dashboard')
+            : ($user->memberships()->exists() ? route('owner.dashboard') : route('player.bookings.index'));
+
+        return redirect()->intended($destination)
             ->with('status', 'Your account email is verified.');
     })->middleware(['signed', 'throttle:6,1'])->name('verification.verify');
     Route::post('/email/verification-notification', function (Request $request) {
@@ -182,6 +196,16 @@ Route::middleware('auth')->group(function () {
 });
 
 Route::prefix('player')->name('player.')->middleware(['auth', 'throttle:authenticated'])->group(function () {
+    Route::get('/account', [AccountSettingsController::class, 'playerEdit'])->name('account.edit');
+    Route::patch('/account/profile', [AccountSettingsController::class, 'updateProfile'])
+        ->middleware('throttle:6,1')
+        ->name('account.profile.update');
+    Route::put('/account/password', [AccountSettingsController::class, 'updatePassword'])
+        ->middleware('throttle:6,1')
+        ->name('account.password.update');
+    Route::post('/account/password-link', [AccountPasswordResetController::class, 'send'])
+        ->middleware('throttle:3,60')
+        ->name('account.password-link.store');
     Route::get('/bookings', [PlayerBookingController::class, 'index'])->name('bookings.index');
     Route::get('/bookings/{reference}', [PlayerBookingController::class, 'show'])
         ->name('bookings.show');
@@ -214,6 +238,16 @@ Route::post('/venues/{venueSlug}/holds', [PlayerBookingController::class, 'store
     ->name('player.bookings.store');
 
 Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:authenticated'])->group(function () {
+    Route::get('/account', [AccountSettingsController::class, 'ownerEdit'])->name('account.edit');
+    Route::patch('/account/profile', [AccountSettingsController::class, 'updateProfile'])
+        ->middleware('throttle:6,1')
+        ->name('account.profile.update');
+    Route::put('/account/password', [AccountSettingsController::class, 'updatePassword'])
+        ->middleware('throttle:6,1')
+        ->name('account.password.update');
+    Route::post('/account/password-link', [AccountPasswordResetController::class, 'send'])
+        ->middleware('throttle:3,60')
+        ->name('account.password-link.store');
     Route::get('/google-business-profile/callback', [GoogleBusinessProfileController::class, 'callback'])
         ->middleware('throttle:google-business-profile')
         ->name('google-business-profile.callback');
