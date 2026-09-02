@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\SocialOwnerSetupController;
 use App\Http\Controllers\Marketplace\DealsController;
 use App\Http\Controllers\Marketplace\DiscoveryController;
 use App\Http\Controllers\Marketplace\HomeController;
+use App\Http\Controllers\Marketplace\LegalController;
 use App\Http\Controllers\Marketplace\OwnerAcquisitionController;
 use App\Http\Controllers\Marketplace\RobotsController;
 use App\Http\Controllers\Marketplace\SalesPartnerQrController;
@@ -77,6 +78,10 @@ Route::middleware('throttle:marketplace')->group(function () {
         ->name('marketplace.for-owners');
     Route::get('/pricing', [OwnerAcquisitionController::class, 'pricing'])
         ->name('marketplace.pricing');
+    Route::get('/privacy', [LegalController::class, 'privacy'])
+        ->name('marketplace.privacy');
+    Route::get('/terms', [LegalController::class, 'terms'])
+        ->name('marketplace.terms');
     Route::get('/courts', [DiscoveryController::class, 'index'])->name('marketplace.courts.index');
     Route::get('/deals', DealsController::class)->name('marketplace.deals');
     Route::get('/directory', [MarketplaceVenueDirectoryController::class, 'index'])

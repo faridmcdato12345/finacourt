@@ -9,6 +9,12 @@
             <main id="main-content" tabindex="-1" class="mx-auto flex w-full max-w-md flex-1 items-center py-12">
                 <slot />
             </main>
+
+            <footer class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 border-t border-slate-200 pt-5 text-xs text-slate-500 sm:justify-start">
+                <a href="/privacy" class="hover:text-court-700">Privacy Policy</a>
+                <a href="/terms" class="hover:text-court-700">Terms of Service</a>
+                <span>© {{ new Date().getFullYear() }} FinACourt</span>
+            </footer>
         </section>
 
         <aside class="relative hidden overflow-hidden bg-court-950 p-12 text-white lg:flex lg:flex-col lg:justify-end">

@@ -29,9 +29,13 @@ const page = usePage();
         </main>
 
         <footer class="border-t border-slate-200 bg-white">
-            <div class="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            <div class="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                 <p>Built for local court owners and the players they serve.</p>
-                <p>© {{ new Date().getFullYear() }} FinACourt</p>
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    <a href="/privacy" class="hover:text-court-700">Privacy Policy</a>
+                    <a href="/terms" class="hover:text-court-700">Terms of Service</a>
+                    <p>© {{ new Date().getFullYear() }} FinACourt</p>
+                </div>
             </div>
         </footer>
     </div>

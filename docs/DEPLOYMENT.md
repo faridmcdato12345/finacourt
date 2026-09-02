@@ -27,6 +27,9 @@ Never copy local values or committed examples verbatim into production. Store se
 | `APP_KEY` | One persistent, backed-up `base64:` key; never rotate without a session/data migration plan |
 | `APP_DEBUG` | `false` |
 | `APP_URL` | Canonical public `https://` origin |
+| `LEGAL_OPERATOR_NAME` | Legal person or registered business operating FinACourt; review before launch |
+| `LEGAL_CONTACT_EMAIL` | Monitored mailbox for privacy, legal, and account-data requests |
+| `LEGAL_EFFECTIVE_DATE` | Human-readable date of the currently published policy version |
 | `TRUSTED_HOSTS` | Comma-separated exact public hostnames |
 | `TRUSTED_PROXIES` | Comma-separated load-balancer IPs/CIDRs; never `*` on a directly reachable app |
 | `SECURITY_CSP_ENABLED` | `true` |
@@ -77,6 +80,8 @@ Never copy local values or committed examples verbatim into production. Store se
 | `MAIL_*` | A real transactional provider and monitored sender identity; `log` is development-only and does not deliver owner booking emails |
 
 Provider-specific webhook secrets do not exist for the manual provider. The PayMongo adapter loads its API and webhook secrets from the environment, verifies the raw request body, uses the payment reference as its checkout idempotency key, and exposes `/webhooks/payments/paymongo` as its webhook URL.
+
+The public Privacy Policy and Terms of Service use the `LEGAL_*` values above. Before production launch, replace the example operator and email, confirm that the mailbox is monitored, and have the policy wording reviewed for the operator's actual registration, location, payment, cancellation, retention, and consumer-protection obligations.
 
 ### Google, Facebook, and Apple sign-in
 

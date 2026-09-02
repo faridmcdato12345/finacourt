@@ -25,6 +25,7 @@
                 <button class="w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Create account</button>
             </form>
 
+            <p class="mt-4 text-center text-xs leading-5 text-slate-500">By creating an account, you agree to FinACourt's <a href="{{ route('marketplace.terms', [], false) }}" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</p>
             <p class="mt-6 text-center text-sm text-slate-500">Already registered? <a href="{{ route('player.login', request()->query('return') ? ['return' => request()->query('return')] : []) }}" class="font-semibold text-court-700">Sign in</a></p>
         </div>
     </section>

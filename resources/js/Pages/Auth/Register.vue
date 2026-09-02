@@ -53,6 +53,7 @@ function submit() {
                 </div>
                 <button type="submit" :disabled="form.processing" class="mt-2 w-full rounded-xl bg-court-700 px-5 py-3.5 text-sm font-semibold text-white shadow-sm hover:bg-court-800 disabled:cursor-wait disabled:opacity-60">{{ form.processing ? 'Creating workspace…' : 'Create owner workspace' }}</button>
             </form>
+            <p class="mt-4 text-center text-xs leading-5 text-slate-500">By creating an account, you agree to FinACourt's <a href="/terms" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="/privacy" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</p>
             <p class="mt-6 text-center text-sm text-slate-600">Already have an account? <Link href="/login" class="font-semibold text-court-700">Sign in</Link></p>
         </div>
     </GuestLayout>
