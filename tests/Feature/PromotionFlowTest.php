@@ -11,6 +11,7 @@ use App\Models\Membership;
 use App\Models\OperatingHour;
 use App\Models\Organization;
 use App\Models\Promotion;
+use App\Models\PromotionSlot;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
@@ -232,6 +233,68 @@ class PromotionFlowTest extends TestCase
             ->assertSee('name="campaign" value="'.$promotion->campaign_token.'"', false);
 
         $this->assertSame(1, $promotion->refresh()->clicks_count);
+    }
+
+    public function test_best_public_deal_is_automatically_attached_to_eligible_venue_slots(): void
+    {
+        [$organization, $venue, $resource] = $this->setupInventory();
+        $date = $this->futureDate();
+        $smallerDiscount = Promotion::factory()->for($venue)->create([
+            'organization_id' => $organization->getKey(),
+            'resource_id' => $resource->getKey(),
+            'title' => 'Ten percent deal',
+            'discount_value' => '10.00',
+        ]);
+        $bestDeal = Promotion::factory()->for($venue)->create([
+            'organization_id' => $organization->getKey(),
+            'resource_id' => $resource->getKey(),
+            'title' => 'Thirty percent morning deal',
+            'discount_value' => '30.00',
+            'targets_specific_slots' => true,
+        ]);
+        PromotionSlot::factory()->for($bestDeal)->for($resource, 'resource')->create([
+            'slot_date' => $date,
+            'starts_at_time' => '08:00',
+            'ends_at_time' => '12:00',
+        ]);
+
+        $response = $this->get(route('marketplace.venues.show', [
+            'venueSlug' => $venue->slug,
+            'resource' => $resource->getKey(),
+            'date' => $date,
+            'duration' => 60,
+        ]));
+
+        $response->assertOk()
+            ->assertSee('data-start="08:00"', false)
+            ->assertSee('data-campaign="'.$bestDeal->campaign_token.'"', false)
+            ->assertSee('campaign='.$bestDeal->campaign_token, false)
+            ->assertSee('30% off');
+        $this->assertMatchesRegularExpression(
+            '/<a\s+[^>]*data-start="08:00"[^>]*data-campaign="'.preg_quote($bestDeal->campaign_token, '/').'"/',
+            $response->getContent(),
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/<a\s+[^>]*data-start="08:00"[^>]*data-campaign="'.preg_quote($smallerDiscount->campaign_token, '/').'"/',
+            $response->getContent(),
+        );
+
+        $player = User::factory()->create();
+        $this->actingAs($player)->get(route('player.bookings.create', [
+            'venueSlug' => $venue->slug,
+            'resource' => $resource->getKey(),
+            'date' => $date,
+            'start' => '09:00',
+            'duration' => 60,
+        ]))
+            ->assertOk()
+            ->assertSee($bestDeal->title)
+            ->assertSee('name="campaign" value="'.$bestDeal->campaign_token.'"', false);
+
+        $booking = $this->createHold($player, $venue, $resource);
+        $this->assertSame($bestDeal->getKey(), $booking->promotion_id);
+        $this->assertSame('455.00', $booking->total_amount);
+        $this->assertSame('195.00', $booking->discount_amount);
     }
 
     public function test_public_pages_show_only_current_public_promotions_from_public_inventory(): void

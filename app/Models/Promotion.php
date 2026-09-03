@@ -92,6 +92,16 @@ class Promotion extends Model
             return false;
         }
 
+        if ($this->targets_specific_slots) {
+            $slots = $this->relationLoaded('slots')
+                ? $this->slots
+                : $this->slots()->get();
+
+            return $slots->contains(
+                fn (PromotionSlot $slot) => $slot->contains($resource, $localStart, $localEnd),
+            );
+        }
+
         if ($this->days_of_week !== null && ! in_array($localStart->dayOfWeek, $this->days_of_week, true)) {
             return false;
         }
@@ -103,16 +113,6 @@ class Promotion extends Model
             if ($startTime < $this->starts_at_time || $endTime > $this->ends_at_time) {
                 return false;
             }
-        }
-
-        if ($this->targets_specific_slots) {
-            $slots = $this->relationLoaded('slots')
-                ? $this->slots
-                : $this->slots()->get();
-
-            return $slots->contains(
-                fn (PromotionSlot $slot) => $slot->contains($resource, $localStart, $localEnd),
-            );
         }
 
         return true;

@@ -51,7 +51,7 @@
                                 aria-label="Select {{ $slot['start_time'] }} to {{ $slot['end_time'] }}"
                             >
                                 {{ $slot['start_time'] }}–{{ $slot['end_time'] }}
-                                @if ($slot['campaign'] ?? null)<span class="mt-1 block text-[10px] text-amber-700">Deal applies</span>@endif
+                                @if ($slot['campaign'] ?? null)<span class="mt-1 block text-[10px] text-amber-700">{{ $slot['promotion_offer'] ?: 'Deal applies' }}</span>@endif
                             </a>
                         @else
                             <span data-unavailable-slot data-start="{{ $slot['start_time'] }}" data-end="{{ $slot['end_time'] }}" class="rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center text-xs font-semibold text-slate-300 line-through">{{ $slot['start_time'] }}–{{ $slot['end_time'] }}</span>

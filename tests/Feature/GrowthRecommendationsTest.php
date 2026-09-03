@@ -64,7 +64,11 @@ class GrowthRecommendationsTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $recommendation->evidence['empty_slot_count']);
         $this->assertStringContainsString('/owner/promotions/create', $recommendation->actionUrl);
         $this->assertStringContainsString('resource='.$resource->getKey(), $recommendation->actionUrl);
-        $this->assertStringContainsString((string) $recommendation->evidence['empty_slot_count'], $recommendation->title);
+        $headlineCount = $recommendation->evidence['last_minute_slot_count'] > 0
+            ? $recommendation->evidence['last_minute_slot_count']
+            : $recommendation->evidence['empty_slot_count'];
+        $this->assertStringContainsString((string) $headlineCount, $recommendation->title);
+        $this->assertSame('Create a promotion', $recommendation->actionLabel);
     }
 
     public function test_demand_rules_require_privacy_thresholded_real_searches_and_available_inventory(): void

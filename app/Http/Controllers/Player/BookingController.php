@@ -23,6 +23,8 @@ use App\Payments\PaymentProviderRegistry;
 use App\Payments\PlatformServiceFeeCalculator;
 use App\Payments\StartHostedCheckout;
 use App\Promotions\PromotionApplicability;
+use App\Promotions\PromotionMarketplace;
+use App\Promotions\PromotionTracker;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,7 +41,9 @@ class BookingController extends Controller
         MarketplaceQuery $marketplace,
         AvailabilityService $availability,
         BookingPrice $prices,
-        PromotionApplicability $promotions,
+        PromotionApplicability $promotionApplicability,
+        PromotionMarketplace $promotionMarketplace,
+        PromotionTracker $promotionTracker,
         TrafficAttribution $attribution,
         PaymentProviderRegistry $payments,
         PlatformServiceFeeCalculator $serviceFees,
@@ -69,12 +73,22 @@ class BookingController extends Controller
             );
             $availability->ensureBookable($resource, $window);
 
-            $promotion = $promotions->resolve($resource, $window, $validated['campaign'] ?? null);
+            $promotion = filled($validated['campaign'] ?? null)
+                ? $promotionApplicability->resolve($resource, $window, $validated['campaign'])
+                : $promotionApplicability->bestDiscount(
+                    $promotionMarketplace->forVenue($venue),
+                    $resource,
+                    $window,
+                );
             $price = $prices->quote($resource, $duration, $promotion);
             $price = [
                 ...$price,
                 ...$serviceFees->quote($price['total_amount'], $price['currency']),
             ];
+
+            if ($promotion !== null) {
+                $promotionTracker->recordClick($request, $promotion);
+            }
 
             if ($availability->hasConflict($resource->getKey(), $window->utcStart, $window->utcEnd)) {
                 $availabilityError = 'That time has just been reserved. Choose another available slot.';
@@ -101,7 +115,7 @@ class BookingController extends Controller
             'duration' => $duration,
             'price' => $price,
             'promotion' => $promotion,
-            'campaign' => $validated['campaign'] ?? null,
+            'campaign' => $promotion?->campaign_token,
             'availabilityError' => $availabilityError,
             'returnUrl' => $returnUrl,
             'defaultPaymentOption' => $defaultPaymentOption->value,
@@ -119,6 +133,9 @@ class BookingController extends Controller
         string $venueSlug,
         MarketplaceQuery $marketplace,
         CreateBooking $createBooking,
+        AvailabilityService $availability,
+        PromotionApplicability $promotionApplicability,
+        PromotionMarketplace $promotionMarketplace,
         TrafficAttribution $attribution,
         AnalyticsRecorder $analytics,
         PaymentProviderRegistry $payments,
@@ -131,6 +148,23 @@ class BookingController extends Controller
             throw ValidationException::withMessages([
                 'resource_id' => 'The selected resource is not available at this venue.',
             ]);
+        }
+
+        $resource->setRelation('venue', $venue);
+        $campaign = $validated['campaign'] ?? null;
+
+        if (! filled($campaign)) {
+            $window = $availability->window(
+                $resource,
+                $validated['booking_date'],
+                $validated['start_time'],
+                $this->endTime($validated['start_time'], (int) $validated['duration_minutes']),
+            );
+            $campaign = $promotionApplicability->bestDiscount(
+                $promotionMarketplace->forVenue($venue),
+                $resource,
+                $window,
+            )?->campaign_token;
         }
 
         $paymentOption = isset($validated['payment_option'])
@@ -149,8 +183,8 @@ class BookingController extends Controller
             ]);
         }
 
-        $promotion = isset($validated['campaign'])
-            ? $venue->promotions()->where('campaign_token', $validated['campaign'])->first()
+        $promotion = filled($campaign)
+            ? $venue->promotions()->where('campaign_token', $campaign)->first()
             : null;
         $traffic = $attribution->current($request);
 
@@ -176,7 +210,7 @@ class BookingController extends Controller
                 'notes' => null,
                 'create_payment' => true,
                 'payment_provider' => $paymentProvider->key(),
-                'campaign' => $validated['campaign'] ?? null,
+                'campaign' => $campaign,
             ],
             $request->user(),
         );

@@ -40,6 +40,12 @@ class EmptyInventoryRule implements RecommendationRule
                 $lastMinute = $slots->where('is_last_minute', true)->count();
                 $bounded = $context->emptySlots()->count() >= $scanLimit;
                 $countPhrase = $bounded ? "at least {$count}" : (string) $count;
+                $title = $lastMinute > 0
+                    ? "{$lastMinute} open court ".($lastMinute === 1 ? 'time is' : 'times are').' still available in the next 24 hours'
+                    : "{$countPhrase} upcoming court times are still open";
+                $explanation = $lastMinute > 0
+                    ? "Start with the {$lastMinute} open court ".($lastMinute === 1 ? 'time' : 'times')." at {$venue->name} that will pass within 24 hours. Across the next {$horizon} days, {$countPhrase} bookable times still have no booking or promotion."
+                    : "FinACourt checked the next {$horizon} days and found {$countPhrase} bookable times at {$venue->name} that do not have bookings or promotions yet.";
 
                 return new GrowthRecommendation(
                     key: GrowthRecommendation::key(
@@ -56,15 +62,15 @@ class EmptyInventoryRule implements RecommendationRule
                     organizationId: $context->organization->getKey(),
                     venueId: $venue->getKey(),
                     venueName: $venue->name,
-                    title: "{$countPhrase} upcoming court times are still open",
-                    explanation: "FinACourt checked the next {$horizon} days and found {$countPhrase} bookable times at {$venue->name} that do not have bookings or deals yet. {$lastMinute} are within 24 hours.",
+                    title: $title,
+                    explanation: $explanation,
                     evidence: [
                         'empty_slot_count' => $count,
                         'last_minute_slot_count' => $lastMinute,
                         'horizon_days' => $horizon,
                         'scan_capped' => $bounded,
                     ],
-                    actionLabel: 'Create a deal for an open time',
+                    actionLabel: 'Create a promotion',
                     actionUrl: route('owner.promotions.create', [
                         'resource' => $first['resource_id'],
                         'date' => $first['slot_date'],

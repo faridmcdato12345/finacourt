@@ -70,7 +70,7 @@ class DemandWithInventoryRule implements RecommendationRule
                     'city' => $venue->city,
                     'sport' => $sport->name,
                 ],
-                actionLabel: 'Create a deal for one time',
+                actionLabel: 'Create a promotion',
                 actionUrl: route('owner.promotions.create', [
                     'resource' => $first['resource_id'],
                     'date' => $first['slot_date'],
