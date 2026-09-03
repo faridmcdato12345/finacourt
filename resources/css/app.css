@@ -1,5 +1,7 @@
 @import 'tailwindcss';
 
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../views/**/*.blade.php';
@@ -29,12 +31,17 @@
     font-synthesis: none;
 }
 
+:root[data-theme='dark'] {
+    color-scheme: dark;
+}
+
 html {
     scroll-behavior: smooth;
 }
 
 body {
     @apply bg-[#f7f8f6] text-slate-950;
+    transition: background-color 180ms ease, color 180ms ease;
 }
 
 ::selection {
@@ -338,6 +345,10 @@ button:disabled,
     backdrop-filter: blur(18px);
 }
 
+.player-mobile-dock[data-authenticated] {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .player-mobile-dock a {
     @apply flex min-w-0 flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-[10px] font-semibold text-court-100;
     min-height: 3.35rem;
@@ -604,4 +615,279 @@ button:disabled,
         animation-duration: 0.01ms !important;
         animation-iteration-count: 1 !important;
     }
+}
+
+/* Shared color-theme control. The same markup is used by Blade and Vue layouts. */
+.theme-toggle {
+    @apply inline-grid size-10 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-court-300 hover:bg-court-50 hover:text-court-800;
+}
+
+.theme-toggle svg {
+    grid-area: 1 / 1;
+    width: 1.15rem;
+    height: 1.15rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: opacity 160ms ease, transform 220ms ease;
+}
+
+[data-theme='light'] .theme-toggle [data-theme-icon='sun'] {
+    opacity: 0;
+    transform: rotate(-35deg) scale(0.65);
+}
+
+[data-theme='dark'] .theme-toggle [data-theme-icon='moon'] {
+    opacity: 0;
+    transform: rotate(35deg) scale(0.65);
+}
+
+/*
+ * The product predates theme tokens and uses Tailwind palette utilities directly.
+ * These semantic remaps keep every existing screen readable while avoiding a
+ * risky page-by-page rewrite. New components can also use Tailwind's dark: variant.
+ */
+html[data-theme='dark'] body {
+    background-color: #07130f;
+    color: #e8f2ed;
+}
+
+html[data-theme='dark'] :is(
+    .bg-white,
+    [class~='bg-white/98'],
+    [class~='bg-white/95'],
+    [class~='bg-white/90'],
+    [class~='bg-white/40']
+) {
+    background-color: rgb(15 35 28 / 0.97);
+}
+
+html[data-theme='dark'] :is(
+    .bg-stone-50,
+    .bg-slate-50,
+    .bg-slate-100,
+    [class~='bg-slate-50/90'],
+    [class~='bg-slate-50/70'],
+    [class~='bg-slate-50/60'],
+    [class~='bg-slate-100/80'],
+    [class~='bg-slate-100/50'],
+    [class~='bg-[#f7f8f6]'],
+    [class~='bg-[#f6f8f5]'],
+    [class~='bg-[#f5f8f6]']
+) {
+    background-color: #091a14;
+}
+
+html[data-theme='dark'] :is(
+    .bg-slate-200,
+    [class~='bg-slate-200/50'],
+    [class~='bg-slate-200/30']
+) {
+    background-color: #1d332b;
+}
+
+html[data-theme='dark'] :is(.bg-court-50, [class~='bg-court-50/60'], [class~='bg-court-50/50'], [class~='bg-court-50/40'], [class~='bg-court-50/30']) {
+    background-color: #0d2b20;
+}
+
+html[data-theme='dark'] .bg-court-100 {
+    background-color: #123a2b;
+}
+
+html[data-theme='dark'] .bg-court-200 {
+    background-color: #1b503b;
+}
+
+html[data-theme='dark'] .bg-court-300 {
+    background-color: #286f51;
+}
+
+html[data-theme='dark'] :is(.text-slate-950, .text-slate-900, .text-slate-800) {
+    color: #edf7f2;
+}
+
+html[data-theme='dark'] :is(.text-slate-700, .text-slate-600) {
+    color: #c1d1ca;
+}
+
+html[data-theme='dark'] .text-slate-500 {
+    color: #9aafa6;
+}
+
+html[data-theme='dark'] .text-slate-400 {
+    color: #819a90;
+}
+
+html[data-theme='dark'] :is(.text-court-950, .text-court-900, .text-court-800, .text-court-700, .text-court-600) {
+    color: #82ddb0;
+}
+
+html[data-theme='dark'] :is(.border-slate-100, .border-slate-200, .border-slate-300, [class~='border-slate-200/90'], [class~='border-slate-200/80']) {
+    border-color: #29463b;
+}
+
+html[data-theme='dark'] :is(.divide-slate-100, .divide-slate-200) > :not(:last-child) {
+    border-color: #29463b;
+}
+
+html[data-theme='dark'] :is(.border-court-100, .border-court-200) {
+    border-color: #1e523f;
+}
+
+html[data-theme='dark'] .border-court-300 {
+    border-color: #32795b;
+}
+
+html[data-theme='dark'] :is(input, textarea, select):not([type='checkbox']):not([type='radio']):not([type='range']) {
+    border-color: #365247;
+    background-color: #10271f;
+    color: #edf7f2;
+}
+
+html[data-theme='dark'] :is(input, textarea)::placeholder {
+    color: #789086;
+}
+
+html[data-theme='dark'] :is(input, textarea, select):disabled {
+    border-color: #273d35;
+    background-color: #172a23;
+    color: #71877e;
+}
+
+html[data-theme='dark'] input[type='file']::file-selector-button {
+    background-color: #173a2c;
+    color: #b4edcf;
+}
+
+html[data-theme='dark'] :is(option, optgroup) {
+    background-color: #10271f;
+    color: #edf7f2;
+}
+
+html[data-theme='dark'] :is(.app-card, .metric-card) {
+    border-color: #29463b;
+    background-color: #0f231c;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 16px 38px rgb(0 0 0 / 0.18);
+}
+
+html[data-theme='dark'] .player-experience {
+    background:
+        radial-gradient(circle at 8% 18%, rgb(36 170 112 / 0.13), transparent 22rem),
+        radial-gradient(circle at 92% 46%, rgb(245 158 11 / 0.08), transparent 24rem),
+        #07130f;
+}
+
+html[data-theme='dark'] .player-header {
+    box-shadow: 0 8px 30px rgb(0 0 0 / 0.24);
+}
+
+html[data-theme='dark'] :is(
+    [class~='bg-[linear-gradient(180deg,#f8fbf9_0%,#ffffff_100%)]'],
+    [class~='bg-[linear-gradient(120deg,#fffbeb_0%,#ffffff_75%)]'],
+    [class~='bg-[linear-gradient(120deg,#f0fbf5_0%,#ffffff_66%)]'],
+    [class~='bg-[linear-gradient(120deg,#f0fbf5_0%,#ffffff_62%)]'],
+    [class~='bg-[linear-gradient(120deg,#effcf5_0%,#ffffff_78%)]'],
+    [class~='bg-[linear-gradient(100deg,#effcf5_0%,#ffffff_70%)]'],
+    [class~='bg-[linear-gradient(100deg,#eefbf4_0%,#fbfefc_52%,#e4f6eb_100%)]']
+) {
+    background-image: linear-gradient(120deg, #123126 0%, #0f231c 72%);
+}
+
+html[data-theme='dark'] .from-white {
+    --tw-gradient-from: #10271f var(--tw-gradient-from-position);
+    --tw-gradient-to: rgb(16 39 31 / 0) var(--tw-gradient-to-position);
+}
+
+html[data-theme='dark'] [class~='to-slate-50/80'] {
+    --tw-gradient-to: rgb(9 26 20 / 0.8) var(--tw-gradient-to-position);
+}
+
+html[data-theme='dark'] [class~='bg-[linear-gradient(90deg,rgba(241,245,249,.55)_1px,transparent_1px)]'] {
+    background-image: linear-gradient(90deg, rgb(41 70 59 / 0.5) 1px, transparent 1px);
+}
+
+html[data-theme='dark'] :is(.bg-amber-50, [class~='bg-amber-50/70'], [class~='bg-amber-50/60'], .bg-amber-100) {
+    background-color: #352508;
+}
+
+html[data-theme='dark'] :is(.bg-amber-200, .bg-amber-300, .bg-amber-400) {
+    background-color: #684507;
+}
+
+html[data-theme='dark'] :is(.border-amber-100, .border-amber-200, .border-amber-300, .border-amber-400) {
+    border-color: #7c5210;
+}
+
+html[data-theme='dark'] :is(.text-amber-700, .text-amber-800, .text-amber-900, .text-amber-950, [class~='text-amber-900/80']) {
+    color: #fcd36a;
+}
+
+html[data-theme='dark'] :is(.bg-red-50, .bg-red-100) {
+    background-color: #3c1618;
+}
+
+html[data-theme='dark'] :is(.border-red-100, .border-red-200, .border-red-300) {
+    border-color: #7f3035;
+}
+
+html[data-theme='dark'] :is(.text-red-600, .text-red-700, .text-red-800, .text-red-900) {
+    color: #fca5a5;
+}
+
+html[data-theme='dark'] :is(.bg-blue-50, .bg-emerald-50) {
+    background-color: #102b31;
+}
+
+html[data-theme='dark'] :is(.text-blue-700, .text-emerald-800) {
+    color: #93c5fd;
+}
+
+html[data-theme='dark'] [class~='hover:bg-slate-100']:hover {
+    background-color: #1a3329;
+}
+
+html[data-theme='dark'] :is([class~='hover:bg-court-50'], [class~='hover:bg-court-100']):hover {
+    background-color: #174332;
+}
+
+html[data-theme='dark'] .player-mobile-dock a[aria-current='page'] {
+    background-color: #d8f7e6;
+    color: #124834;
+}
+
+html[data-theme='dark'] :is(.owner-mobile-navigation, .owner-sidebar-navigation) .bg-white {
+    background-color: #d8f7e6;
+    color: #124834;
+}
+
+html[data-theme='dark'] .leaflet-tile-pane {
+    filter: brightness(0.72) contrast(1.15) saturate(0.75);
+}
+
+html[data-theme='dark'] .leaflet-control-attribution {
+    background-color: rgb(15 35 28 / 0.88);
+    color: #c1d1ca;
+}
+
+html[data-theme='dark'] .leaflet-control-attribution a {
+    color: #82ddb0;
+}
+
+html[data-theme='dark'] .theme-toggle {
+    border-color: #365247;
+    background-color: #10271f;
+    color: #b4edcf;
+}
+
+html[data-theme='dark'] .theme-toggle:hover {
+    border-color: #4ac78d;
+    background-color: #174332;
+    color: #d8f7e6;
+}
+
+html[data-theme='dark'] .theme-keep-light {
+    background-color: #fff;
+    color: #0f172a;
 }

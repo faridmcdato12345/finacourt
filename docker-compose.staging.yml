@@ -1,0 +1,272 @@
+# Staging deployment for FinACourt.
+#
+# Deploy with:
+#
+# docker compose \
+#   --env-file .env.staging \
+#   -p finacourt-staging \
+#   -f docker-compose.staging.yml \
+#   up -d --build
+#
+# Architecture:
+#
+# Internet
+#   -> Caddy reverse proxy
+#   -> shared "proxy" Docker network
+#   -> FinACourt staging web container
+#   -> private staging network
+#   -> PHP-FPM / MySQL / Queue / Scheduler
+#
+# Staging web binds to:
+# 127.0.0.1:8001
+#
+# Production remains on:
+# 127.0.0.1:8000
+
+x-app-environment: &app-environment
+  APP_ENV: staging
+  APP_DEBUG: "false"
+
+  DB_CONNECTION: mysql
+  DB_HOST: db
+  DB_PORT: 3306
+
+  CACHE_STORE: database
+  QUEUE_CONNECTION: database
+  SESSION_DRIVER: database
+  SESSION_SECURE_COOKIE: "true"
+
+  SECURITY_CSP_ENABLED: "true"
+  PILOT_DEMO_SEED: "false"
+
+  LOG_CHANNEL: stack
+  LOG_STACK: stderr
+
+
+x-app-runtime: &app-runtime
+  image: ${FINACOURT_APP_IMAGE:-finacourt-staging-app:latest}
+
+  env_file:
+    - ${FINACOURT_ENV_FILE:-.env.staging}
+
+  environment:
+    <<: *app-environment
+
+  restart: unless-stopped
+
+  volumes:
+    - public_uploads:/var/www/html/storage/app/public
+
+  depends_on:
+    db:
+      condition: service_healthy
+
+  networks:
+    - finacourt
+
+
+services:
+
+  # =========================================================
+  # Laravel / PHP-FPM
+  # =========================================================
+  app:
+    <<: *app-runtime
+
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: app
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+
+    command:
+      - sh
+      - -lc
+      - |
+        test -n "$${APP_KEY:-}" || {
+          echo "APP_KEY is required" >&2
+          exit 1
+        }
+
+        php artisan optimize
+
+        exec php-fpm
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "php-fpm -t >/dev/null 2>&1 || exit 1"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+
+  # =========================================================
+  # Queue Worker
+  # =========================================================
+  queue:
+    <<: *app-runtime
+
+    command:
+      - sh
+      - -lc
+      - |
+        test -n "$${APP_KEY:-}" || {
+          echo "APP_KEY is required" >&2
+          exit 1
+        }
+
+        php artisan optimize
+
+        exec php artisan queue:work \
+          --queue=emails,default \
+          --sleep=3 \
+          --tries=3 \
+          --backoff=10 \
+          --timeout=90 \
+          --max-time=3600
+
+    stop_grace_period: 2m
+
+
+  # =========================================================
+  # Scheduler
+  # =========================================================
+  scheduler:
+    <<: *app-runtime
+
+    command:
+      - sh
+      - -lc
+      - |
+        test -n "$${APP_KEY:-}" || {
+          echo "APP_KEY is required" >&2
+          exit 1
+        }
+
+        php artisan optimize
+
+        exec php artisan schedule:work
+
+    stop_grace_period: 1m
+
+
+  # =========================================================
+  # Staging Nginx
+  # =========================================================
+  web:
+    image: ${FINACOURT_WEB_IMAGE:-finacourt-staging-web:latest}
+
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+      target: web
+      args:
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+
+    restart: unless-stopped
+
+    ports:
+      - "${FINACOURT_BIND_ADDRESS:-127.0.0.1}:${FINACOURT_HTTP_PORT:-8001}:80"
+
+    volumes:
+      - public_uploads:/var/www/html/storage/app/public:ro
+
+    depends_on:
+      app:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O /dev/null http://127.0.0.1/nginx-health || exit 1"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - finacourt
+      - proxy
+
+
+  # =========================================================
+  # Staging MySQL
+  # =========================================================
+  db:
+    image: mysql:8.4
+
+    env_file:
+      - ${FINACOURT_ENV_FILE:-.env.staging}
+
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:?Set DB_DATABASE in .env.staging}
+      MYSQL_USER: ${DB_USERNAME:?Set DB_USERNAME in .env.staging}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.staging}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env.staging}
+
+    restart: unless-stopped
+
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h 127.0.0.1 -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+    networks:
+      - finacourt
+
+
+# =========================================================
+# Networks
+# =========================================================
+networks:
+
+  # Docker Compose will create a project-specific network,
+  # e.g. finacourt-staging_finacourt
+  finacourt:
+    driver: bridge
+
+  # Existing shared Caddy proxy network.
+  proxy:
+    external: true
+
+
+# =========================================================
+# Persistent Staging Volumes
+#
+# Because we deploy with:
+# -p finacourt-staging
+#
+# Docker automatically creates separate volumes such as:
+#
+# finacourt-staging_mysql_data
+# finacourt-staging_public_uploads
+#
+# These are separate from production.
+# =========================================================
+volumes:
+
+  mysql_data:
+
+  public_uploads:

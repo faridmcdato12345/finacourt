@@ -53,6 +53,8 @@ class ApplyResponseCachePolicy
             'marketplace.home',
             'marketplace.for-owners',
             'marketplace.pricing',
+            'marketplace.privacy',
+            'marketplace.terms',
             'marketplace.courts.index',
             'marketplace.courts.city',
             'marketplace.courts.sport-city',

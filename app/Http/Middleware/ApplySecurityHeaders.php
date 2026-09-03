@@ -37,7 +37,7 @@ class ApplySecurityHeaders
                 "base-uri 'self'",
                 "connect-src 'self'",
                 "font-src 'self'",
-                "form-action 'self'",
+                "form-action 'self' https://checkout.paymongo.com",
                 "frame-ancestors 'self'",
                 "frame-src 'self' ".config('maps.frame_origin'),
                 "img-src 'self' data:".($mapTileOrigin !== '' ? " {$mapTileOrigin}" : ''),

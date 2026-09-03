@@ -2,6 +2,8 @@
     <url><loc>{{ route('marketplace.home') }}</loc></url>
     <url><loc>{{ route('marketplace.for-owners') }}</loc></url>
     <url><loc>{{ route('marketplace.pricing') }}</loc></url>
+    <url><loc>{{ route('marketplace.privacy') }}</loc></url>
+    <url><loc>{{ route('marketplace.terms') }}</loc></url>
     <url><loc>{{ route('marketplace.courts.index') }}</loc></url>
     <url><loc>{{ route('marketplace.directory.index') }}</loc></url>
     @if ($hasDeals)<url><loc>{{ route('marketplace.deals') }}</loc></url>@endif

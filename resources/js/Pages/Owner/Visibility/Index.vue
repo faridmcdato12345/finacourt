@@ -123,7 +123,7 @@ async function copy(value, key) {
                             </div>
                             <div v-if="venue.links.length" class="mt-5 grid gap-3 sm:grid-cols-2">
                                 <div v-for="link in venue.links" :key="link.id" class="rounded-2xl border border-slate-200 bg-white p-3">
-                                    <img :src="link.qr_url" :alt="`${link.label} QR code`" class="mx-auto aspect-square w-36 rounded-xl bg-white">
+                                    <img :src="link.qr_url" :alt="`${link.label} QR code`" class="theme-keep-light mx-auto aspect-square w-36 rounded-xl bg-white">
                                     <p class="mt-2 text-center text-xs font-semibold text-slate-900">{{ link.promotion || link.label }}</p>
                                     <p class="mt-1 text-center text-[11px] text-slate-400">{{ link.visits_count }} scans</p>
                                     <div class="mt-3 flex justify-center gap-2"><a :href="link.url" target="_blank" rel="noopener" class="text-xs font-semibold text-court-800">Open</a><a :href="link.qr_url" download class="text-xs font-semibold text-court-800">Download SVG</a></div>

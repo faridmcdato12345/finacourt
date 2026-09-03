@@ -30,6 +30,9 @@ class AuthenticationTest extends TestCase
             ->assertSee('Owner log in')
             ->assertSee('href="'.route('player.login').'"', false)
             ->assertSee('href="'.route('login').'"', false)
+            ->assertSee('href="'.route('marketplace.for-owners').'"', false)
+            ->assertSee('data-owner-registration-link href="'.route('register').'"', false)
+            ->assertDontSee('data-owner-registration-link href="'.route('marketplace.for-owners').'"', false)
             ->assertSee('List your courts');
     }
 

@@ -35,6 +35,7 @@
                 <div class="flex flex-wrap gap-2 sm:justify-end">
                     <a href="{{ route('marketplace.courts.index') }}" class="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-court-900 shadow-lg shadow-black/10 hover:bg-court-50">Find your next game →</a>
                     <a href="{{ route('player.preferences.edit') }}" class="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white backdrop-blur hover:bg-white/15">Game alerts</a>
+                    <a href="{{ route('player.account.edit') }}" class="rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white backdrop-blur hover:bg-white/15">My account</a>
                     <form action="{{ route('logout') }}" method="post">@csrf<button class="rounded-xl border border-white/15 px-4 py-3 text-sm font-semibold text-court-100 hover:bg-white/10">Sign out</button></form>
                 </div>
             </div>

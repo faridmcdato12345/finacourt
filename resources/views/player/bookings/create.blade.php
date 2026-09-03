@@ -86,6 +86,7 @@
                             </div>
                         </fieldset>
                         <label class="mt-6 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><input name="terms" type="checkbox" value="1" required class="mt-1 rounded border-slate-300"><span>I understand this creates a {{ config('booking.hold_minutes') }}-minute hold. FinACourt will check the court and payment status again before confirming.</span></label>
+                        <p class="mt-3 text-xs leading-5 text-slate-500">By continuing, you agree to the <a href="{{ route('marketplace.terms', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</p>
                         <button data-loading-label="Securing your hold…" class="mt-6 min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Hold this time for {{ config('booking.hold_minutes') }} minutes</button>
                     </form>
                 @endguest

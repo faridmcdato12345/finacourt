@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="light">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#146d4a">
-        <meta name="color-scheme" content="light">
+        <meta name="color-scheme" content="light dark">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -22,6 +22,7 @@
         <link rel="manifest" href="/manifest.webmanifest">
         <link rel="icon" type="image/png" href="/icons/finacourt-logo-192.png">
         <link rel="apple-touch-icon" href="/icons/finacourt-logo-192.png">
+        @include('partials.theme-bootstrap')
         @foreach ($structuredData as $schema)
             <script nonce="{{ Vite::cspNonce() }}" type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
         @endforeach
@@ -39,6 +40,7 @@
                     FinACourt
                 </a>
                 <nav class="flex min-w-0 items-center gap-1 text-sm font-medium" aria-label="Primary navigation">
+                    @include('partials.theme-toggle', ['class' => 'shrink-0'])
                     <a href="{{ route('marketplace.courts.index') }}" aria-label="Find courts" @if (request()->routeIs('marketplace.courts.*', 'marketplace.venues.*')) aria-current="page" @endif class="player-nav-link flex items-center gap-2 whitespace-nowrap rounded-lg p-2 text-slate-700 hover:bg-slate-100 hover:text-court-800 sm:px-3">
                         <svg viewBox="0 0 24 24" class="size-5 sm:hidden" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4" /></svg>
                         <span class="hidden sm:inline">Find courts</span>
@@ -47,6 +49,9 @@
                     <a href="{{ route('marketplace.directory.index') }}" @if (request()->routeIs('marketplace.directory.*')) aria-current="page" @endif class="player-nav-link hidden whitespace-nowrap rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-court-800 lg:block">Venue guide</a>
                     @auth
                         <a href="{{ route('player.bookings.index') }}" @if (request()->routeIs('player.bookings.*', 'player.preferences.*')) aria-current="page" @endif class="player-nav-link hidden whitespace-nowrap rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 sm:block">My bookings</a>
+                        <a href="{{ route('player.account.edit') }}" @if (request()->routeIs('player.account.*')) aria-current="page" @endif aria-label="My player account" class="player-nav-link grid size-10 shrink-0 place-items-center rounded-full border border-court-100 bg-court-50 font-semibold text-court-800 hover:border-court-300">
+                            {{ str(auth()->user()->name)->substr(0, 1)->upper() }}
+                        </a>
                         @if (auth()->user()->is_platform_admin)
                             <a href="{{ route('platform.dashboard') }}" class="whitespace-nowrap rounded-xl bg-court-700 px-4 py-2.5 font-semibold text-white hover:bg-court-800">Platform</a>
                         @elseif (auth()->user()->memberships()->exists())
@@ -56,7 +61,7 @@
                         <a href="{{ route('marketplace.for-owners') }}" class="hidden whitespace-nowrap rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-court-800 xl:block">For owners</a>
                         <a href="{{ route('player.login') }}" class="whitespace-nowrap rounded-lg px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-court-800 sm:px-3"><span class="sm:hidden">Player</span><span class="hidden sm:inline">Player log in</span></a>
                         <a href="{{ route('login') }}" class="whitespace-nowrap rounded-xl border border-court-200 bg-court-50 px-2.5 py-2.5 font-semibold text-court-800 shadow-sm hover:border-court-400 hover:bg-court-100 sm:px-4"><span class="sm:hidden">Owner</span><span class="hidden sm:inline">Owner log in</span></a>
-                        <a href="{{ route('marketplace.for-owners') }}" class="hidden whitespace-nowrap rounded-xl bg-court-700 px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-court-800 lg:block">List your courts</a>
+                        <a data-owner-registration-link href="{{ route('register') }}" class="hidden whitespace-nowrap rounded-xl bg-court-700 px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-court-800 lg:block">List your courts</a>
                     @endauth
                 </nav>
             </div>
@@ -71,16 +76,17 @@
                     <p class="mt-4 max-w-sm text-sm leading-6 text-slate-500">Find real local sports facilities, compare court details, and reserve against live venue schedules.</p>
                     <button type="button" data-install-app hidden class="mt-5 rounded-xl border border-court-200 bg-court-50 px-4 py-2.5 text-sm font-semibold text-court-800">Install the web app</button>
                 </div>
-                <div class="grid gap-8 sm:grid-cols-3">
-                    <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Play</p><nav class="mt-4 space-y-3 text-sm text-slate-600"><a class="block hover:text-court-700" href="{{ route('marketplace.courts.index') }}">Find courts</a><a class="block hover:text-court-700" href="{{ route('marketplace.directory.index') }}">Local venue guide</a><a class="block hover:text-court-700" href="{{ route('marketplace.deals') }}">Deals</a><a class="block hover:text-court-700" href="{{ route('player.bookings.index') }}">My bookings</a></nav></div>
+                <div class="grid gap-8 sm:grid-cols-2 xl:grid-cols-4">
+                    <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Play</p><nav class="mt-4 space-y-3 text-sm text-slate-600"><a class="block hover:text-court-700" href="{{ route('marketplace.courts.index') }}">Find courts</a><a class="block hover:text-court-700" href="{{ route('marketplace.directory.index') }}">Local venue guide</a><a class="block hover:text-court-700" href="{{ route('marketplace.deals') }}">Deals</a><a class="block hover:text-court-700" href="{{ route('player.bookings.index') }}">My bookings</a>@auth<a class="block hover:text-court-700" href="{{ route('player.account.edit') }}">My account</a>@endauth</nav></div>
                     <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">For owners</p><nav class="mt-4 space-y-3 text-sm text-slate-600"><a class="block hover:text-court-700" href="{{ route('marketplace.for-owners') }}">Why join FinACourt</a><a class="block hover:text-court-700" href="{{ route('marketplace.pricing') }}">Pricing</a><a class="block hover:text-court-700" href="{{ route('register') }}">Create owner account</a><a class="block hover:text-court-700" href="{{ route('login') }}">Owner sign in</a></nav></div>
                     <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Marketplace</p><p class="mt-4 text-sm leading-6 text-slate-500">Courts under Find courts can be checked and booked live. Venue guide pages are clearly marked and ask players to contact the venue directly.</p></div>
+                    <div><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Legal</p><nav class="mt-4 space-y-3 text-sm text-slate-600"><a class="block hover:text-court-700" href="{{ route('marketplace.privacy', [], false) }}">Privacy Policy</a><a class="block hover:text-court-700" href="{{ route('marketplace.terms', [], false) }}">Terms of Service</a></nav></div>
                 </div>
             </div>
             <div class="border-t border-slate-100"><div class="page-shell flex flex-col gap-2 py-5 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between"><p>© {{ now()->year }} FinACourt</p><p>Web-first · Mobile-ready · Secure reservations</p></div></div>
         </footer>
 
-        <nav class="player-mobile-dock sm:hidden" aria-label="Player shortcuts">
+        <nav class="player-mobile-dock sm:hidden" @auth data-authenticated @endauth aria-label="Player shortcuts">
             <a href="{{ route('marketplace.home') }}" @if (request()->routeIs('marketplace.home')) aria-current="page" @endif>
                 @include('marketplace.partials.icon', ['name' => 'court', 'class' => 'size-5'])
                 <span>Home</span>
@@ -97,6 +103,12 @@
                 @include('marketplace.partials.icon', ['name' => 'calendar', 'class' => 'size-5'])
                 <span>Bookings</span>
             </a>
+            @auth
+                <a href="{{ route('player.account.edit') }}" @if (request()->routeIs('player.account.*')) aria-current="page" @endif>
+                    @include('marketplace.partials.icon', ['name' => 'user', 'class' => 'size-5'])
+                    <span>Account</span>
+                </a>
+            @endauth
         </nav>
     </body>
 </html>

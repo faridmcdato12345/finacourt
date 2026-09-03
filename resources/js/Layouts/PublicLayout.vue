@@ -1,5 +1,6 @@
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
+import ThemeToggle from '../Components/ThemeToggle.vue';
 
 const page = usePage();
 </script>
@@ -14,6 +15,7 @@ const page = usePage();
                 </a>
 
                 <nav class="flex items-center gap-2 text-sm font-medium" aria-label="Primary navigation">
+                    <ThemeToggle />
                     <Link v-if="page.props.auth.user && !page.props.auth.user.is_platform_admin" href="/owner/dashboard" class="rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100">Dashboard</Link>
                     <Link v-else-if="page.props.auth.user?.is_platform_admin" href="/platform/dashboard" class="rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100">Platform</Link>
                     <template v-else>
@@ -29,9 +31,13 @@ const page = usePage();
         </main>
 
         <footer class="border-t border-slate-200 bg-white">
-            <div class="mx-auto flex max-w-7xl flex-col gap-2 px-5 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+            <div class="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
                 <p>Built for local court owners and the players they serve.</p>
-                <p>© {{ new Date().getFullYear() }} FinACourt</p>
+                <div class="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    <a href="/privacy" class="hover:text-court-700">Privacy Policy</a>
+                    <a href="/terms" class="hover:text-court-700">Terms of Service</a>
+                    <p>© {{ new Date().getFullYear() }} FinACourt</p>
+                </div>
             </div>
         </footer>
     </div>

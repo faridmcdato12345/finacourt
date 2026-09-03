@@ -1,3 +1,5 @@
+import './theme';
+
 const status = () => document.querySelector('[data-network-status]');
 
 function updateNetworkStatus() {
