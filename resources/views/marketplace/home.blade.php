@@ -13,6 +13,7 @@
                 ...$featuredPromotion->marketplaceParameters(),
             ]).'#availability'
             : null;
+        $featuredPromotionIsUpcoming = $featuredPromotion?->isUpcoming() ?? false;
     @endphp
 
     <section data-player-hero class="relative overflow-hidden border-b border-slate-200 bg-white">
@@ -141,9 +142,9 @@
                             <h2 class="text-lg font-semibold tracking-tight {{ $featuredCoverPhotoUrl ? 'text-white' : 'text-court-950' }} sm:text-xl">{{ $featuredPromotion->title }}</h2>
                             @if ($featuredPromotion->offerLabel())<span class="rounded-lg bg-white px-2.5 py-1 text-xs font-bold text-court-800 shadow-sm ring-1 ring-court-100">{{ $featuredPromotion->offerLabel() }}</span>@endif
                         </div>
-                        <p class="mt-1.5 text-xs leading-5 {{ $featuredCoverPhotoUrl ? 'text-slate-200' : 'text-slate-500' }}">{{ $featuredPromotion->venue->name }} · {{ $featuredPromotion->resource?->name ?: 'Eligible venue courts' }} · Valid through {{ $featuredPromotion->ends_on->format('M j, Y') }}</p>
+                        <p class="mt-1.5 text-xs leading-5 {{ $featuredCoverPhotoUrl ? 'text-slate-200' : 'text-slate-500' }}">{{ $featuredPromotion->venue->name }} · {{ $featuredPromotion->resource?->name ?: 'Eligible venue courts' }} · {{ $featuredPromotionIsUpcoming ? 'Available from '.$featuredPromotion->starts_on->format('M j, Y') : 'Valid through '.$featuredPromotion->ends_on->format('M j, Y') }}</p>
                     </div>
-                    <a href="{{ $featuredDealUrl }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold shadow-sm sm:col-span-2 lg:col-span-1 lg:w-auto {{ $featuredCoverPhotoUrl ? 'bg-white text-court-900 hover:bg-court-50' : 'bg-court-700 text-white hover:bg-court-800' }}">Explore deal @include('marketplace.partials.icon', ['name' => 'chevron-right', 'class' => 'size-4'])</a>
+                    <a href="{{ $featuredDealUrl }}" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold shadow-sm sm:col-span-2 lg:col-span-1 lg:w-auto {{ $featuredCoverPhotoUrl ? 'bg-white text-court-900 hover:bg-court-50' : 'bg-court-700 text-white hover:bg-court-800' }}">{{ $featuredPromotionIsUpcoming ? 'Book ahead' : 'Explore deal' }} @include('marketplace.partials.icon', ['name' => 'chevron-right', 'class' => 'size-4'])</a>
                 </div>
             </div>
         @endif

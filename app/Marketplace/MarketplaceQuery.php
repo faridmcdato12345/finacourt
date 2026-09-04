@@ -362,6 +362,7 @@ class MarketplaceQuery
                 || ($promotion->audience_sport_id !== null
                     && $promotion->audience_sport_id !== $resource->sport_id)
                 || ($promotion->targets_specific_slots && ! $requiresExactApplicability)
+                || (! $requiresExactApplicability && $promotion->isUpcoming())
                 || ($requiresExactApplicability && ($window === null || ! $promotion->appliesTo(
                     $resource,
                     $window->localStart,

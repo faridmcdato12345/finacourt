@@ -120,6 +120,81 @@ class PromotionEngineV2Test extends TestCase
         $this->assertDatabaseCount('promotion_slots', 0);
     }
 
+    public function test_publish_now_exposes_future_deals_without_discounting_ineligible_dates(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-04 12:00', 'Asia/Manila'));
+        [$organization, $venue, $resource] = $this->setupInventory();
+        $dealDate = '2026-09-06';
+        $activePromotion = Promotion::factory()->for($venue)->create([
+            'organization_id' => $organization->getKey(),
+            'resource_id' => $resource->getKey(),
+            'title' => 'Book Sunday early deal',
+            'promotion_type' => PromotionType::SpecificSlots,
+            'goal' => PromotionGoal::PromoteSpecificSlots,
+            'status' => PromotionStatus::Active,
+            'starts_on' => $dealDate,
+            'ends_on' => $dealDate,
+            'targets_specific_slots' => true,
+        ]);
+        PromotionSlot::factory()->for($activePromotion)->create(
+            $this->slotData($resource, $dealDate, '09:00', '10:00'),
+        );
+        $scheduledPromotion = Promotion::factory()->for($venue)->create([
+            'organization_id' => $organization->getKey(),
+            'resource_id' => $resource->getKey(),
+            'title' => 'Hidden until Sunday deal',
+            'status' => PromotionStatus::Scheduled,
+            'starts_on' => $dealDate,
+            'ends_on' => $dealDate,
+        ]);
+
+        $this->get(route('marketplace.deals'))
+            ->assertOk()
+            ->assertSee($activePromotion->title)
+            ->assertSee('Starts Sep 6')
+            ->assertSee('Book for Sep 6')
+            ->assertSee('date=2026-09-06', false)
+            ->assertDontSee($scheduledPromotion->title);
+
+        $this->get(route('marketplace.courts.index'))
+            ->assertOk()
+            ->assertSee($activePromotion->title)
+            ->assertSee('data-effective-hourly-price="650.00"', false);
+
+        $this->get(route('marketplace.courts.index', [
+            'date' => $dealDate,
+            'start_time' => '09:00',
+            'duration_minutes' => 60,
+        ]))->assertOk()
+            ->assertSee($activePromotion->title)
+            ->assertSee('data-effective-hourly-price="520.00"', false);
+
+        $player = User::factory()->create();
+        $this->actingAs($player)->post(route('player.bookings.store', $venue->slug), [
+            ...$this->holdData($resource, '2026-09-04', '18:00'),
+            'campaign' => $activePromotion->campaign_token,
+        ])->assertSessionHasErrors('campaign');
+
+        $this->actingAs($player)->post(route('player.bookings.store', $venue->slug), [
+            ...$this->holdData($resource, $dealDate, '09:00'),
+            'campaign' => $activePromotion->campaign_token,
+        ])->assertRedirect();
+
+        $booking = Booking::query()->firstOrFail();
+        $this->assertSame('520.00', $booking->unit_price);
+        $this->assertSame($activePromotion->getKey(), $booking->promotion_id);
+
+        $this->travelTo(CarbonImmutable::parse('2026-09-06 08:00', 'Asia/Manila'));
+        $this->get(route('marketplace.deals'))
+            ->assertOk()
+            ->assertSee($scheduledPromotion->title);
+
+        $this->travelTo(CarbonImmutable::parse('2026-09-06 10:01', 'Asia/Manila'));
+        $this->get(route('marketplace.deals'))
+            ->assertOk()
+            ->assertDontSee($activePromotion->title);
+    }
+
     public function test_specific_slot_price_is_server_calculated_and_only_applies_inside_selected_window(): void
     {
         [$organization, $venue, $resource] = $this->setupInventory();
