@@ -10,6 +10,7 @@ const user = computed(() => page.props.auth.user);
 const organization = computed(() => page.props.currentOrganization);
 const organizations = computed(() => page.props.organizations || []);
 const abilities = computed(() => page.props.abilities || {});
+const isEmailVerified = computed(() => Boolean(user.value?.email_verified));
 
 function isActive(prefix) {
     return page.url.startsWith(prefix);
@@ -26,7 +27,7 @@ function switchOrganization(id) {
     <div class="min-h-screen bg-[#f6f8f5]">
         <header class="sticky top-0 z-40 border-b border-court-900 bg-court-950 text-white lg:hidden">
             <div class="flex h-16 items-center justify-between gap-4 px-4">
-                <a href="/owner/dashboard" class="flex items-center gap-2.5 text-lg font-bold tracking-[0.08em]">
+                <a :href="isEmailVerified ? '/owner/dashboard' : '/owner/account'" class="flex items-center gap-2.5 text-lg font-bold tracking-[0.08em]">
                     <img :src="'/icons/finacourt-logo-192.png'" alt="" class="size-9 rounded-xl object-cover" width="36" height="36">
                     FinACourt
                 </a>
@@ -36,16 +37,18 @@ function switchOrganization(id) {
                 </div>
             </div>
             <nav class="owner-mobile-navigation scrollbar-none flex gap-1 overflow-x-auto px-3 pb-3 text-sm" aria-label="Mobile owner navigation">
-                <Link href="/owner/dashboard" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/dashboard') ? 'bg-white text-court-950' : 'text-court-100']">Home</Link>
-                <Link v-if="abilities.manage_inventory" href="/owner/venues" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/venues') ? 'bg-white text-court-950' : 'text-court-100']">Venues</Link>
-                <Link v-if="abilities.manage_bookings" href="/owner/bookings" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/bookings') ? 'bg-white text-court-950' : 'text-court-100']">Bookings</Link>
-                <Link v-if="organization?.role === 'owner'" href="/owner/earnings" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/earnings') ? 'bg-white text-court-950' : 'text-court-100']">Earnings</Link>
-                <Link v-if="abilities.manage_bookings" href="/owner/reactivation" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/reactivation') ? 'bg-white text-court-950' : 'text-court-100']">Customers</Link>
-                <Link v-if="abilities.manage_inventory" href="/owner/promotions" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/promotions') ? 'bg-white text-court-950' : 'text-court-100']">Promotions</Link>
-                <Link v-if="abilities.manage_inventory" href="/owner/visibility" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/visibility') ? 'bg-white text-court-950' : 'text-court-100']">Get found</Link>
-                <Link v-if="organization?.role === 'owner'" href="/owner/directory-claims" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/directory-claims') ? 'bg-white text-court-950' : 'text-court-100']">Venue requests</Link>
-                <Link href="/owner/growth" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/growth') ? 'bg-white text-court-950' : 'text-court-100']">Growth opportunities</Link>
-                <Link href="/owner/analytics" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/analytics') ? 'bg-white text-court-950' : 'text-court-100']">Visits</Link>
+                <template v-if="isEmailVerified">
+                    <Link href="/owner/dashboard" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/dashboard') ? 'bg-white text-court-950' : 'text-court-100']">Home</Link>
+                    <Link v-if="abilities.manage_inventory" href="/owner/venues" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/venues') ? 'bg-white text-court-950' : 'text-court-100']">Venues</Link>
+                    <Link v-if="abilities.manage_bookings" href="/owner/bookings" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/bookings') ? 'bg-white text-court-950' : 'text-court-100']">Bookings</Link>
+                    <Link v-if="organization?.role === 'owner'" href="/owner/earnings" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/earnings') ? 'bg-white text-court-950' : 'text-court-100']">Earnings</Link>
+                    <Link v-if="abilities.manage_bookings" href="/owner/reactivation" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/reactivation') ? 'bg-white text-court-950' : 'text-court-100']">Customers</Link>
+                    <Link v-if="abilities.manage_inventory" href="/owner/promotions" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/promotions') ? 'bg-white text-court-950' : 'text-court-100']">Promotions</Link>
+                    <Link v-if="abilities.manage_inventory" href="/owner/visibility" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/visibility') ? 'bg-white text-court-950' : 'text-court-100']">Get found</Link>
+                    <Link v-if="organization?.role === 'owner'" href="/owner/directory-claims" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/directory-claims') ? 'bg-white text-court-950' : 'text-court-100']">Venue requests</Link>
+                    <Link href="/owner/growth" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/growth') ? 'bg-white text-court-950' : 'text-court-100']">Growth opportunities</Link>
+                    <Link href="/owner/analytics" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/analytics') ? 'bg-white text-court-950' : 'text-court-100']">Visits</Link>
+                </template>
                 <Link href="/owner/account" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/account') ? 'bg-white text-court-950' : 'text-court-100']">My account</Link>
             </nav>
         </header>
@@ -61,7 +64,7 @@ function switchOrganization(id) {
                     <div class="court-visual grid size-12 shrink-0 place-items-center rounded-xl border border-white/15"><span class="relative z-10 text-sm font-bold">{{ organization?.name?.slice(0, 1) }}</span></div>
                     <div class="min-w-0"><p class="truncate text-sm font-semibold">{{ organization?.name }}</p><p class="mt-1 text-xs capitalize text-court-200">{{ organization?.role || 'Platform administrator' }}</p></div>
                 </div>
-                <label v-if="organizations.length > 1" class="mt-4 block">
+                <label v-if="isEmailVerified && organizations.length > 1" class="mt-4 block">
                     <span class="sr-only">Switch organization</span>
                     <AppSelect
                         :model-value="organization.id"
@@ -76,7 +79,7 @@ function switchOrganization(id) {
                 </label>
             </div>
 
-            <nav class="owner-sidebar-navigation mt-6 space-y-1.5" aria-label="Owner navigation">
+            <nav v-if="isEmailVerified" class="owner-sidebar-navigation mt-6 space-y-1.5" aria-label="Owner navigation">
                 <Link href="/owner/dashboard" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/dashboard') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-12h6V4h-6v4Z" /></svg>Home</Link>
                 <Link v-if="abilities.manage_inventory" href="/owner/venues" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/venues') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20V8l8-4 8 4v12M8 20v-6h8v6M9 10h.01M15 10h.01" /></svg>Venues & courts</Link>
                 <Link v-if="abilities.manage_bookings" href="/owner/bookings" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/bookings') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M6 3v3m12-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v14H4V6a1 1 0 0 1 1-1Zm3 8h3v3H8v-3Z" /></svg>Bookings</Link>

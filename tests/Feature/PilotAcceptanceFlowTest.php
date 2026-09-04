@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\Venue;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\URL;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -33,10 +34,18 @@ class PilotAcceptanceFlowTest extends TestCase
             'organization_name' => 'Pilot Courts',
             'password' => 'pilot-password',
             'password_confirmation' => 'pilot-password',
-        ])->assertRedirect(route('owner.dashboard'));
+        ])->assertRedirect(route('verification.notice'));
 
         $owner = User::query()->where('email', 'pilot.owner@example.com')->firstOrFail();
         $organization = Organization::query()->where('name', 'Pilot Courts')->firstOrFail();
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(10),
+            ['id' => $owner->getKey(), 'hash' => sha1($owner->email)],
+        );
+        $this->get($verificationUrl)->assertRedirect(route('owner.dashboard'));
+        $owner->refresh();
+
         $sport = Sport::factory()->create(['name' => 'Badminton', 'slug' => 'badminton']);
         $amenity = Amenity::factory()->create(['name' => 'Parking', 'slug' => 'parking']);
 

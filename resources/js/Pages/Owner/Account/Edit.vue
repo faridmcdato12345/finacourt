@@ -50,6 +50,12 @@ function sendPasswordLink() {
                 <p class="mt-3 leading-7 text-slate-500">Keep your own name, sign-in email, and password up to date. These changes do not alter your venue details.</p>
             </div>
 
+            <div v-if="!account.email_verified" class="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+                <p class="font-semibold">Verify your email to unlock the owner workspace</p>
+                <p class="mt-1 text-sm leading-6">You can correct your email or password here. Venue, booking, promotion, payout, and visibility tools stay protected until your email is verified.</p>
+                <a href="/email/verify" class="mt-4 inline-flex rounded-xl bg-amber-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-amber-950">Continue email verification</a>
+            </div>
+
             <div class="mt-8 grid gap-6 lg:grid-cols-2 lg:items-start">
                 <form class="app-card p-6 sm:p-7" @submit.prevent="saveProfile">
                     <div class="flex items-start gap-4">

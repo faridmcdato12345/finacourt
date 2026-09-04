@@ -25,6 +25,7 @@ use App\Notifications\VenueClaimVerificationCode;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\URL;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -174,7 +175,19 @@ class UnclaimedVenueDirectoryTest extends TestCase
             'organization_name' => 'Invited Owner Courts',
             'password' => 'secure-password',
             'password_confirmation' => 'secure-password',
-        ])->assertRedirect($invitationUrl);
+        ])->assertRedirect(route('verification.notice'));
+
+        $this->assertSame($invitationUrl, session('url.intended'));
+
+        $owner = User::query()->where('email', 'invited-owner@example.com')->firstOrFail();
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(10),
+            ['id' => $owner->getKey(), 'hash' => sha1($owner->email)],
+        );
+
+        $this->get($verificationUrl)->assertRedirect($invitationUrl);
+        $this->assertTrue($owner->fresh()->hasVerifiedEmail());
     }
 
     public function test_admin_verification_publication_and_edits_follow_the_audited_state_machine(): void

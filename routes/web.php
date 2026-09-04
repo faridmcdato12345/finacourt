@@ -163,20 +163,32 @@ Route::post('/reset-password', [AccountPasswordResetController::class, 'store'])
 
 Route::middleware('auth')->group(function () {
     Route::get('/owner/social/setup', [SocialOwnerSetupController::class, 'create'])
+        ->middleware('verified')
         ->name('owner.social-setup.create');
     Route::post('/owner/social/setup', [SocialOwnerSetupController::class, 'store'])
-        ->middleware('throttle:6,1')
+        ->middleware(['verified', 'throttle:6,1'])
         ->name('owner.social-setup.store');
-    Route::get('/email/verify', fn () => view('auth.verify-email', [
-        'seo' => [
-            'title' => 'Verify your account email',
-            'description' => 'Verify your FinACourt account email before requesting venue ownership.',
-            'canonical' => route('verification.notice'),
-            'robots' => 'noindex,nofollow',
-            'type' => 'website',
-        ],
-        'structuredData' => [],
-    ]))->name('verification.notice');
+    Route::get('/email/verify', function (Request $request) {
+        $isOwner = $request->user()->memberships()->exists();
+        $accountRoute = $isOwner
+            ? 'owner.account.edit'
+            : 'player.account.edit';
+
+        return view('auth.verify-email', [
+            'accountSettingsUrl' => route($accountRoute),
+            'isOwnerVerification' => $isOwner,
+            'seo' => [
+                'title' => 'Verify your account email',
+                'description' => $isOwner
+                    ? 'Verify your FinACourt account email before using the court-owner workspace.'
+                    : 'Verify the email address associated with your FinACourt account.',
+                'canonical' => route('verification.notice'),
+                'robots' => 'noindex,nofollow',
+                'type' => 'website',
+            ],
+            'structuredData' => [],
+        ]);
+    })->name('verification.notice');
     Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
         $request->fulfill();
 
@@ -248,6 +260,9 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:
     Route::post('/account/password-link', [AccountPasswordResetController::class, 'send'])
         ->middleware('throttle:3,60')
         ->name('account.password-link.store');
+});
+
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant', 'throttle:authenticated'])->group(function () {
     Route::get('/google-business-profile/callback', [GoogleBusinessProfileController::class, 'callback'])
         ->middleware('throttle:google-business-profile')
         ->name('google-business-profile.callback');
@@ -342,7 +357,7 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:
 });
 
 Route::post('/owner/organizations/{organization}/activate', OrganizationContextController::class)
-    ->middleware('auth')
+    ->middleware(['auth', 'verified'])
     ->name('owner.organizations.activate');
 
 Route::prefix('partner')->name('partner.')->middleware(['auth', 'sales.partner', 'throttle:authenticated'])->group(function () {

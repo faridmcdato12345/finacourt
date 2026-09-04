@@ -22,6 +22,7 @@ class HandleInertiaRequests extends Middleware
                     'id' => $user->getKey(),
                     'name' => $user->name,
                     'email' => $user->email,
+                    'email_verified' => $user->hasVerifiedEmail(),
                     'is_platform_admin' => $user->is_platform_admin,
                     'is_sales_partner' => $user->salesPartnerProfile()->exists(),
                 ] : null,

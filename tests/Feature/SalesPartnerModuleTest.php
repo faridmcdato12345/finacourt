@@ -115,7 +115,7 @@ class SalesPartnerModuleTest extends TestCase
             'organization_name' => 'Raw Marker Courts',
             'password' => 'secure-password',
             'password_confirmation' => 'secure-password',
-        ])->assertRedirect(route('owner.dashboard'));
+        ])->assertRedirect(route('verification.notice'));
         $this->assertDatabaseCount('sales_partner_attributions', 0);
         $this->post(route('logout'));
 
@@ -126,7 +126,7 @@ class SalesPartnerModuleTest extends TestCase
             'organization_name' => 'Trusted Referral Courts',
             'password' => 'secure-password',
             'password_confirmation' => 'secure-password',
-        ])->assertRedirect(route('owner.dashboard'));
+        ])->assertRedirect(route('verification.notice'));
 
         $attribution = SalesPartnerAttribution::query()->firstOrFail();
         $this->assertSame($partner->getKey(), $attribution->sales_partner_profile_id);
