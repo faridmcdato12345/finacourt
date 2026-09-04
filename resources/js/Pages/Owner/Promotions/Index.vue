@@ -6,7 +6,7 @@ import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
 const props = defineProps({ promotions: Array, pagination: Object, opportunities: Array });
 
 const liveCount = computed(() => props.promotions.filter(
-    (promotion) => promotion.effective_status === 'active',
+    (promotion) => promotion.status === 'active',
 ).length);
 const draftCount = computed(() => props.promotions.filter(
     (promotion) => ['draft', 'paused'].includes(promotion.effective_status),
@@ -23,13 +23,21 @@ function opportunityUrl(slot) {
     return `/owner/promotions/create?${query.toString()}`;
 }
 
-function statusClass(status) {
-    if (status === 'active') return 'bg-court-50 text-court-800';
-    if (status === 'scheduled') return 'bg-blue-50 text-blue-700';
-    if (status === 'draft') return 'bg-slate-100 text-slate-600';
-    if (status === 'paused') return 'bg-amber-50 text-amber-800';
+function statusClass(promotion) {
+    if (promotion.status === 'active') return 'bg-court-50 text-court-800';
+    if (promotion.effective_status === 'scheduled') return 'bg-blue-50 text-blue-700';
+    if (promotion.effective_status === 'draft') return 'bg-slate-100 text-slate-600';
+    if (promotion.effective_status === 'paused') return 'bg-amber-50 text-amber-800';
 
     return 'bg-slate-100 text-slate-500';
+}
+
+function statusLabel(promotion) {
+    if (promotion.status === 'active' && promotion.effective_status === 'scheduled') {
+        return `Published · starts ${promotion.starts_on}`;
+    }
+
+    return promotion.effective_status_label;
 }
 
 function money(value) {
@@ -55,7 +63,7 @@ function money(value) {
             </header>
 
             <section class="mt-7 grid gap-4 sm:grid-cols-3" aria-label="Promotion summary">
-                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Live now</p><p class="mt-2 text-3xl font-semibold">{{ liveCount }}</p><p class="mt-1 text-xs text-slate-500">Visible on this page</p></div>
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Published now</p><p class="mt-2 text-3xl font-semibold">{{ liveCount }}</p><p class="mt-1 text-xs text-slate-500">Visible to players, including upcoming offers</p></div>
                 <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Needs attention</p><p class="mt-2 text-3xl font-semibold">{{ draftCount }}</p><p class="mt-1 text-xs text-slate-500">Draft or paused on this page</p></div>
                 <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Open-time ideas</p><p class="mt-2 text-3xl font-semibold">{{ opportunities.length }}</p><p class="mt-1 text-xs text-slate-500">Calculated from real availability</p></div>
             </section>
@@ -80,7 +88,7 @@ function money(value) {
 
                 <div v-if="promotions.length" class="mt-5 grid gap-4 md:grid-cols-2">
                     <article v-for="promotion in promotions" :key="promotion.id" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex items-start justify-between gap-4"><div><p class="text-xs font-semibold uppercase tracking-wider text-court-700">{{ promotion.promotion_type_label }}</p><h4 class="mt-2 text-xl font-semibold">{{ promotion.title }}</h4><p class="mt-1 text-sm text-slate-500">{{ promotion.venue }}<span v-if="promotion.resource"> · {{ promotion.resource }}</span></p></div><span :class="['shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(promotion.effective_status)]">{{ promotion.effective_status_label }}</span></div>
+                        <div class="flex items-start justify-between gap-4"><div><p class="text-xs font-semibold uppercase tracking-wider text-court-700">{{ promotion.promotion_type_label }}</p><h4 class="mt-2 text-xl font-semibold">{{ promotion.title }}</h4><p class="mt-1 text-sm text-slate-500">{{ promotion.venue }}<span v-if="promotion.resource"> · {{ promotion.resource }}</span></p></div><span :class="['shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(promotion)]">{{ statusLabel(promotion) }}</span></div>
                         <div class="mt-4 rounded-xl bg-slate-50 px-4 py-3"><p class="font-semibold text-court-800">{{ promotion.offer_label || 'Normal price' }}</p><p class="mt-1 text-xs text-slate-500">{{ promotion.slots_count ? `${promotion.slots_count} exact court ${promotion.slots_count === 1 ? 'time' : 'times'}` : `${promotion.starts_on} through ${promotion.ends_on}` }}</p></div>
                         <dl class="mt-4 grid grid-cols-4 gap-2 text-center text-xs"><div><dt class="text-slate-400">Shown</dt><dd class="mt-1 text-base font-semibold text-slate-900">{{ promotion.impressions_count }}</dd></div><div><dt class="text-slate-400">Opened</dt><dd class="mt-1 text-base font-semibold text-slate-900">{{ promotion.clicks_count }}</dd></div><div><dt class="text-slate-400">Started</dt><dd class="mt-1 text-base font-semibold text-slate-900">{{ promotion.booking_starts_count }}</dd></div><div><dt class="text-slate-400">Booked</dt><dd class="mt-1 text-base font-semibold text-slate-900">{{ promotion.bookings_count }}</dd></div></dl>
                         <div class="mt-5 flex gap-2 border-t border-slate-100 pt-4"><Link :href="`/owner/promotions/${promotion.id}`" class="flex-1 rounded-xl bg-court-700 px-4 py-2.5 text-center text-sm font-semibold text-white">View results</Link><Link :href="`/owner/promotions/${promotion.id}/edit`" class="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Edit</Link></div>

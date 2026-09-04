@@ -50,11 +50,17 @@ class Promotion extends Model
     public function scopePublicInventory(Builder $query): void
     {
         $query->where('is_active', true)
-            ->whereIn('status', [PromotionStatus::Scheduled, PromotionStatus::Active])
+            ->where(function (Builder $query): void {
+                $query->where('status', PromotionStatus::Active->value)
+                    ->orWhere(function (Builder $query): void {
+                        $query->where('status', PromotionStatus::Scheduled->value)
+                            ->whereDate('starts_on', '<=', now()->addDay()->toDateString());
+                    });
+            })
             ->where('is_public', true)
-            // Coarse UTC bounds keep expired/future rows out of marketplace
-            // queries; isPublicNow performs the exact venue-timezone check.
-            ->whereDate('starts_on', '<=', now()->addDay()->toDateString())
+            // Scheduled promotions only enter the coarse query near their start
+            // date. Explicitly active promotions are released immediately, even
+            // when their eligible booking dates are still in the future.
             ->whereDate('ends_on', '>=', now()->subDay()->toDateString())
             ->whereHas('venue', fn (Builder $query) => $query
                 ->marketplace()
@@ -126,13 +132,28 @@ class Promotion extends Model
 
         $at ??= now($this->venue->organization->timezone);
         $date = $at->toDateString();
+        $isReleased = $this->status === PromotionStatus::Active
+            || ($this->status === PromotionStatus::Scheduled
+                && $this->effectiveStatus($at) === PromotionStatus::Active);
 
-        return $this->effectiveStatus($at) === PromotionStatus::Active
+        return $isReleased
             && $this->venue->is_published
             && ($this->resource === null || $this->resource->is_active)
-            && $date >= $this->starts_on->toDateString()
             && $date <= $this->ends_on->toDateString()
             && (! $this->targets_specific_slots || $this->nextSlot($at) !== null);
+    }
+
+    public function isUpcoming(?CarbonInterface $at = null): bool
+    {
+        if ($at === null) {
+            $timezone = $this->relationLoaded('venue')
+                && $this->venue->relationLoaded('organization')
+                ? $this->venue->organization->timezone
+                : config('app.timezone');
+            $at = now($timezone);
+        }
+
+        return $at->toDateString() < $this->starts_on->toDateString();
     }
 
     public function effectiveStatus(?CarbonInterface $at = null): PromotionStatus
@@ -190,7 +211,8 @@ class Promotion extends Model
 
         return array_filter([
             'resource' => $slot?->resource_id ?? $this->resource_id,
-            'date' => $slot?->slot_date->toDateString(),
+            'date' => $slot?->slot_date->toDateString()
+                ?? ($this->isUpcoming() ? $this->starts_on->toDateString() : null),
             'campaign' => $this->campaign_token,
             'slot' => $slot?->slot_token,
         ]);
