@@ -21,6 +21,12 @@ class OwnerPayoutEvent extends Model
         return $this->belongsTo(OwnerPayout::class, 'owner_payout_id');
     }
 
+    /** @return BelongsTo<User, $this> */
+    public function actor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'actor_user_id');
+    }
+
     protected function casts(): array
     {
         return [

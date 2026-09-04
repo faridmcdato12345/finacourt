@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Marketplace\MarketplaceQuery;
 use App\Marketplace\StructuredData;
 use App\Marketplace\VenueMap;
+use App\Promotions\PromotionApplicability;
 use App\Promotions\PromotionMarketplace;
 use App\Promotions\PromotionTracker;
 use Carbon\CarbonImmutable;
@@ -25,6 +26,7 @@ class VenueController extends Controller
         AvailabilityService $availabilityService,
         StructuredData $structuredData,
         PromotionMarketplace $promotionMarketplace,
+        PromotionApplicability $promotionApplicability,
         PromotionTracker $tracker,
         AnalyticsRecorder $analytics,
         VenueMap $maps,
@@ -78,11 +80,13 @@ class VenueController extends Controller
             $availability = $availabilityService->slots($resource, $date, $duration);
             $analytics->recordAvailabilityView($request, $venue, $resource, $date);
 
-            if ($campaignPromotion !== null) {
+            if ($campaignPromotion !== null || ! isset($validated['campaign'])) {
                 $availability['slots'] = $availability['slots']->map(function (array $slot) use (
                     $availabilityService,
                     $campaignPromotion,
                     $date,
+                    $promotionApplicability,
+                    $promotions,
                     $resource,
                 ): array {
                     $window = $availabilityService->window(
@@ -92,11 +96,16 @@ class VenueController extends Controller
                         $slot['end_time'],
                         requireFuture: false,
                     );
-                    $slot['campaign'] = $campaignPromotion->appliesTo(
-                        $resource,
-                        $window->localStart,
-                        $window->localEnd,
-                    ) ? $campaignPromotion->campaign_token : null;
+                    $promotion = $campaignPromotion;
+
+                    if ($promotion === null) {
+                        $promotion = $promotionApplicability->bestDiscount($promotions, $resource, $window);
+                    } elseif (! $promotion->appliesTo($resource, $window->localStart, $window->localEnd)) {
+                        $promotion = null;
+                    }
+
+                    $slot['campaign'] = $promotion?->campaign_token;
+                    $slot['promotion_offer'] = $promotion?->offerLabel();
 
                     return $slot;
                 });

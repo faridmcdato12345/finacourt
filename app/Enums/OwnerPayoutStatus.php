@@ -6,6 +6,10 @@ enum OwnerPayoutStatus: string
 {
     case Pending = 'pending';
     case Approved = 'approved';
+    case Processing = 'processing';
+    case Paid = 'paid';
+    // Kept so historical production rows created by the original workflow
+    // remain readable. New completed payouts use Paid.
     case Sent = 'sent';
     case Failed = 'failed';
     case Reversed = 'reversed';
@@ -14,9 +18,10 @@ enum OwnerPayoutStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Pending => 'Waiting for approval',
-            self::Approved => 'Ready to send',
-            self::Sent => 'Sent',
+            self::Pending => 'Queued',
+            self::Approved => 'Approved',
+            self::Processing => 'Processing',
+            self::Paid, self::Sent => 'Paid',
             self::Failed => 'Could not be sent',
             self::Reversed => 'Returned',
             self::Cancelled => 'Cancelled',

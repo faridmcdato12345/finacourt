@@ -3,10 +3,15 @@
 namespace Tests\Feature;
 
 use App\Enums\MembershipRole;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\User;
+use App\Notifications\QueuedVerifyEmail;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -38,6 +43,8 @@ class AuthenticationTest extends TestCase
 
     public function test_owner_can_register_with_a_new_organization(): void
     {
+        Notification::fake();
+
         $response = $this->post('/register', [
             'name' => 'Alicia Owner',
             'email' => 'alicia@example.com',
@@ -50,12 +57,111 @@ class AuthenticationTest extends TestCase
         $organization = Organization::query()->where('name', 'Alicia Sports Center')->firstOrFail();
         $membership = Membership::query()->firstOrFail();
 
-        $response->assertRedirect(route('owner.dashboard'));
+        $response->assertRedirect(route('verification.notice'));
         $this->assertAuthenticatedAs($user);
         $this->assertSame($organization->getKey(), $membership->organization_id);
         $this->assertSame($user->getKey(), $membership->user_id);
         $this->assertSame(MembershipRole::Owner, $membership->role);
         $this->assertSame($organization->getKey(), session('tenant.organization_id'));
+        Notification::assertSentTo(
+            $user,
+            function (QueuedVerifyEmail $notification) use ($user): bool {
+                return $notification instanceof ShouldQueue
+                    && $notification->queue === 'emails'
+                    && in_array('mail', $notification->via($user), true);
+            },
+        );
+    }
+
+    public function test_unverified_owner_can_manage_their_account_but_cannot_enter_or_change_the_workspace(): void
+    {
+        Notification::fake();
+        $owner = User::factory()->unverified()->create([
+            'email' => 'unverified-owner@example.com',
+            'password' => 'secure-password',
+        ]);
+        $organization = Organization::factory()->create();
+        Membership::factory()->owner()->for($owner)->for($organization)->create();
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('verification.notice'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Auth/VerifyEmail')
+                ->where('email', 'unverified-owner@example.com')
+                ->where('accountSettingsUrl', route('owner.account.edit', [], false))
+                ->where('isOwnerVerification', true)
+                ->where('routes.resend', route('verification.send', [], false))
+                ->where('routes.logout', route('logout', [], false)));
+
+        $this->get(route('owner.account.edit'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Account/Edit')
+                ->where('auth.user.email_verified', false)
+                ->where('account.email_verified', false));
+
+        $this->get(route('owner.dashboard'))
+            ->assertRedirect(route('verification.notice'));
+
+        $this->post(route('owner.venues.store'), [])
+            ->assertRedirect(route('verification.notice'));
+
+        $this->assertDatabaseCount('venues', 0);
+
+        $this->patch(route('owner.account.profile.update'), [
+            'name' => $owner->name,
+            'email' => 'corrected-owner@example.com',
+            'profile_current_password' => 'secure-password',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $owner->refresh();
+        $this->assertSame('corrected-owner@example.com', $owner->email);
+        $this->assertFalse($owner->hasVerifiedEmail());
+        Notification::assertSentTo($owner, QueuedVerifyEmail::class);
+    }
+
+    public function test_email_verification_notice_supports_inertia_navigation_without_an_html_modal(): void
+    {
+        $owner = User::factory()->unverified()->create([
+            'email' => 'inertia-owner@example.com',
+        ]);
+        $organization = Organization::factory()->create();
+        Membership::factory()->owner()->for($owner)->for($organization)->create();
+        $inertiaVersion = app(HandleInertiaRequests::class)->version(
+            Request::create(route('verification.notice')),
+        );
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->withHeaders([
+                'X-Inertia' => 'true',
+                'X-Inertia-Version' => $inertiaVersion,
+            ])
+            ->get(route('verification.notice'))
+            ->assertOk()
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('component', 'Auth/VerifyEmail')
+            ->assertJsonPath('props.email', 'inertia-owner@example.com')
+            ->assertJsonPath('props.isOwnerVerification', true);
+    }
+
+    public function test_unverified_owner_login_returns_to_email_verification(): void
+    {
+        $owner = User::factory()->unverified()->create([
+            'email' => 'pending-owner@example.com',
+            'password' => 'secure-password',
+        ]);
+        $organization = Organization::factory()->create();
+        Membership::factory()->owner()->for($owner)->for($organization)->create();
+
+        $this->post(route('login'), [
+            'email' => $owner->email,
+            'password' => 'secure-password',
+        ])->assertRedirect(route('verification.notice'));
+
+        $this->assertAuthenticatedAs($owner);
     }
 
     public function test_owner_can_authenticate_and_reach_the_dashboard(): void

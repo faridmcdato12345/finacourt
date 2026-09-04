@@ -12,6 +12,7 @@ use App\Http\Requests\SavePromotionRequest;
 use App\Models\Organization;
 use App\Models\Promotion;
 use App\Models\Venue;
+use App\Payments\PlatformServiceFeeCalculator;
 use App\Promotions\EmptySlotFinder;
 use App\Promotions\PromotionLifecycle;
 use App\Promotions\PromotionSlotSynchronizer;
@@ -27,6 +28,8 @@ use Inertia\Response;
 
 class PromotionController extends Controller
 {
+    public function __construct(private readonly PlatformServiceFeeCalculator $serviceFees) {}
+
     public function index(TenantContext $context, EmptySlotFinder $emptySlots): Response
     {
         Gate::authorize('viewAny', [Promotion::class, $context->organization()]);
@@ -262,6 +265,7 @@ class PromotionController extends Controller
                 'label' => $day->label(),
             ]),
             'opportunities' => $opportunities ?? collect(),
+            'serviceFee' => $this->serviceFeePolicy(),
         ];
     }
 
@@ -280,10 +284,41 @@ class PromotionController extends Controller
         $data['days_of_week'] = empty($data['days_of_week']) ? null : array_map('intval', $data['days_of_week']);
         $data['starts_at_time'] = $data['starts_at_time'] ?? null;
         $data['ends_at_time'] = $data['ends_at_time'] ?? null;
-        $slots = $data['slots'] ?? [];
+        $type = PromotionType::from($data['promotion_type']);
+
+        if ($type === PromotionType::SpecificSlots) {
+            $data['resource_id'] = null;
+            $data['audience_sport_id'] = null;
+            $data['days_of_week'] = null;
+            $data['starts_at_time'] = null;
+            $data['ends_at_time'] = null;
+        }
+
+        $slots = $type === PromotionType::SpecificSlots
+            ? ($data['slots'] ?? [])
+            : [];
         unset($data['slots'], $data['status'], $data['is_active']);
 
         return [$data, $slots];
+    }
+
+    /** @return array<string, int|string|null>|null */
+    private function serviceFeePolicy(): ?array
+    {
+        $rule = $this->serviceFees->activeRule('PHP');
+
+        if ($rule === null) {
+            return null;
+        }
+
+        return [
+            'name' => $rule->name,
+            'type' => $rule->fee_type->value,
+            'percentage_basis_points' => $rule->percentage_basis_points,
+            'fixed_amount' => $rule->fixed_amount,
+            'minimum_amount' => $rule->minimum_fee_amount,
+            'maximum_amount' => $rule->maximum_fee_amount,
+        ];
     }
 
     /** @return array<string, mixed> */

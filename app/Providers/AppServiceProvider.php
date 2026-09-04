@@ -18,6 +18,8 @@ use App\Payments\Contracts\PaymentProvider;
 use App\Payments\PaymentProviderRegistry;
 use App\Payments\Providers\ManualPaymentProvider;
 use App\Payments\Providers\PayMongoPaymentProvider;
+use App\Payouts\Contracts\PayoutProvider;
+use App\Payouts\Providers\ManualPayoutProvider;
 use App\Policies\BookingPolicy;
 use App\Policies\CourtResourcePolicy;
 use App\Policies\OrganizationPolicy;
@@ -64,6 +66,18 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(BusinessProfileGateway::class, StoredBusinessProfileGateway::class);
         $this->app->singleton(ManualPaymentProvider::class);
         $this->app->singleton(PayMongoPaymentProvider::class);
+        // Owner payouts stay manual until this deployment has an activated
+        // provider wallet and a tested transfer/callback integration.
+        $this->app->singleton(ManualPayoutProvider::class);
+        $this->app->bind(PayoutProvider::class, function ($app) {
+            $provider = (string) config('settlements.provider', 'manual');
+
+            if ($provider !== 'manual') {
+                throw new \LogicException("Unsupported owner payout provider [{$provider}]. Configure OWNER_PAYOUT_PROVIDER=manual until a tested transfer integration is installed.");
+            }
+
+            return $app->make(ManualPayoutProvider::class);
+        });
         $this->app->singleton(PaymentProviderRegistry::class, function ($app) {
             $providers = [$app->make(ManualPaymentProvider::class)];
             $defaultProvider = (string) config('payments.default', 'manual');

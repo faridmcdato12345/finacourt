@@ -39,7 +39,7 @@ class SuccessfulCampaignRule implements RecommendationRule
                 venueId: $campaign['venue_id'],
                 venueName: $campaign['venue_name'],
                 title: "“{$campaign['title']}” brought in {$campaign['bookings']} bookings",
-                explanation: "This deal brought in {$campaign['bookings']} confirmed FinACourt bookings worth ".number_format($campaign['revenue'], 2)." {$campaign['currency']} during the last {$context->lookbackDays} days. Review it before deciding whether to run something similar.",
+                explanation: "This promotion brought in {$campaign['bookings']} confirmed FinACourt bookings worth ".number_format($campaign['revenue'], 2)." {$campaign['currency']} during the last {$context->lookbackDays} days. Review it before deciding whether to run something similar.",
                 evidence: [
                     'promotion_id' => $campaign['promotion_id'],
                     'qualified_bookings' => $campaign['bookings'],
@@ -48,7 +48,7 @@ class SuccessfulCampaignRule implements RecommendationRule
                     'lookback_days' => $context->lookbackDays,
                     'campaign_status' => $campaign['status'],
                 ],
-                actionLabel: 'Review deal',
+                actionLabel: 'Review promotion',
                 actionUrl: route('owner.promotions.show', $campaign['promotion_id']),
                 calculatedAt: $context->calculatedAt,
                 expiresAt: $context->expiresAt,

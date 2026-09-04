@@ -51,6 +51,10 @@ class AuthenticatedSessionController extends Controller
         }
 
         if ($user->memberships()->exists()) {
+            if (! $user->hasVerifiedEmail()) {
+                return redirect()->route('verification.notice');
+            }
+
             return redirect()->intended(route('owner.dashboard'));
         }
 

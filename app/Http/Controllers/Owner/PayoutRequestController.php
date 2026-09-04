@@ -17,6 +17,7 @@ class PayoutRequestController extends Controller
         OwnerPayoutWorkflow $workflow,
     ): RedirectResponse {
         abort_unless($context->membership()?->role === MembershipRole::Owner, 403);
+        $request->validate(['confirmed' => ['required', 'accepted']]);
 
         $payout = $workflow->request(
             $context->organization(),
@@ -26,7 +27,7 @@ class PayoutRequestController extends Controller
 
         return back()->with(
             'status',
-            "Payout {$payout->reference} was requested. FinACourt will review it before sending the transfer.",
+            "Early payout {$payout->reference} was requested for {$payout->net_amount} {$payout->currency}. FinACourt will review it before sending the transfer.",
         );
     }
 }

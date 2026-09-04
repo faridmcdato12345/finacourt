@@ -73,6 +73,7 @@ use App\Http\Controllers\Webhooks\PaymentWebhookController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::middleware('throttle:marketplace')->group(function () {
     Route::get('/', HomeController::class)->name('marketplace.home');
@@ -163,20 +164,27 @@ Route::post('/reset-password', [AccountPasswordResetController::class, 'store'])
 
 Route::middleware('auth')->group(function () {
     Route::get('/owner/social/setup', [SocialOwnerSetupController::class, 'create'])
+        ->middleware('verified')
         ->name('owner.social-setup.create');
     Route::post('/owner/social/setup', [SocialOwnerSetupController::class, 'store'])
-        ->middleware('throttle:6,1')
+        ->middleware(['verified', 'throttle:6,1'])
         ->name('owner.social-setup.store');
-    Route::get('/email/verify', fn () => view('auth.verify-email', [
-        'seo' => [
-            'title' => 'Verify your account email',
-            'description' => 'Verify your FinACourt account email before requesting venue ownership.',
-            'canonical' => route('verification.notice'),
-            'robots' => 'noindex,nofollow',
-            'type' => 'website',
-        ],
-        'structuredData' => [],
-    ]))->name('verification.notice');
+    Route::get('/email/verify', function (Request $request) {
+        $isOwner = $request->user()->memberships()->exists();
+        $accountRoute = $isOwner
+            ? 'owner.account.edit'
+            : 'player.account.edit';
+
+        return Inertia::render('Auth/VerifyEmail', [
+            'email' => $request->user()->email,
+            'accountSettingsUrl' => route($accountRoute, [], false),
+            'isOwnerVerification' => $isOwner,
+            'routes' => [
+                'resend' => route('verification.send', [], false),
+                'logout' => route('logout', [], false),
+            ],
+        ]);
+    })->name('verification.notice');
     Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
         $request->fulfill();
 
@@ -248,6 +256,9 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:
     Route::post('/account/password-link', [AccountPasswordResetController::class, 'send'])
         ->middleware('throttle:3,60')
         ->name('account.password-link.store');
+});
+
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant', 'throttle:authenticated'])->group(function () {
     Route::get('/google-business-profile/callback', [GoogleBusinessProfileController::class, 'callback'])
         ->middleware('throttle:google-business-profile')
         ->name('google-business-profile.callback');
@@ -342,7 +353,7 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:
 });
 
 Route::post('/owner/organizations/{organization}/activate', OrganizationContextController::class)
-    ->middleware('auth')
+    ->middleware(['auth', 'verified'])
     ->name('owner.organizations.activate');
 
 Route::prefix('partner')->name('partner.')->middleware(['auth', 'sales.partner', 'throttle:authenticated'])->group(function () {
@@ -367,6 +378,7 @@ Route::prefix('platform')->name('platform.')->middleware(['auth', 'platform.admi
     Route::post('/owner-payouts', [PlatformOwnerPayoutController::class, 'store'])->name('owner-payouts.store');
     Route::post('/owner-payouts/adjustments', [PlatformOwnerPayoutController::class, 'adjust'])->name('owner-payouts.adjustments.store');
     Route::post('/owner-payouts/{payout}/approve', [PlatformOwnerPayoutController::class, 'approve'])->name('owner-payouts.approve');
+    Route::post('/owner-payouts/{payout}/process', [PlatformOwnerPayoutController::class, 'process'])->name('owner-payouts.process');
     Route::post('/owner-payouts/{payout}/send', [PlatformOwnerPayoutController::class, 'send'])->name('owner-payouts.send');
     Route::post('/owner-payouts/{payout}/fail', [PlatformOwnerPayoutController::class, 'fail'])->name('owner-payouts.fail');
     Route::post('/owner-payouts/{payout}/cancel', [PlatformOwnerPayoutController::class, 'cancel'])->name('owner-payouts.cancel');

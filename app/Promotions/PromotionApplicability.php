@@ -2,13 +2,17 @@
 
 namespace App\Promotions;
 
+use App\Bookings\BookingPrice;
 use App\Bookings\BookingWindow;
 use App\Models\CourtResource;
 use App\Models\Promotion;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 class PromotionApplicability
 {
+    public function __construct(private readonly BookingPrice $prices) {}
+
     public function resolve(
         CourtResource $resource,
         BookingWindow $window,
@@ -42,5 +46,32 @@ class PromotionApplicability
         }
 
         return $promotion;
+    }
+
+    /** @param Collection<int, Promotion> $candidates */
+    public function bestDiscount(
+        Collection $candidates,
+        CourtResource $resource,
+        BookingWindow $window,
+    ): ?Promotion {
+        return $candidates
+            ->filter(fn (Promotion $candidate) => $candidate->appliesTo(
+                $resource,
+                $window->localStart,
+                $window->localEnd,
+            ))
+            ->map(fn (Promotion $candidate) => [
+                'promotion' => $candidate,
+                'price' => $this->prices->quote($resource, $window->durationMinutes, $candidate),
+            ])
+            ->filter(fn (array $candidate) => (float) $candidate['price']['discount_amount'] > 0)
+            ->sort(function (array $left, array $right): int {
+                $priceComparison = (float) $left['price']['total_amount'] <=> (float) $right['price']['total_amount'];
+
+                return $priceComparison !== 0
+                    ? $priceComparison
+                    : $left['promotion']->getKey() <=> $right['promotion']->getKey();
+            })
+            ->first()['promotion'] ?? null;
     }
 }

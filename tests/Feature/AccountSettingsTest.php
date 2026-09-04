@@ -6,8 +6,8 @@ use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\SocialAccount;
 use App\Models\User;
+use App\Notifications\QueuedVerifyEmail;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
@@ -129,7 +129,7 @@ class AccountSettingsTest extends TestCase
         $player->refresh();
         $this->assertSame('new@example.com', $player->email);
         $this->assertNull($player->email_verified_at);
-        Notification::assertSentTo($player, VerifyEmail::class);
+        Notification::assertSentTo($player, QueuedVerifyEmail::class);
     }
 
     public function test_user_cannot_take_another_accounts_email_address(): void

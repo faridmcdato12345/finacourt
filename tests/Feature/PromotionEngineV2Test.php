@@ -14,6 +14,7 @@ use App\Models\CourtResource;
 use App\Models\Membership;
 use App\Models\OperatingHour;
 use App\Models\Organization;
+use App\Models\PlatformServiceFeeRule;
 use App\Models\Promotion;
 use App\Models\PromotionSlot;
 use App\Models\Sport;
@@ -32,6 +33,10 @@ class PromotionEngineV2Test extends TestCase
     public function test_deal_goal_choices_include_plain_language_explanations(): void
     {
         [, , , $owner] = $this->setupInventory();
+        PlatformServiceFeeRule::factory()->create([
+            'percentage_basis_points' => 500,
+            'created_by_user_id' => $owner->getKey(),
+        ]);
 
         $this->actingAs($owner)
             ->get(route('owner.promotions.create'))
@@ -41,7 +46,9 @@ class PromotionEngineV2Test extends TestCase
                 ->has('goals', count(PromotionGoal::cases()))
                 ->where('goals.0.label', PromotionGoal::FillEmptySlots->label())
                 ->where('goals.0.description', PromotionGoal::FillEmptySlots->description())
-                ->where('goals.4.description', PromotionGoal::PromoteSpecificSlots->description()));
+                ->where('goals.4.description', PromotionGoal::PromoteSpecificSlots->description())
+                ->where('serviceFee.type', 'percentage')
+                ->where('serviceFee.percentage_basis_points', 500));
     }
 
     public function test_owner_creates_one_campaign_with_multiple_stable_eligible_slots(): void
@@ -51,6 +58,9 @@ class PromotionEngineV2Test extends TestCase
 
         $this->actingAs($owner)->post(route('owner.promotions.store'), $this->campaignData($venue, [
             'resource_id' => $resource->getKey(),
+            'days_of_week' => [1, 3],
+            'starts_at_time' => '06:00',
+            'ends_at_time' => '11:59',
             'slots' => [
                 $this->slotData($resource, $date, '09:00', '10:00'),
                 $this->slotData($resource, $date, '10:00', '11:00'),
@@ -62,6 +72,11 @@ class PromotionEngineV2Test extends TestCase
         $this->assertSame(PromotionGoal::PromoteSpecificSlots, $promotion->goal);
         $this->assertSame(PromotionStatus::Active, $promotion->status);
         $this->assertTrue($promotion->targets_specific_slots);
+        $this->assertNull($promotion->resource_id);
+        $this->assertNull($promotion->audience_sport_id);
+        $this->assertNull($promotion->days_of_week);
+        $this->assertNull($promotion->starts_at_time);
+        $this->assertNull($promotion->ends_at_time);
         $this->assertCount(2, $promotion->slots);
         $this->assertCount(2, $promotion->slots->pluck('slot_token')->unique());
 
@@ -84,6 +99,25 @@ class PromotionEngineV2Test extends TestCase
             $tokens->all(),
             $promotion->refresh()->slots()->pluck('slot_token', 'id')->all(),
         );
+    }
+
+    public function test_non_exact_strategy_cannot_retain_hidden_exact_slots(): void
+    {
+        [, $venue, $resource, $owner] = $this->setupInventory();
+        $date = $this->futureDate();
+
+        $this->actingAs($owner)->post(route('owner.promotions.store'), $this->campaignData($venue, [
+            'resource_id' => $resource->getKey(),
+            'goal' => PromotionGoal::IncreaseOffPeakBookings->value,
+            'promotion_type' => PromotionType::TimeWindow->value,
+            'starts_at_time' => '09:00',
+            'ends_at_time' => '12:00',
+            'slots' => [$this->slotData($resource, $date, '09:00', '10:00')],
+        ]))->assertRedirect();
+
+        $promotion = Promotion::query()->firstOrFail();
+        $this->assertFalse($promotion->targets_specific_slots);
+        $this->assertDatabaseCount('promotion_slots', 0);
     }
 
     public function test_specific_slot_price_is_server_calculated_and_only_applies_inside_selected_window(): void
@@ -123,6 +157,39 @@ class PromotionEngineV2Test extends TestCase
             'campaign' => $promotion->campaign_token,
         ])->assertSessionHasErrors('campaign');
         $this->assertDatabaseCount('bookings', 1);
+    }
+
+    public function test_exact_slot_is_authoritative_over_recurring_day_and_time_filters(): void
+    {
+        [$organization, $venue, $resource] = $this->setupInventory();
+        $date = $this->futureDate();
+        $selectedDay = CarbonImmutable::parse($date, 'Asia/Manila')->dayOfWeek;
+        $promotion = Promotion::factory()->for($venue)->create([
+            'organization_id' => $organization->getKey(),
+            'resource_id' => $resource->getKey(),
+            'goal' => PromotionGoal::PromoteSpecificSlots,
+            'promotion_type' => PromotionType::SpecificSlots,
+            'discount_value' => '20.00',
+            'starts_on' => $date,
+            'ends_on' => $date,
+            'days_of_week' => [($selectedDay + 1) % 7],
+            'starts_at_time' => '06:00:00',
+            'ends_at_time' => '11:59:00',
+            'targets_specific_slots' => true,
+        ]);
+        PromotionSlot::factory()->for($promotion)->create(
+            $this->slotData($resource, $date, '08:00', '12:00'),
+        );
+
+        $this->actingAs(User::factory()->create())->post(route('player.bookings.store', $venue->slug), [
+            ...$this->holdData($resource, $date, '11:00'),
+            'campaign' => $promotion->campaign_token,
+        ])->assertRedirect();
+
+        $booking = Booking::query()->firstOrFail();
+        $this->assertSame('520.00', $booking->unit_price);
+        $this->assertSame('130.00', $booking->discount_amount);
+        $this->assertSame($promotion->getKey(), $booking->promotion_id);
     }
 
     public function test_slot_validation_rejects_cross_tenant_outside_campaign_and_overlapping_windows(): void

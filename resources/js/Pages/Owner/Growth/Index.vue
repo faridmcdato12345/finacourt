@@ -1,156 +1,112 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
-import { reactive } from 'vue';
-import AppSelect from '../../../Components/AppSelect.vue';
+import { computed, ref } from 'vue';
+import GrowthOpportunityCard from '../../../Components/GrowthOpportunityCard.vue';
 import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
+import { groupOpportunities, relativeUpdatedAt } from '../../../lib/growth-opportunities.js';
 
 const props = defineProps({ report: Object, snoozeOptions: Array });
-const snoozeDays = reactive({});
-const number = (value) => new Intl.NumberFormat('en-PH', { maximumFractionDigits: 1 }).format(Number(value));
-const evidenceLabels = {
-    empty_slot_count: 'Open court times',
-    last_minute_slot_count: 'Within 24 hours',
-    horizon_days: 'Days checked',
-    scan_capped: 'More times may exist',
-    searches: 'Player searches',
-    unique_searchers: 'Different searchers',
-    available_slot_count: 'Open court times',
-    lookback_days: 'Days reviewed',
-    city: 'City',
-    sport: 'Sport',
-    date: 'Date',
-    start: 'Start time',
-    end: 'End time',
-    segment: 'Player group',
-    unfulfilled_searches: 'Searches without a good match',
-    no_results: 'No matching venue',
-    no_availability: 'No matching time',
-    inactive_customer_count: 'Past players',
-    inactive_days: 'Days since last booking',
-    minimum_group_size: 'Minimum group size',
-    promotion_id: 'Deal ID',
-    qualified_bookings: 'Confirmed bookings',
-    qualified_booking_value: 'Value of confirmed bookings',
-    currency: 'Currency',
-    campaign_status: 'Deal status',
-    profile_views: 'Venue page visits',
-    unique_visitors: 'Different visitors',
-    conversion_rate_percent: 'Visits that became bookings',
-    stronger_source: 'Better source',
-    stronger_unique_visitors: 'Visitors from better source',
-    stronger_qualified_bookings: 'Bookings from better source',
-    stronger_conversion_rate_percent: 'Booking rate from better source',
-    comparison_source: 'Compared with',
-    comparison_unique_visitors: 'Visitors from compared source',
-    comparison_qualified_bookings: 'Bookings from compared source',
-    comparison_conversion_rate_percent: 'Booking rate from compared source',
-    gap_percentage_points: 'Difference',
-};
-const label = (key) => evidenceLabels[key] || String(key).replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-const priorityLabel = (priority) => ({ high: 'Important', medium: 'Worth trying', low: 'When you have time' }[priority] || label(priority));
-const hiddenEvidence = new Set(['promotion_id', 'currency', 'campaign_status', 'resource', 'venue']);
-const sourceLabels = {
-    marketplace_organic: 'FinACourt search',
-    marketplace_promotion: 'FinACourt deal',
-    google_organic: 'Google Search',
-    google_maps: 'Google Maps',
-    facebook: 'Facebook',
-    instagram: 'Instagram',
-    tiktok: 'TikTok',
-    qr_code: 'QR code',
-    referral: 'Referral link',
-    sales_partner: 'Partner referral',
-    direct: 'Direct visit',
-    unknown: 'Unknown',
-};
-const visibleEvidence = (evidence = {}) => Object.fromEntries(Object.entries(evidence).filter(([key]) => !hiddenEvidence.has(key)));
-const display = (value, key = null) => {
-    if (typeof value === 'boolean') return value ? 'Yes' : 'No';
-    if (key && ['stronger_source', 'comparison_source'].includes(key)) return sourceLabels[value] || numberOrText(value);
-    if (key === 'segment' && value === 'inactive_30') return 'No booking in 30 days';
-    if (key && key.includes('rate_percent')) return `${number(value)}%`;
-    if (key === 'gap_percentage_points') return `${number(value)} points`;
+const refreshing = ref(false);
 
-    return numberOrText(value);
-};
-const numberOrText = (value) => typeof value === 'number' ? number(value) : value;
+const activeOpportunities = computed(() => props.report?.active || []);
+const featuredOpportunity = computed(() => activeOpportunities.value[0] || null);
+const opportunitySections = computed(() => groupOpportunities(activeOpportunities.value.slice(1)));
+const opportunityCount = computed(() => activeOpportunities.value.length);
+const updatedLabel = computed(() => relativeUpdatedAt(props.report?.calculated_at));
 
-function setState(recommendation, status) {
+function setState(recommendation, status, snoozeDays = null) {
     router.post(`/owner/growth/${recommendation.key}/state`, {
         status,
-        snooze_days: status === 'snoozed' ? (snoozeDays[recommendation.key] || props.snoozeOptions[0]?.value) : null,
+        snooze_days: status === 'snoozed' ? snoozeDays : null,
     }, { preserveScroll: true });
 }
 
 function restore(recommendation) {
     router.delete(`/owner/growth/${recommendation.key}/state`, { preserveScroll: true });
 }
+
+function refreshOpportunities() {
+    refreshing.value = true;
+    router.reload({
+        only: ['report'],
+        preserveScroll: true,
+        onFinish: () => { refreshing.value = false; },
+    });
+}
 </script>
 
 <template>
-    <Head title="More bookings" />
+    <Head title="Growth opportunities" />
     <OwnerLayout>
-        <div class="mx-auto max-w-[92rem] space-y-7">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div class="mx-auto max-w-[92rem] space-y-8">
+            <header class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                 <div>
-                    <p class="eyebrow">Helpful next steps</p>
-                    <h1 class="mt-2 text-3xl font-semibold tracking-[-0.035em] text-slate-950 sm:text-4xl">Ways to get more bookings</h1>
-                    <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">Simple suggestions based on real player searches, bookings, deals, and past players. Nothing happens unless you choose it.</p>
+                    <p class="eyebrow">Growth opportunities</p>
+                    <h1 class="mt-2 text-3xl font-semibold tracking-[-0.035em] text-slate-950 sm:text-4xl">Your next steps to get more bookings</h1>
+                    <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">Start with the first recommendation. Every opportunity is based on your real availability, marketplace activity, bookings, or past customers.</p>
                 </div>
-                <div class="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
-                    Last checked <strong class="text-slate-800">{{ new Date(report.calculated_at).toLocaleString() }}</strong>
+                <div class="flex items-center gap-3 self-start rounded-2xl border border-slate-200 bg-white px-4 py-3 lg:self-auto">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-900">{{ opportunityCount }} current {{ opportunityCount === 1 ? 'opportunity' : 'opportunities' }}</p>
+                        <p class="mt-0.5 text-xs text-slate-500">Updated {{ updatedLabel }}</p>
+                    </div>
+                    <button type="button" :disabled="refreshing" class="grid size-10 place-items-center rounded-xl border border-slate-200 text-slate-600 hover:border-court-300 hover:text-court-800 disabled:cursor-wait disabled:opacity-50" aria-label="Refresh growth opportunities" @click="refreshOpportunities">
+                        <svg viewBox="0 0 24 24" :class="['size-5', refreshing && 'animate-spin']" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M20 6v5h-5M4 18v-5h5" /><path d="M18.5 9A7 7 0 0 0 6.7 5.7L4 8m16 8-2.7 2.3A7 7 0 0 1 5.5 15" /></svg>
+                    </button>
                 </div>
-            </div>
+            </header>
 
-            <section v-if="report.active.length" class="grid gap-5 xl:grid-cols-2">
-                <article v-for="recommendation in report.active" :key="recommendation.key" class="app-card overflow-hidden">
-                    <div class="border-b border-slate-100 p-5 sm:p-6">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span :class="recommendation.priority === 'high' ? 'bg-amber-50 text-amber-800' : recommendation.priority === 'medium' ? 'bg-court-50 text-court-800' : 'bg-slate-100 text-slate-600'" class="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider">{{ priorityLabel(recommendation.priority) }}</span>
-                            <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">{{ recommendation.type_label }}</span>
-                            <span v-if="recommendation.venue" class="text-xs text-slate-400">{{ recommendation.venue }}</span>
-                        </div>
-                        <h2 class="mt-4 text-xl font-semibold tracking-tight text-slate-950">{{ recommendation.title }}</h2>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">{{ recommendation.explanation }}</p>
+            <template v-if="featuredOpportunity">
+                <section aria-labelledby="best-next-action">
+                    <h2 id="best-next-action" class="sr-only">Best next action</h2>
+                    <GrowthOpportunityCard :recommendation="featuredOpportunity" :snooze-options="snoozeOptions" featured @change-state="setState" />
+                </section>
+
+                <section v-for="section in opportunitySections" :key="section.key" class="space-y-4" :aria-labelledby="`opportunity-${section.key}`">
+                    <div>
+                        <h2 :id="`opportunity-${section.key}`" class="text-xl font-semibold tracking-tight text-slate-950">{{ section.title }}</h2>
+                        <p class="mt-1 text-sm leading-6 text-slate-500">{{ section.description }}</p>
                     </div>
-                    <div class="grid gap-5 p-5 sm:p-6 lg:grid-cols-[1fr_auto] lg:items-end">
-                        <dl class="grid gap-2 sm:grid-cols-2">
-                            <div v-for="(value, key) in visibleEvidence(recommendation.evidence)" :key="key" class="rounded-xl bg-slate-50 px-3 py-2.5">
-                                <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{{ label(key) }}</dt>
-                                <dd class="mt-1 text-sm font-semibold text-slate-800">{{ display(value, key) }}</dd>
-                            </div>
-                        </dl>
-                        <Link :href="recommendation.suggested_action.url" class="rounded-xl bg-court-700 px-4 py-3 text-center text-sm font-semibold text-white">{{ recommendation.suggested_action.label }} →</Link>
+                    <div class="grid gap-5 xl:grid-cols-2">
+                        <GrowthOpportunityCard v-for="recommendation in section.recommendations" :key="recommendation.key" :recommendation="recommendation" :snooze-options="snoozeOptions" @change-state="setState" />
                     </div>
-                    <div class="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3 sm:px-6">
-                        <button type="button" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600" @click="setState(recommendation, 'dismissed')">Hide</button>
-                        <button type="button" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600" @click="setState(recommendation, 'resolved')">Done</button>
-                        <div class="ml-auto flex items-center gap-2">
-                            <AppSelect v-model="snoozeDays[recommendation.key]" :options="snoozeOptions" size="sm" class="min-w-28 bg-white" />
-                            <button type="button" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600" @click="setState(recommendation, 'snoozed')">Remind me later</button>
-                        </div>
-                    </div>
-                </article>
-            </section>
+                </section>
+            </template>
 
             <section v-else class="app-card px-6 py-16 text-center">
                 <div class="mx-auto grid size-12 place-items-center rounded-2xl bg-court-50 text-xl text-court-700">✓</div>
-                <h2 class="mt-4 text-xl font-semibold text-slate-900">No suggestions yet</h2>
-                <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">FinACourt waits until there is enough real activity before suggesting something. It does not invent numbers.</p>
-                <div class="mt-5 flex justify-center gap-3"><Link href="/owner/analytics" class="text-sm font-semibold text-court-700">View visits and bookings</Link><Link href="/owner/promotions" class="text-sm font-semibold text-court-700">View deals</Link></div>
-            </section>
-
-            <section v-if="report.suppressed.length" class="app-card overflow-hidden">
-                <div class="border-b border-slate-100 px-5 py-5 sm:px-6"><p class="eyebrow">Your choices</p><h2 class="mt-1 text-xl font-semibold">Hidden suggestions</h2><p class="mt-2 text-sm text-slate-500">Hidden and done suggestions stay out of the way until you bring them back. Reminders return automatically later.</p></div>
-                <div class="divide-y divide-slate-100">
-                    <div v-for="recommendation in report.suppressed" :key="recommendation.key" class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                        <div><p class="font-semibold text-slate-900">{{ recommendation.title }}</p><p class="mt-1 text-xs text-slate-400">{{ recommendation.state_label }}<span v-if="recommendation.snoozed_until"> until {{ new Date(recommendation.snoozed_until).toLocaleString() }}</span></p></div>
-                        <button type="button" class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-court-700" @click="restore(recommendation)">Show again</button>
-                    </div>
+                <h2 class="mt-4 text-xl font-semibold text-slate-900">No growth opportunities right now</h2>
+                <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">FinACourt waits for enough real activity before recommending an action. Keep your court availability and venue details current while new marketplace activity comes in.</p>
+                <div class="mt-5 flex flex-wrap justify-center gap-4">
+                    <Link href="/owner/analytics" class="text-sm font-semibold text-court-700">View visits and bookings →</Link>
+                    <Link href="/owner/promotions" class="text-sm font-semibold text-court-700">Manage promotions →</Link>
                 </div>
             </section>
 
-            <p class="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-xs leading-5 text-slate-500">Suggestions refresh every day. To protect players, search breakdowns only appear when enough different people searched. Booked values do not include cancelled bookings, failed payments, or refunded payments.</p>
+            <details v-if="report.suppressed.length" class="app-card group overflow-visible">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-5 sm:px-6 [&::-webkit-details-marker]:hidden">
+                    <div>
+                        <p class="eyebrow">Past choices</p>
+                        <h2 class="mt-1 text-lg font-semibold text-slate-900">Dismissed and snoozed opportunities</h2>
+                        <p class="mt-1 text-sm text-slate-500">{{ report.suppressed.length }} hidden {{ report.suppressed.length === 1 ? 'opportunity' : 'opportunities' }}</p>
+                    </div>
+                    <span class="grid size-9 place-items-center rounded-full bg-slate-100 text-slate-600 transition group-open:rotate-180">⌄</span>
+                </summary>
+                <div class="divide-y divide-slate-100 border-t border-slate-100">
+                    <div v-for="recommendation in report.suppressed" :key="recommendation.key" class="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                        <div>
+                            <p class="font-semibold text-slate-900">{{ recommendation.title }}</p>
+                            <p class="mt-1 text-xs text-slate-500">{{ recommendation.state_label }}<span v-if="recommendation.snoozed_until"> until {{ new Date(recommendation.snoozed_until).toLocaleString() }}</span></p>
+                        </div>
+                        <button type="button" class="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-court-700 hover:border-court-300" @click="restore(recommendation)">Show again</button>
+                    </div>
+                </div>
+            </details>
+
+            <details class="rounded-2xl border border-slate-200 bg-slate-50 text-sm text-slate-600">
+                <summary class="cursor-pointer list-none px-5 py-4 font-semibold text-slate-800 [&::-webkit-details-marker]:hidden">How recommendations work <span class="ml-1 text-court-700">+</span></summary>
+                <p class="border-t border-slate-200 px-5 py-4 text-xs leading-5">Recommendations refresh from real platform activity. Search breakdowns appear only after enough different people have searched. Booking values exclude cancelled bookings, failed payments, and refunds. FinACourt never launches a promotion or contacts a customer unless you choose the action.</p>
+            </details>
         </div>
     </OwnerLayout>
 </template>

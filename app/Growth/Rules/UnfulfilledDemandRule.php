@@ -72,7 +72,7 @@ class UnfulfilledDemandRule implements RecommendationRule
                     'city' => $venue->city,
                     'sport' => $sport->name,
                 ],
-                actionLabel: $slot === null ? 'Review your open times' : 'Create a deal for an open time',
+                actionLabel: $slot === null ? 'Review your open times' : 'Create a promotion',
                 actionUrl: $action,
                 calculatedAt: $context->calculatedAt,
                 expiresAt: $context->expiresAt,

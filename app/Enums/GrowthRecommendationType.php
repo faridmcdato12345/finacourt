@@ -19,7 +19,7 @@ enum GrowthRecommendationType: string
             self::DemandWithInventory => 'Players are searching',
             self::UnfulfilledDemand => 'Searches without a good match',
             self::InactiveCustomers => 'Past players to invite back',
-            self::RepeatSuccessfulCampaign => 'Deal worth repeating',
+            self::RepeatSuccessfulCampaign => 'Promotion worth repeating',
             self::LowBookingConversion => 'Lots of visits, few bookings',
             self::ChannelConversionGap => 'Where players come from',
         };
