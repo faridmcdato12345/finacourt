@@ -6,7 +6,10 @@ use App\Enums\MembershipRole;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\User;
+use App\Notifications\QueuedVerifyEmail;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -38,6 +41,8 @@ class AuthenticationTest extends TestCase
 
     public function test_owner_can_register_with_a_new_organization(): void
     {
+        Notification::fake();
+
         $response = $this->post('/register', [
             'name' => 'Alicia Owner',
             'email' => 'alicia@example.com',
@@ -56,6 +61,14 @@ class AuthenticationTest extends TestCase
         $this->assertSame($user->getKey(), $membership->user_id);
         $this->assertSame(MembershipRole::Owner, $membership->role);
         $this->assertSame($organization->getKey(), session('tenant.organization_id'));
+        Notification::assertSentTo(
+            $user,
+            function (QueuedVerifyEmail $notification) use ($user): bool {
+                return $notification instanceof ShouldQueue
+                    && $notification->queue === 'emails'
+                    && in_array('mail', $notification->via($user), true);
+            },
+        );
     }
 
     public function test_owner_can_authenticate_and_reach_the_dashboard(): void
