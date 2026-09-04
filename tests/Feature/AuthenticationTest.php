@@ -3,12 +3,14 @@
 namespace Tests\Feature;
 
 use App\Enums\MembershipRole;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Membership;
 use App\Models\Organization;
 use App\Models\User;
 use App\Notifications\QueuedVerifyEmail;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -85,8 +87,13 @@ class AuthenticationTest extends TestCase
             ->withSession(['tenant.organization_id' => $organization->getKey()])
             ->get(route('verification.notice'))
             ->assertOk()
-            ->assertSee('unverified-owner@example.com')
-            ->assertSee('href="'.route('owner.account.edit').'"', false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Auth/VerifyEmail')
+                ->where('email', 'unverified-owner@example.com')
+                ->where('accountSettingsUrl', route('owner.account.edit', [], false))
+                ->where('isOwnerVerification', true)
+                ->where('routes.resend', route('verification.send', [], false))
+                ->where('routes.logout', route('logout', [], false)));
 
         $this->get(route('owner.account.edit'))
             ->assertOk()
@@ -113,6 +120,31 @@ class AuthenticationTest extends TestCase
         $this->assertSame('corrected-owner@example.com', $owner->email);
         $this->assertFalse($owner->hasVerifiedEmail());
         Notification::assertSentTo($owner, QueuedVerifyEmail::class);
+    }
+
+    public function test_email_verification_notice_supports_inertia_navigation_without_an_html_modal(): void
+    {
+        $owner = User::factory()->unverified()->create([
+            'email' => 'inertia-owner@example.com',
+        ]);
+        $organization = Organization::factory()->create();
+        Membership::factory()->owner()->for($owner)->for($organization)->create();
+        $inertiaVersion = app(HandleInertiaRequests::class)->version(
+            Request::create(route('verification.notice')),
+        );
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->withHeaders([
+                'X-Inertia' => 'true',
+                'X-Inertia-Version' => $inertiaVersion,
+            ])
+            ->get(route('verification.notice'))
+            ->assertOk()
+            ->assertHeader('X-Inertia', 'true')
+            ->assertJsonPath('component', 'Auth/VerifyEmail')
+            ->assertJsonPath('props.email', 'inertia-owner@example.com')
+            ->assertJsonPath('props.isOwnerVerification', true);
     }
 
     public function test_unverified_owner_login_returns_to_email_verification(): void

@@ -73,6 +73,7 @@ use App\Http\Controllers\Webhooks\PaymentWebhookController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 Route::middleware('throttle:marketplace')->group(function () {
     Route::get('/', HomeController::class)->name('marketplace.home');
@@ -174,19 +175,14 @@ Route::middleware('auth')->group(function () {
             ? 'owner.account.edit'
             : 'player.account.edit';
 
-        return view('auth.verify-email', [
-            'accountSettingsUrl' => route($accountRoute),
+        return Inertia::render('Auth/VerifyEmail', [
+            'email' => $request->user()->email,
+            'accountSettingsUrl' => route($accountRoute, [], false),
             'isOwnerVerification' => $isOwner,
-            'seo' => [
-                'title' => 'Verify your account email',
-                'description' => $isOwner
-                    ? 'Verify your FinACourt account email before using the court-owner workspace.'
-                    : 'Verify the email address associated with your FinACourt account.',
-                'canonical' => route('verification.notice'),
-                'robots' => 'noindex,nofollow',
-                'type' => 'website',
+            'routes' => [
+                'resend' => route('verification.send', [], false),
+                'logout' => route('logout', [], false),
             ],
-            'structuredData' => [],
         ]);
     })->name('verification.notice');
     Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
