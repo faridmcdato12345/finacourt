@@ -367,6 +367,7 @@ Route::prefix('platform')->name('platform.')->middleware(['auth', 'platform.admi
     Route::post('/owner-payouts', [PlatformOwnerPayoutController::class, 'store'])->name('owner-payouts.store');
     Route::post('/owner-payouts/adjustments', [PlatformOwnerPayoutController::class, 'adjust'])->name('owner-payouts.adjustments.store');
     Route::post('/owner-payouts/{payout}/approve', [PlatformOwnerPayoutController::class, 'approve'])->name('owner-payouts.approve');
+    Route::post('/owner-payouts/{payout}/process', [PlatformOwnerPayoutController::class, 'process'])->name('owner-payouts.process');
     Route::post('/owner-payouts/{payout}/send', [PlatformOwnerPayoutController::class, 'send'])->name('owner-payouts.send');
     Route::post('/owner-payouts/{payout}/fail', [PlatformOwnerPayoutController::class, 'fail'])->name('owner-payouts.fail');
     Route::post('/owner-payouts/{payout}/cancel', [PlatformOwnerPayoutController::class, 'cancel'])->name('owner-payouts.cancel');

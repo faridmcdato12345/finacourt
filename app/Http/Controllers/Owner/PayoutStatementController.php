@@ -29,8 +29,14 @@ class PayoutStatementController extends Controller
             fputcsv($stream, ['Court owner account', $payout->organization->name]);
             fputcsv($stream, ['Status', $payout->status->label()]);
             fputcsv($stream, ['Period', $payout->period_started_at->toDateString().' to '.$payout->period_ended_at->toDateString()]);
-            fputcsv($stream, ['Amount', $payout->amount, $payout->currency]);
-            fputcsv($stream, ['Transfer reference', $payout->external_reference ?: 'Not sent yet']);
+            fputcsv($stream, ['Payout type', $payout->payout_type->label()]);
+            fputcsv($stream, ['Gross owner earnings', $payout->gross_amount, $payout->currency]);
+            fputcsv($stream, ['Transfer fee', $payout->payout_fee, $payout->currency]);
+            fputcsv($stream, ['Fee paid by', $payout->fee_payer === 'owner' ? 'Court owner' : 'FinACourt']);
+            fputcsv($stream, ['Net payout', $payout->net_amount, $payout->currency]);
+            fputcsv($stream, ['Paid amount', $payout->paid_amount ?: 'Not paid yet', $payout->currency]);
+            fputcsv($stream, ['Paid at', $payout->paid_at?->toDateTimeString() ?: 'Not paid yet']);
+            fputcsv($stream, ['Transfer reference', $payout->external_reference ?: 'Not paid yet']);
             fputcsv($stream, []);
             fputcsv($stream, ['Date', 'Type', 'Booking', 'Description', 'Amount', 'Currency']);
 

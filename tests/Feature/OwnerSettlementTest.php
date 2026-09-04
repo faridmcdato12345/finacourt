@@ -6,6 +6,7 @@ use App\Enums\BookingSource;
 use App\Enums\MembershipRole;
 use App\Enums\OwnerPayoutMethod;
 use App\Enums\OwnerPayoutStatus;
+use App\Enums\OwnerPayoutType;
 use App\Enums\OwnerSettlementEntryType;
 use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
@@ -33,8 +34,11 @@ class OwnerSettlementTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['settlements.availability_delay_days' => 0]);
-        config(['settlements.minimum_request_amount_centavos' => 50000]);
+        config(['settlements.enabled' => true]);
+        config(['settlements.clearing_hours' => 0]);
+        config(['settlements.early.enabled' => true]);
+        config(['settlements.early.minimum_centavos' => 50000]);
+        config(['settlements.transfer_fee_centavos' => 0]);
     }
 
     public function test_verified_online_payment_creates_only_the_court_price_as_owner_earnings(): void
@@ -142,7 +146,7 @@ class OwnerSettlementTest extends TestCase
         $this->actingAs($admin)->post(route('platform.owner-payouts.store'), [
             'organization_id' => $organization->getKey(),
             'currency' => 'PHP',
-            'period_ended_at' => now()->toDateString(),
+            'period_ended_at' => now('Asia/Manila')->toDateString(),
         ])->assertRedirect();
 
         $payout = OwnerPayout::query()->sole();
@@ -155,14 +159,17 @@ class OwnerSettlementTest extends TestCase
         $this->assertSame('09171234567', $payout->refresh()->destination_snapshot['details']['mobile_number']);
 
         $this->actingAs($admin)->post(route('platform.owner-payouts.approve', $payout))->assertRedirect();
+        $this->actingAs($admin)->post(route('platform.owner-payouts.process', $payout))->assertRedirect();
         $this->actingAs($admin)->post(route('platform.owner-payouts.send', $payout), [
             'external_reference' => 'GCASH-TRANSFER-123',
+            'paid_amount' => '650.00',
+            'paid_at' => now('Asia/Manila')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
 
         $payout->refresh();
-        $this->assertSame(OwnerPayoutStatus::Sent, $payout->status);
+        $this->assertSame(OwnerPayoutStatus::Paid, $payout->status);
         $this->assertSame('GCASH-TRANSFER-123', $payout->external_reference);
-        $this->assertCount(3, $payout->events);
+        $this->assertCount(4, $payout->events);
 
         $this->actingAs($owner)->get(route('owner.settlements.payouts.statement', $payout))
             ->assertOk()
@@ -180,14 +187,15 @@ class OwnerSettlementTest extends TestCase
         $this->actingAs($owner)->get(route('owner.settlements.index'))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->where('payoutRequest.can_request', true)
-                ->where('payoutRequest.minimum_amount', '500.00')
-                ->where('summary.ready', '650.00'));
+                ->where('earlyPayout.can_request', true)
+                ->where('earlyPayout.minimum_amount', '500.00')
+                ->where('summary.available', '650.00'));
 
         $this->actingAs($owner)->post(route('owner.settlements.request'), [
             'organization_id' => $otherOrganization->getKey(),
             'amount' => '999999.00',
             'currency' => 'USD',
+            'confirmed' => true,
         ])->assertRedirect();
 
         $payout = OwnerPayout::query()->sole();
@@ -195,6 +203,7 @@ class OwnerSettlementTest extends TestCase
         $this->assertSame('650.00', $payout->amount);
         $this->assertSame('PHP', $payout->currency);
         $this->assertSame(OwnerPayoutStatus::Pending, $payout->status);
+        $this->assertSame(OwnerPayoutType::Early, $payout->payout_type);
         $this->assertSame($owner->getKey(), $payout->requested_by_user_id);
         $this->assertNotNull($payout->requested_at);
         $this->assertSame('09171234567', $payout->destination_snapshot['details']['mobile_number']);
@@ -202,7 +211,7 @@ class OwnerSettlementTest extends TestCase
         $this->assertDatabaseHas('owner_payout_events', [
             'owner_payout_id' => $payout->getKey(),
             'actor_user_id' => $owner->getKey(),
-            'action' => 'requested',
+            'action' => 'requested_early',
         ]);
 
         $this->actingAs($admin)->get(route('platform.owner-payouts.index'))
@@ -212,10 +221,13 @@ class OwnerSettlementTest extends TestCase
                 ->where('payouts.0.requested_by', $owner->name));
 
         $this->actingAs($admin)->post(route('platform.owner-payouts.approve', $payout))->assertRedirect();
+        $this->actingAs($admin)->post(route('platform.owner-payouts.process', $payout))->assertRedirect();
         $this->actingAs($admin)->post(route('platform.owner-payouts.send', $payout), [
             'external_reference' => 'GCASH-PAYMONGO-EARNINGS-1',
+            'paid_amount' => '650.00',
+            'paid_at' => now('Asia/Manila')->format('Y-m-d\TH:i'),
         ])->assertRedirect();
-        $this->assertSame(OwnerPayoutStatus::Sent, $payout->refresh()->status);
+        $this->assertSame(OwnerPayoutStatus::Paid, $payout->refresh()->status);
     }
 
     public function test_owner_request_requires_active_details_and_the_configured_minimum(): void
@@ -223,14 +235,14 @@ class OwnerSettlementTest extends TestCase
         [$organization, $owner, , $booking, $payment] = $this->setupOnlinePayment();
         $this->pay($booking, $payment);
 
-        $this->actingAs($owner)->post(route('owner.settlements.request'))
+        $this->actingAs($owner)->post(route('owner.settlements.request'), ['confirmed' => true])
             ->assertSessionHasErrors('payout');
         $this->assertDatabaseCount('owner_payouts', 0);
 
         $this->saveProfile($organization, $owner);
-        config(['settlements.minimum_request_amount_centavos' => 70000]);
+        config(['settlements.early.minimum_centavos' => 70000]);
 
-        $this->actingAs($owner)->post(route('owner.settlements.request'))
+        $this->actingAs($owner)->post(route('owner.settlements.request'), ['confirmed' => true])
             ->assertSessionHasErrors('payout');
         $this->assertDatabaseCount('owner_payouts', 0);
         $this->assertNull(OwnerSettlementEntry::query()->sole()->owner_payout_id);
@@ -244,8 +256,8 @@ class OwnerSettlementTest extends TestCase
         $this->saveProfile($organization, $owner);
         $this->pay($booking, $payment);
 
-        $this->actingAs($staff)->post(route('owner.settlements.request'))->assertForbidden();
-        $this->actingAs($owner)->post(route('owner.settlements.request'))->assertRedirect();
+        $this->actingAs($staff)->post(route('owner.settlements.request'), ['confirmed' => true])->assertForbidden();
+        $this->actingAs($owner)->post(route('owner.settlements.request'), ['confirmed' => true])->assertRedirect();
 
         OwnerSettlementEntry::query()->create([
             'organization_id' => $organization->getKey(),
@@ -258,7 +270,7 @@ class OwnerSettlementTest extends TestCase
             'available_at' => now(),
         ]);
 
-        $this->actingAs($owner)->post(route('owner.settlements.request'))
+        $this->actingAs($owner)->post(route('owner.settlements.request'), ['confirmed' => true])
             ->assertSessionHasErrors('payout');
 
         $this->assertDatabaseCount('owner_payouts', 1);
@@ -283,7 +295,7 @@ class OwnerSettlementTest extends TestCase
         $this->actingAs($admin)->post(route('platform.owner-payouts.store'), [
             'organization_id' => $organization->getKey(),
             'currency' => 'PHP',
-            'period_ended_at' => now()->toDateString(),
+            'period_ended_at' => now('Asia/Manila')->toDateString(),
         ]);
         $payout = OwnerPayout::query()->sole();
 
@@ -294,10 +306,16 @@ class OwnerSettlementTest extends TestCase
         $this->assertSame(OwnerPayoutStatus::Failed, $payout->refresh()->status);
         $this->assertNull(OwnerSettlementEntry::query()->sole()->owner_payout_id);
 
+        $this->actingAs($owner)->get(route('owner.settlements.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('payouts.0.status', OwnerPayoutStatus::Failed->value)
+                ->where('payouts.0.status_reason', 'Recipient account rejected the transfer.'));
+
         $this->actingAs($admin)->post(route('platform.owner-payouts.store'), [
             'organization_id' => $organization->getKey(),
             'currency' => 'PHP',
-            'period_ended_at' => now()->toDateString(),
+            'period_ended_at' => now('Asia/Manila')->toDateString(),
         ])->assertRedirect();
         $this->assertDatabaseCount('owner_payouts', 2);
     }
@@ -311,7 +329,7 @@ class OwnerSettlementTest extends TestCase
         $this->actingAs($admin)->post(route('platform.owner-payouts.store'), [
             'organization_id' => $organization->getKey(),
             'currency' => 'PHP',
-            'period_ended_at' => now()->toDateString(),
+            'period_ended_at' => now('Asia/Manila')->toDateString(),
         ])->assertRedirect();
         $payout = OwnerPayout::query()->sole();
 
@@ -338,11 +356,16 @@ class OwnerSettlementTest extends TestCase
         $this->actingAs($admin)->post(route('platform.owner-payouts.store'), [
             'organization_id' => $organization->getKey(),
             'currency' => 'PHP',
-            'period_ended_at' => now()->toDateString(),
+            'period_ended_at' => now('Asia/Manila')->toDateString(),
         ]);
         $payout = OwnerPayout::query()->sole();
         $this->actingAs($admin)->post(route('platform.owner-payouts.approve', $payout));
-        $this->actingAs($admin)->post(route('platform.owner-payouts.send', $payout), ['external_reference' => 'BANK-1']);
+        $this->actingAs($admin)->post(route('platform.owner-payouts.process', $payout));
+        $this->actingAs($admin)->post(route('platform.owner-payouts.send', $payout), [
+            'external_reference' => 'BANK-1',
+            'paid_amount' => '650.00',
+            'paid_at' => now('Asia/Manila')->format('Y-m-d\TH:i'),
+        ]);
         $this->actingAs($admin)->post(route('platform.owner-payouts.reverse', $payout), ['reason' => 'Bank returned the transfer.']);
 
         $this->assertSame(OwnerPayoutStatus::Reversed, $payout->refresh()->status);
@@ -382,6 +405,8 @@ class OwnerSettlementTest extends TestCase
             'currency' => 'PHP',
             'payment_mode' => PaymentMode::HostedCheckout,
             'payment_status' => PaymentStatus::Pending,
+            'start_at' => now()->subHours(2),
+            'end_at' => now()->subHour(),
         ]);
         $payment = Payment::factory()->for($booking)->create([
             'organization_id' => $organization->getKey(),

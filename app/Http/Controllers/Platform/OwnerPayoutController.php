@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Organization;
 use App\Models\OwnerPayout;
 use App\Settlements\OwnerPayoutWorkflow;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class OwnerPayoutController extends Controller
 {
@@ -17,14 +19,23 @@ class OwnerPayoutController extends Controller
         $validated = $request->validate([
             'organization_id' => ['required', 'integer', Rule::exists('organizations', 'id')],
             'currency' => ['required', 'string', 'size:3'],
-            'period_ended_at' => ['required', 'date', 'before_or_equal:today'],
+            'period_ended_at' => ['required', 'date'],
         ]);
+        $timezone = (string) config('settlements.timezone', 'Asia/Manila');
+        $periodEndedAt = CarbonImmutable::parse($validated['period_ended_at'], $timezone)->startOfDay();
+
+        if ($periodEndedAt->isAfter(CarbonImmutable::now($timezone)->startOfDay())) {
+            throw ValidationException::withMessages([
+                'period_ended_at' => 'The payout cutoff cannot be after today in the settlement timezone.',
+            ]);
+        }
+
         $organization = Organization::query()->findOrFail($validated['organization_id']);
         $payout = $workflow->create(
             $organization,
             $request->user(),
             $validated['currency'],
-            $validated['period_ended_at'],
+            $periodEndedAt->toDateString(),
         );
 
         return back()->with('status', "Payout {$payout->reference} was prepared. Review it before approving.");
@@ -37,21 +48,51 @@ class OwnerPayoutController extends Controller
         return back()->with('status', 'The payout is approved and ready to send outside FinACourt.');
     }
 
+    public function process(Request $request, OwnerPayout $payout, OwnerPayoutWorkflow $workflow): RedirectResponse
+    {
+        $workflow->startProcessing($payout, $request->user());
+
+        return back()->with('status', 'The payout is now processing. Complete the external transfer, then record its reconciliation details.');
+    }
+
     public function send(Request $request, OwnerPayout $payout, OwnerPayoutWorkflow $workflow): RedirectResponse
     {
         $validated = $request->validate([
             'external_reference' => ['required', 'string', 'max:255'],
+            'paid_amount' => ['required', 'decimal:0,2', 'gt:0'],
+            'paid_at' => ['required', 'date'],
             'note' => ['nullable', 'string', 'max:1000'],
         ]);
-        $workflow->markSent($payout, $request->user(), $validated['external_reference'], $validated['note'] ?? null);
+        $paidAt = CarbonImmutable::parse(
+            $validated['paid_at'],
+            (string) config('settlements.timezone', 'Asia/Manila'),
+        )->utc();
 
-        return back()->with('status', 'The external transfer reference was recorded and the payout is marked sent.');
+        if ($paidAt->isFuture()) {
+            throw ValidationException::withMessages([
+                'paid_at' => 'The paid timestamp cannot be in the future.',
+            ]);
+        }
+
+        $workflow->markPaid(
+            $payout,
+            $request->user(),
+            $validated['external_reference'],
+            (string) $validated['paid_amount'],
+            $paidAt,
+            $validated['note'] ?? null,
+        );
+
+        return back()->with('status', 'The transfer was reconciled and the payout is marked paid.');
     }
 
     public function fail(Request $request, OwnerPayout $payout, OwnerPayoutWorkflow $workflow): RedirectResponse
     {
-        $validated = $request->validate(['reason' => ['required', 'string', 'max:1000']]);
-        $workflow->markFailed($payout, $request->user(), $validated['reason']);
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+            'failure_code' => ['nullable', 'string', 'max:100'],
+        ]);
+        $workflow->markFailed($payout, $request->user(), $validated['reason'], $validated['failure_code'] ?? null);
 
         return back()->with('status', 'The payout could not be sent. Its earnings are available for a new payout batch.');
     }
@@ -76,7 +117,7 @@ class OwnerPayoutController extends Controller
     {
         $validated = $request->validate([
             'organization_id' => ['required', 'integer', Rule::exists('organizations', 'id')],
-            'amount' => ['required', 'numeric', 'between:-99999999.99,99999999.99', 'not_in:0,0.00'],
+            'amount' => ['required', 'decimal:0,2', 'between:-99999999.99,99999999.99', 'not_in:0,0.00'],
             'currency' => ['required', 'string', 'size:3'],
             'reason' => ['required', 'string', 'max:1000'],
         ]);

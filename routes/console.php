@@ -9,3 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('bookings:send-reminders')->hourly()->withoutOverlapping();
+Schedule::command('owners:payout-scheduled')
+    ->dailyAt('00:30')
+    ->timezone((string) config('settlements.timezone', 'Asia/Manila'))
+    ->withoutOverlapping();
