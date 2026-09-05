@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\OwnerClaimInvitationContext;
 use App\Enums\MembershipRole;
 use App\Http\Controllers\Controller;
 use App\Models\Membership;
@@ -16,8 +17,10 @@ use Inertia\Response;
 
 class SocialOwnerSetupController extends Controller
 {
-    public function create(Request $request): Response|RedirectResponse
-    {
+    public function create(
+        Request $request,
+        OwnerClaimInvitationContext $claimInvitation,
+    ): Response|RedirectResponse {
         if ($request->user()->memberships()->exists()) {
             return redirect()->route('owner.dashboard');
         }
@@ -26,6 +29,7 @@ class SocialOwnerSetupController extends Controller
 
         return Inertia::render('Auth/CompleteOwnerSetup', [
             'user' => $request->user()->only(['name', 'email']),
+            'claimInvitation' => $claimInvitation->isPending($request),
         ]);
     }
 

@@ -1,5 +1,6 @@
 <?php
 
+use App\Auth\OwnerClaimInvitationContext;
 use App\Http\Controllers\AccountPasswordResetController;
 use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -169,7 +170,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/owner/social/setup', [SocialOwnerSetupController::class, 'store'])
         ->middleware(['verified', 'throttle:6,1'])
         ->name('owner.social-setup.store');
-    Route::get('/email/verify', function (Request $request) {
+    Route::get('/email/verify', function (Request $request, OwnerClaimInvitationContext $claimInvitation) {
         $isOwner = $request->user()->memberships()->exists();
         $accountRoute = $isOwner
             ? 'owner.account.edit'
@@ -179,6 +180,7 @@ Route::middleware('auth')->group(function () {
             'email' => $request->user()->email,
             'accountSettingsUrl' => route($accountRoute, [], false),
             'isOwnerVerification' => $isOwner,
+            'claimInvitation' => $claimInvitation->isPending($request),
             'routes' => [
                 'resend' => route('verification.send', [], false),
                 'logout' => route('logout', [], false),

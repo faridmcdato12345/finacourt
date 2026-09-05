@@ -189,6 +189,14 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $invitationUrl = route('owner.directory-claims.invitations.create', $token);
 
         $this->get($invitationUrl)->assertRedirect(route('login'));
+        $this->get(route('login'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Auth/Login')
+                ->where('claimInvitation', true));
+        $this->get(route('register'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Auth/Register')
+                ->where('claimInvitation', true));
         $this->post(route('register'), [
             'name' => 'Invited Owner',
             'email' => 'invited-owner@example.com',
@@ -198,6 +206,10 @@ class UnclaimedVenueDirectoryTest extends TestCase
         ])->assertRedirect(route('verification.notice'));
 
         $this->assertSame($invitationUrl, session('url.intended'));
+        $this->get(route('verification.notice'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Auth/VerifyEmail')
+                ->where('claimInvitation', true));
 
         $owner = User::query()->where('email', 'invited-owner@example.com')->firstOrFail();
         $verificationUrl = URL::temporarySignedRoute(

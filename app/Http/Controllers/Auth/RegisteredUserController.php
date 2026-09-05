@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\OwnerClaimInvitationContext;
 use App\Auth\SocialProviderRegistry;
 use App\Enums\MembershipRole;
 use App\Http\Controllers\Controller;
@@ -21,10 +22,14 @@ use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
-    public function create(SocialProviderRegistry $providers): Response
-    {
+    public function create(
+        Request $request,
+        SocialProviderRegistry $providers,
+        OwnerClaimInvitationContext $claimInvitation,
+    ): Response {
         return Inertia::render('Auth/Register', [
             'socialProviders' => $providers->available('owner'),
+            'claimInvitation' => $claimInvitation->isPending($request),
         ]);
     }
 

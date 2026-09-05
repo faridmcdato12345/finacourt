@@ -3,7 +3,10 @@ import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import GuestLayout from '../../Layouts/GuestLayout.vue';
 import SocialLoginButtons from '../../Components/SocialLoginButtons.vue';
 
-defineProps({ socialProviders: { type: Array, default: () => [] } });
+defineProps({
+    socialProviders: { type: Array, default: () => [] },
+    claimInvitation: { type: Boolean, default: false },
+});
 
 const form = useForm({ name: '', email: '', organization_name: '', password: '', password_confirmation: '' });
 const page = usePage();
@@ -20,6 +23,12 @@ function submit() {
             <p class="text-sm font-semibold text-court-700">For court owners</p>
             <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Create your organization</h1>
             <p class="mt-3 text-slate-600">This account becomes the organization owner. Staff access can be added later.</p>
+
+            <section v-if="claimInvitation" class="mt-6 rounded-2xl border border-court-200 bg-court-50 p-5 text-court-950">
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-court-700">Private venue invitation</p>
+                <p class="mt-2 text-sm leading-6 text-court-900/80">Create your court-owner account and verify its email. FinACourt will then return you to the private venue invitation to continue the ownership request.</p>
+                <p class="mt-3 text-sm">Already registered? <Link href="/login" class="font-semibold text-court-700 hover:text-court-800">Sign in instead</Link></p>
+            </section>
 
             <p v-if="page.props.errors?.social" role="alert" class="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ page.props.errors.social }}</p>
             <SocialLoginButtons :providers="socialProviders" />

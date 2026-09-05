@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\OwnerClaimInvitationContext;
 use App\Auth\SocialProviderRegistry;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
@@ -14,10 +15,14 @@ use Inertia\Response;
 
 class AuthenticatedSessionController extends Controller
 {
-    public function create(SocialProviderRegistry $providers): Response
-    {
+    public function create(
+        Request $request,
+        SocialProviderRegistry $providers,
+        OwnerClaimInvitationContext $claimInvitation,
+    ): Response {
         return Inertia::render('Auth/Login', [
             'socialProviders' => $providers->available('owner'),
+            'claimInvitation' => $claimInvitation->isPending($request),
         ]);
     }
 
