@@ -60,6 +60,26 @@ class UnclaimedVenueDirectoryTest extends TestCase
         ]);
     }
 
+    public function test_platform_admin_can_paste_high_precision_coordinates(): void
+    {
+        $admin = User::factory()->platformAdmin()->create();
+        $sport = Sport::factory()->create();
+        $payload = $this->listingPayload($sport);
+        $payload['latitude'] = '8.011252567134004';
+        $payload['longitude'] = '124.2850209441782';
+
+        $this->actingAs($admin)
+            ->post(route('platform.directory.store'), $payload)
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $listing = VenueDirectoryListing::query()->sole();
+
+        $this->assertSame('8.0112526', $listing->latitude);
+        $this->assertSame('124.2850209', $listing->longitude);
+        $this->assertNotNull($listing->coordinates_verified_at);
+    }
+
     public function test_only_platform_admin_can_manage_directory_provenance(): void
     {
         [$owner, $organization] = $this->ownerWithOrganization();
