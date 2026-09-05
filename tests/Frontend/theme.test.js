@@ -54,11 +54,12 @@ function themeDocument() {
     return { attributes, control, documentRef, label, themeColor };
 }
 
-test('saved theme wins over the device preference and invalid values are ignored', () => {
+test('saved theme wins and fresh or invalid preferences default to light', () => {
     assert.equal(savedTheme(storageWith(DARK_THEME)), DARK_THEME);
     assert.equal(savedTheme(storageWith('sepia')), null);
     assert.equal(preferredTheme(storageWith(LIGHT_THEME), { matches: true }), LIGHT_THEME);
-    assert.equal(preferredTheme(storageWith(), { matches: true }), DARK_THEME);
+    assert.equal(preferredTheme(storageWith(), { matches: true }), LIGHT_THEME);
+    assert.equal(preferredTheme(storageWith('sepia'), { matches: true }), LIGHT_THEME);
 });
 
 test('applying dark mode updates the page, browser color, and accessible control label', () => {

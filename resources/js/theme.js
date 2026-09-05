@@ -28,11 +28,8 @@ export function savedTheme(storage = availableStorage()) {
     }
 }
 
-export function preferredTheme(
-    storage = availableStorage(),
-    mediaQuery = globalThis.window?.matchMedia?.('(prefers-color-scheme: dark)'),
-) {
-    return savedTheme(storage) || systemTheme(mediaQuery);
+export function preferredTheme(storage = availableStorage()) {
+    return savedTheme(storage) || LIGHT_THEME;
 }
 
 function updateThemeControls(theme, documentRef) {
@@ -93,7 +90,7 @@ export function bindThemeControls({
     if (!documentRef?.documentElement || !windowRef) return;
 
     const storage = availableStorage(windowRef);
-    applyTheme(preferredTheme(storage, windowRef.matchMedia?.('(prefers-color-scheme: dark)')), documentRef);
+    applyTheme(preferredTheme(storage), documentRef);
 
     documentRef.addEventListener('click', (event) => {
         const control = event.target?.closest?.('[data-theme-toggle]');
@@ -108,10 +105,6 @@ export function bindThemeControls({
         }
     });
 
-    const colorPreference = windowRef.matchMedia?.('(prefers-color-scheme: dark)');
-    colorPreference?.addEventListener?.('change', () => {
-        if (!savedTheme(storage)) applyTheme(systemTheme(colorPreference), documentRef);
-    });
 }
 
 if (globalThis.document && globalThis.window) {

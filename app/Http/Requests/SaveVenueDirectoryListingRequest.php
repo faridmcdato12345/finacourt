@@ -10,6 +10,32 @@ use Illuminate\Validation\Rule;
 
 class SaveVenueDirectoryListingRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        $coordinates = collect([
+            'latitude' => [-90, 90],
+            'longitude' => [-180, 180],
+        ])->mapWithKeys(function (array $range, string $field): array {
+            $value = $this->input($field);
+
+            if ($value === null || $value === '' || ! is_numeric($value)) {
+                return [];
+            }
+
+            $coordinate = (float) $value;
+
+            if ($coordinate < $range[0] || $coordinate > $range[1]) {
+                return [];
+            }
+
+            return [$field => number_format($coordinate, 7, '.', '')];
+        })->all();
+
+        if ($coordinates !== []) {
+            $this->merge($coordinates);
+        }
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->is_platform_admin === true;
