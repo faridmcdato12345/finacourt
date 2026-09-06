@@ -283,12 +283,6 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
         ->where('invitationToken', '[a-f0-9]{64}')
         ->middleware(['verified', 'throttle:directory-claim'])
         ->name('directory-claims.invitations.store');
-    Route::post('/directory-claims/{claim}/proof/email', [VenueClaimController::class, 'resendEmailCode'])
-        ->middleware(['verified', 'throttle:directory-claim'])
-        ->name('directory-claims.proof.email');
-    Route::post('/directory-claims/{claim}/proof/verify', [VenueClaimController::class, 'verifyEmailCode'])
-        ->middleware(['verified', 'throttle:directory-claim-proof'])
-        ->name('directory-claims.proof.verify');
     Route::delete('/directory-claims/{claim}', [VenueClaimController::class, 'cancel'])
         ->name('directory-claims.cancel');
     Route::get('/location-options/cities', PsgcLocationController::class)

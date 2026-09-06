@@ -112,7 +112,7 @@ function submit() {
                 </label>
 
                 <div class="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                    When possible, FinACourt sends a code to a venue email already found from a public source. Otherwise, a platform administrator records an independent phone, document, or in-person check before approval.
+                    Your FinACourt account email is already verified, so no additional code will be sent. After you submit, a platform administrator independently checks the venue through an official public contact, business evidence, or an in-person visit before approval.
                 </div>
 
                 <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm leading-6 text-slate-700">

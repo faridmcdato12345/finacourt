@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'is_published',
     'claimed_at',
     'verified_at',
+    'marketplace_review_requested_at',
 ])]
 class Venue extends Model
 {
@@ -165,6 +166,7 @@ class Venue extends Model
             'is_published' => 'boolean',
             'claimed_at' => 'datetime',
             'verified_at' => 'datetime',
+            'marketplace_review_requested_at' => 'datetime',
         ];
     }
 }

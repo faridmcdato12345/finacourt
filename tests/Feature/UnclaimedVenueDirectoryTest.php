@@ -21,9 +21,11 @@ use App\Models\Venue;
 use App\Models\VenueClaimInvitation;
 use App\Models\VenueClaimRequest;
 use App\Models\VenueDirectoryListing;
-use App\Notifications\VenueClaimVerificationCode;
+use App\Notifications\OwnerVenueClaimApprovedNotification;
+use App\Notifications\OwnerVenuePublishedNotification;
+use App\Notifications\PlatformClaimedVenueReviewRequestedNotification;
+use App\Notifications\PlatformVenueClaimSubmittedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Notifications\AnonymousNotifiable;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -459,55 +461,60 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->assertNull(VenueClaimInvitation::query()->sole()->used_at);
     }
 
-    public function test_public_email_challenge_goes_only_to_the_independently_sourced_venue_email(): void
+    public function test_claim_submission_requires_no_second_email_code_and_waits_for_an_independent_platform_check(): void
     {
         Notification::fake();
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport, ['email' => 'frontdesk@venue.example']);
-        $invitationToken = $this->claimInvitationToken($listing);
+        $administrator = User::factory()->platformAdmin()->create();
+        $secondAdministrator = User::factory()->platformAdmin()->create();
+        $ordinaryUser = User::factory()->create();
+        $invitationToken = $this->claimInvitationToken($listing, $administrator);
         [$owner, $organization] = $this->ownerWithOrganization();
 
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
             ->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload())
-            ->assertRedirect(route('owner.directory-claims.index'));
+            ->assertRedirect(route('owner.directory-claims.index'))
+            ->assertSessionHas('status', fn (string $message): bool => str_contains($message, 'no additional code is required'));
 
         $claim = VenueClaimRequest::query()->sole();
-        $capturedCode = null;
-        Notification::assertSentOnDemand(
-            VenueClaimVerificationCode::class,
-            function (
-                VenueClaimVerificationCode $notification,
-                array $channels,
-                AnonymousNotifiable $notifiable,
-            ) use (&$capturedCode): bool {
-                $capturedCode = $notification->code;
-
-                return $channels === ['mail']
-                    && $notifiable->routes['mail'] === 'frontdesk@venue.example';
-            },
-        );
-
-        $this->assertSame(VenueClaimProofMethod::PublicEmailCode, $claim->proof_method);
+        foreach ([$administrator, $secondAdministrator] as $recipient) {
+            Notification::assertSentTo(
+                $recipient,
+                function (PlatformVenueClaimSubmittedNotification $notification) use ($claim, $listing, $organization, $owner, $recipient): bool {
+                    return in_array('mail', $notification->via($recipient), true)
+                        && $notification->claimId === $claim->getKey()
+                        && $notification->venueName === $listing->name
+                        && $notification->organizationName === $organization->name
+                        && $notification->requesterName === $owner->name
+                        && $notification->requesterEmail === $owner->email
+                        && $notification->relationship === 'Owner'
+                        && $notification->url === route('platform.directory.index');
+                },
+            );
+        }
+        Notification::assertNotSentTo($ordinaryUser, PlatformVenueClaimSubmittedNotification::class);
+        Notification::assertNotSentTo($owner, PlatformVenueClaimSubmittedNotification::class);
         $this->assertSame(VenueClaimProofStatus::Pending, $claim->proof_status);
-        $this->assertSame('fr•••••••@venue.example', $claim->proof_destination);
-        $this->assertNotNull($claim->getRawOriginal('proof_code_hash'));
-        $this->assertNotSame($capturedCode, $claim->getRawOriginal('proof_code_hash'));
-
-        $this->post(route('owner.directory-claims.proof.verify', $claim), ['code' => $capturedCode])
-            ->assertRedirect();
-
-        $claim->refresh();
-        $this->assertSame(VenueClaimProofStatus::Verified, $claim->proof_status);
-        $this->assertNotNull($claim->proof_verified_at);
-        $this->assertNotNull($claim->approval_available_at);
+        $this->assertNull($claim->proof_method);
+        $this->assertNull($claim->proof_destination);
         $this->assertNull($claim->proof_code_hash);
+        $this->assertNull($claim->proof_sent_at);
+        $this->assertNull($claim->proof_verified_at);
+        $this->assertNull($claim->approval_available_at);
+
+        $this->get(route('owner.directory-claims.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/DirectoryClaims/Index')
+                ->where('claims.0.proof_status_label', 'Waiting for independent check')
+                ->missing('claims.0.proof_destination')
+                ->missing('claims.0.can_request_email_code'));
     }
 
-    public function test_email_proof_is_tenant_scoped_and_locks_after_repeated_wrong_codes(): void
+    public function test_claimant_email_code_endpoints_are_no_longer_exposed(): void
     {
-        Notification::fake();
-        config(['directory.claim_verification_max_attempts' => 3]);
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport, ['email' => 'manager@venue.example']);
         $invitationToken = $this->claimInvitationToken($listing);
@@ -518,29 +525,9 @@ class UnclaimedVenueDirectoryTest extends TestCase
             ->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload());
         $claim = VenueClaimRequest::query()->sole();
 
-        [$otherOwner, $otherOrganization] = $this->ownerWithOrganization();
-        $this->actingAs($otherOwner)
-            ->withSession(['tenant.organization_id' => $otherOrganization->getKey()])
-            ->post(route('owner.directory-claims.proof.verify', $claim), ['code' => '111111'])
+        $this->post("/owner/directory-claims/{$claim->getKey()}/proof/email")->assertNotFound();
+        $this->post("/owner/directory-claims/{$claim->getKey()}/proof/verify", ['code' => '111111'])
             ->assertNotFound();
-
-        $this->actingAs($owner)
-            ->withSession(['tenant.organization_id' => $organization->getKey()]);
-        foreach (range(1, 3) as $_attempt) {
-            $this->post(route('owner.directory-claims.proof.verify', $claim), ['code' => '111111'])
-                ->assertSessionHasErrors('code');
-        }
-
-        $claim->refresh();
-        $this->assertSame(3, $claim->proof_attempts);
-        $this->assertSame(VenueClaimProofStatus::Locked, $claim->proof_status);
-        $this->post(route('owner.directory-claims.proof.email', $claim))
-            ->assertSessionHasErrors('proof');
-        $this->assertSame(VenueClaimProofStatus::Locked, $claim->fresh()->proof_status);
-        $this->assertDatabaseHas('venue_directory_audits', [
-            'venue_directory_listing_id' => $listing->getKey(),
-            'event_type' => 'claim_email_code_locked',
-        ]);
     }
 
     public function test_platform_cannot_approve_a_claim_without_independent_proof_or_during_the_safety_hold_without_an_override(): void
@@ -583,6 +570,7 @@ class UnclaimedVenueDirectoryTest extends TestCase
 
     public function test_platform_admin_can_override_the_safety_hold_with_confirmation_and_an_audited_reason(): void
     {
+        Notification::fake();
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport);
         $invitationToken = $this->claimInvitationToken($listing);
@@ -617,8 +605,20 @@ class UnclaimedVenueDirectoryTest extends TestCase
             'safety_hold_override_confirmed' => true,
         ])->assertRedirect()->assertSessionHasNoErrors();
 
-        $this->assertDatabaseCount('venues', 1);
+        $venue = Venue::query()->sole();
         $this->assertFalse($organization->fresh()->requires_venue_claim_approval);
+        Notification::assertSentToTimes($owner, OwnerVenueClaimApprovedNotification::class, 1);
+        Notification::assertSentTo(
+            $owner,
+            function (OwnerVenueClaimApprovedNotification $notification) use ($claim, $venue, $organization, $owner): bool {
+                return in_array('mail', $notification->via($owner), true)
+                    && $notification->claimId === $claim->getKey()
+                    && $notification->venueName === $venue->name
+                    && $notification->organizationName === $organization->name
+                    && $notification->url === route('owner.venues.show', $venue);
+            },
+        );
+        Notification::assertNotSentTo($admin, OwnerVenueClaimApprovedNotification::class);
         $audit = $listing->audits()
             ->where('event_type', 'claim_approval_hold_overridden')
             ->sole();
@@ -714,15 +714,18 @@ class UnclaimedVenueDirectoryTest extends TestCase
 
     public function test_claimed_venue_needs_a_separate_marketplace_review_and_can_be_revoked(): void
     {
+        Notification::fake();
         $sport = Sport::factory()->create(['name' => 'Pickleball', 'slug' => 'pickleball']);
         $listing = $this->publishedListing($sport, [
             'name' => 'Claim Review Courts',
             'city' => 'Davao City',
             'city_slug' => 'davao-city',
         ]);
-        $invitationToken = $this->claimInvitationToken($listing);
-        [$owner, $organization] = $this->ownerWithOrganization();
         $admin = User::factory()->platformAdmin()->create();
+        $secondAdmin = User::factory()->platformAdmin()->create();
+        $ordinaryUser = User::factory()->create();
+        $invitationToken = $this->claimInvitationToken($listing, $admin);
+        [$owner, $organization] = $this->ownerWithOrganization();
 
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
@@ -735,7 +738,43 @@ class UnclaimedVenueDirectoryTest extends TestCase
 
         $venue = Venue::query()->sole();
         CourtResource::factory()->for($venue)->for($sport)->create();
-        $venue->update(['is_published' => true]);
+        $venuePayload = $this->venueUpdatePayload($venue, $sport, true);
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->put(route('owner.venues.update', $venue), $venuePayload)
+            ->assertRedirect(route('owner.venues.show', $venue))
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', fn (string $message): bool => str_contains($message, 'FinACourt was notified'));
+
+        $venue->refresh();
+        $this->assertTrue($venue->is_published);
+        $this->assertNotNull($venue->marketplace_review_requested_at);
+
+        foreach ([$admin, $secondAdmin] as $recipient) {
+            Notification::assertSentToTimes($recipient, PlatformClaimedVenueReviewRequestedNotification::class, 1);
+            Notification::assertSentTo(
+                $recipient,
+                function (PlatformClaimedVenueReviewRequestedNotification $notification) use ($venue, $listing, $organization, $owner, $recipient): bool {
+                    return in_array('mail', $notification->via($recipient), true)
+                        && $notification->venueId === $venue->getKey()
+                        && $notification->venueName === $venue->name
+                        && $notification->organizationName === $organization->name
+                        && $notification->requesterName === $owner->name
+                        && $notification->requesterEmail === $owner->email
+                        && $notification->url === route('platform.directory.edit', $listing);
+                },
+            );
+        }
+        Notification::assertNotSentTo($ordinaryUser, PlatformClaimedVenueReviewRequestedNotification::class);
+        Notification::assertNotSentTo($owner, PlatformClaimedVenueReviewRequestedNotification::class);
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->put(route('owner.venues.update', $venue), $venuePayload)
+            ->assertRedirect(route('owner.venues.show', $venue));
+        Notification::assertSentToTimes($admin, PlatformClaimedVenueReviewRequestedNotification::class, 1);
+        Notification::assertSentToTimes($secondAdmin, PlatformClaimedVenueReviewRequestedNotification::class, 1);
 
         $this->get(route('marketplace.courts.index'))
             ->assertOk()
@@ -746,6 +785,27 @@ class UnclaimedVenueDirectoryTest extends TestCase
             ->post(route('platform.directory.claimed-venue.verify', $listing), [
                 'verification_notes' => 'The venue setup, active court, public details, and ownership audit were checked before launch.',
             ])->assertRedirect();
+
+        $venue->refresh();
+        $this->assertNotNull($venue->verified_at);
+        Notification::assertSentToTimes($owner, OwnerVenuePublishedNotification::class, 1);
+        Notification::assertSentTo(
+            $owner,
+            function (OwnerVenuePublishedNotification $notification) use ($venue, $organization, $owner): bool {
+                return in_array('mail', $notification->via($owner), true)
+                    && $notification->venueId === $venue->getKey()
+                    && $notification->venueName === $venue->name
+                    && $notification->organizationName === $organization->name
+                    && $notification->url === route('marketplace.venues.show', $venue->slug);
+            },
+        );
+        Notification::assertNotSentTo($admin, OwnerVenuePublishedNotification::class);
+
+        $this->actingAs($admin)
+            ->post(route('platform.directory.claimed-venue.verify', $listing), [
+                'verification_notes' => 'A duplicate final approval must not send another owner notification.',
+            ])->assertSessionHasErrors('listing');
+        Notification::assertSentToTimes($owner, OwnerVenuePublishedNotification::class, 1);
 
         $this->get(route('marketplace.courts.index'))
             ->assertOk()
@@ -760,6 +820,7 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $venue->refresh();
         $this->assertFalse($venue->is_published);
         $this->assertNull($venue->verified_at);
+        $this->assertNull($venue->marketplace_review_requested_at);
         $this->get(route('marketplace.courts.index'))->assertDontSee($venue->name);
         $this->assertDatabaseHas('venue_directory_audits', [
             'venue_directory_listing_id' => $listing->getKey(),
@@ -905,6 +966,27 @@ class UnclaimedVenueDirectoryTest extends TestCase
             ->assertRedirect();
 
         $this->travel(((int) config('directory.claim_approval_hold_hours')) + 1)->hours();
+    }
+
+    /** @return array<string, mixed> */
+    private function venueUpdatePayload(Venue $venue, Sport $sport, bool $isPublished): array
+    {
+        return [
+            'name' => $venue->name,
+            'slug' => $venue->slug,
+            'description' => $venue->description,
+            'address' => $venue->address,
+            'city' => $venue->city,
+            'province' => $venue->province,
+            'latitude' => $venue->latitude,
+            'longitude' => $venue->longitude,
+            'phone' => $venue->phone,
+            'email' => $venue->email,
+            'website' => $venue->website,
+            'is_published' => $isPublished,
+            'sports' => [$sport->getKey()],
+            'amenities' => [],
+        ];
     }
 
     /** @return array<string, mixed> */

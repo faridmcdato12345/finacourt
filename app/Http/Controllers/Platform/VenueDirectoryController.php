@@ -169,6 +169,7 @@ class VenueDirectoryController extends Controller
                     'organization' => $directoryListing->claimedVenue->organization?->name,
                     'is_published' => $directoryListing->claimedVenue->is_published,
                     'is_marketplace_verified' => $directoryListing->claimedVenue->verified_at !== null,
+                    'marketplace_review_requested_at' => $directoryListing->claimedVenue->marketplace_review_requested_at?->format('M j, Y H:i'),
                     'verified_at' => $directoryListing->claimedVenue->verified_at?->format('M j, Y H:i'),
                     'active_resources_count' => $directoryListing->claimedVenue->active_resources_count,
                 ] : null,

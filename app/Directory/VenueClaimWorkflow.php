@@ -24,6 +24,7 @@ class VenueClaimWorkflow
         private readonly VenueDirectoryAudit $audit,
         private readonly VenueSlug $venueSlug,
         private readonly OwnerClaimWorkspaceAccess $workspaceAccess,
+        private readonly VenueClaimNotifier $notifier,
     ) {}
 
     /** @param array{relationship_to_venue: string, verification_contact: string, evidence_details: string} $data */
@@ -40,7 +41,7 @@ class VenueClaimWorkflow
             abort(403, 'Only the account owner can request to add this venue.');
         }
 
-        return DB::transaction(function () use ($invitationToken, $requester, $organization, $data): VenueClaimRequest {
+        $claim = DB::transaction(function () use ($invitationToken, $requester, $organization, $data): VenueClaimRequest {
             $invitation = VenueClaimInvitation::query()
                 ->where('token_hash', VenueClaimInvitation::hashToken($invitationToken))
                 ->lockForUpdate()
@@ -87,6 +88,10 @@ class VenueClaimWorkflow
 
             return $claim;
         });
+
+        $this->notifier->submittedForIndependentReview($claim);
+
+        return $claim;
     }
 
     public function approve(
@@ -98,7 +103,7 @@ class VenueClaimWorkflow
     ): Venue {
         abort_unless($administrator->is_platform_admin, 403);
 
-        return DB::transaction(function () use (
+        $venue = DB::transaction(function () use (
             $claim,
             $administrator,
             $reviewNotes,
@@ -230,6 +235,10 @@ class VenueClaimWorkflow
 
             return $venue;
         });
+
+        $this->notifier->approved($claim, $venue);
+
+        return $venue;
     }
 
     public function reject(VenueClaimRequest $claim, User $administrator, string $reviewNotes): void
@@ -260,7 +269,7 @@ class VenueClaimWorkflow
     ): Venue {
         abort_unless($administrator->is_platform_admin, 403);
 
-        return DB::transaction(function () use ($listing, $administrator, $notes): Venue {
+        $venue = DB::transaction(function () use ($listing, $administrator, $notes): Venue {
             $locked = VenueDirectoryListing::query()->lockForUpdate()->findOrFail($listing->getKey());
 
             if ($locked->status !== DirectoryListingStatus::Claimed || $locked->claimed_venue_id === null) {
@@ -283,6 +292,12 @@ class VenueClaimWorkflow
 
             $venue = Venue::query()->lockForUpdate()->findOrFail($locked->claimed_venue_id);
 
+            if ($venue->verified_at !== null) {
+                throw ValidationException::withMessages([
+                    'listing' => 'This claimed venue has already completed its final marketplace check.',
+                ]);
+            }
+
             if (! $venue->is_published || ! $venue->resources()->marketplace()->exists()) {
                 throw ValidationException::withMessages([
                     'listing' => 'Finish the venue details, add a court players can book, and choose “Show this venue to players” before asking FinACourt to check it.',
@@ -297,6 +312,10 @@ class VenueClaimWorkflow
 
             return $venue;
         });
+
+        $this->notifier->marketplaceApproved($venue);
+
+        return $venue;
     }
 
     public function revokeClaimedVenueMarketplaceAccess(
@@ -314,7 +333,11 @@ class VenueClaimWorkflow
             }
 
             $venue = Venue::query()->lockForUpdate()->findOrFail($locked->claimed_venue_id);
-            $venue->update(['verified_at' => null, 'is_published' => false]);
+            $venue->update([
+                'verified_at' => null,
+                'is_published' => false,
+                'marketplace_review_requested_at' => null,
+            ]);
             $this->audit->record($locked, 'claimed_venue_marketplace_access_revoked', $administrator, changes: [
                 'venue_id' => $venue->getKey(),
                 'reason' => Str::limit($reason, 1000),

@@ -11,9 +11,9 @@ enum VenueClaimProofStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::Pending => 'Waiting for check',
-            self::Verified => 'Venue email confirmed',
-            self::Locked => 'Too many code tries',
+            self::Pending => 'Waiting for independent check',
+            self::Verified => 'Ownership check confirmed',
+            self::Locked => 'Manual check required',
         };
     }
 }

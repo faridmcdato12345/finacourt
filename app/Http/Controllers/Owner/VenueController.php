@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Owner;
 
+use App\Directory\VenueClaimNotifier;
 use App\Enums\Weekday;
 use App\Google\BusinessProfile\GoogleBusinessProfilePanel;
 use App\Http\Controllers\Controller;
@@ -184,6 +185,7 @@ class VenueController extends Controller
                 'is_published' => $venue->is_published,
                 'claimed_at' => $venue->claimed_at?->toISOString(),
                 'verified_at' => $venue->verified_at?->toISOString(),
+                'marketplace_review_requested_at' => $venue->marketplace_review_requested_at?->toISOString(),
                 'requires_platform_review' => $requiresPlatformReview,
                 'sports' => $venue->sports->map->only(['id', 'name', 'slug']),
                 'amenities' => $venue->amenities->map->only(['id', 'name', 'slug']),
@@ -259,6 +261,7 @@ class VenueController extends Controller
                 ]),
                 'is_claimed' => $venue->claimed_at !== null,
                 'is_verified' => $venue->verified_at !== null,
+                'marketplace_review_requested_at' => $venue->marketplace_review_requested_at?->toISOString(),
                 'requires_platform_review' => $requiresPlatformReview,
             ],
             'googleBusinessProfile' => $googleBusinessProfile->forVenue($venue),
@@ -269,6 +272,7 @@ class VenueController extends Controller
         UpdateVenueRequest $request,
         Venue $venue,
         ResolveVenueLocation $resolveVenueLocation,
+        VenueClaimNotifier $claimNotifier,
     ): RedirectResponse {
         $data = $request->validated();
         $sportIds = $data['sports'];
@@ -279,14 +283,42 @@ class VenueController extends Controller
         $data['province_slug'] = Str::slug($data['province']);
         $data = $this->withCoordinateVerification($data);
 
-        DB::transaction(function () use ($venue, $data, $sportIds, $amenityIds): void {
-            $venue->update($data);
-            $venue->sports()->sync($sportIds);
-            $venue->amenities()->sync($amenityIds);
+        $marketplaceReviewRequested = false;
+
+        DB::transaction(function () use (
+            $venue,
+            $data,
+            $sportIds,
+            $amenityIds,
+            &$marketplaceReviewRequested,
+        ): void {
+            $lockedVenue = Venue::query()->lockForUpdate()->findOrFail($venue->getKey());
+            $requiresPlatformReview = $lockedVenue->claimedDirectoryListings()->exists();
+
+            if ($requiresPlatformReview && $lockedVenue->verified_at === null) {
+                if (($data['is_published'] ?? false) && $lockedVenue->marketplace_review_requested_at === null) {
+                    $data['marketplace_review_requested_at'] = now('UTC');
+                    $marketplaceReviewRequested = true;
+                } elseif (! ($data['is_published'] ?? false)) {
+                    $data['marketplace_review_requested_at'] = null;
+                }
+            }
+
+            $lockedVenue->update($data);
+            $lockedVenue->sports()->sync($sportIds);
+            $lockedVenue->amenities()->sync($amenityIds);
         });
 
+        $venue->refresh();
+
+        if ($marketplaceReviewRequested) {
+            $claimNotifier->submittedForMarketplaceReview($venue, $request->user());
+        }
+
         return redirect()->route('owner.venues.show', $venue)
-            ->with('status', 'Venue details updated.');
+            ->with('status', $marketplaceReviewRequested
+                ? 'Venue saved. FinACourt was notified that it is ready for the final marketplace check.'
+                : 'Venue details updated.');
     }
 
     public function destroy(Venue $venue): RedirectResponse
