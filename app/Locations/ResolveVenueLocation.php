@@ -25,7 +25,7 @@ class ResolveVenueLocation
             ]);
         }
 
-        if ($city->parent_code !== $parent->code) {
+        if (! $city->isSelectableUnder($parent)) {
             throw ValidationException::withMessages([
                 'psgc_city_municipality_code' => 'The selected city or municipality does not belong to that province or region.',
             ]);

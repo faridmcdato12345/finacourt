@@ -2,13 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Enums\AnalyticsEventType;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
+use App\Models\AnalyticsEvent;
 use App\Models\Booking;
 use App\Models\CourtResource;
 use App\Models\OperatingHour;
 use App\Models\Organization;
 use App\Models\Promotion;
+use App\Models\PsgcLocation;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
@@ -263,13 +266,13 @@ class PublicMarketplaceTest extends TestCase
 
         $this->get(route('marketplace.courts.city', 'makati'))
             ->assertOk()
-            ->assertSee('Sports courts in Makati')
+            ->assertSee('Sports Courts in Makati')
             ->assertSee($makatiVenue->name)
             ->assertDontSee($cebuVenue->name);
 
         $this->get(route('marketplace.courts.sport-city', [$badminton->slug, 'makati']))
             ->assertOk()
-            ->assertSee('Badminton courts in Makati')
+            ->assertSee('Badminton Courts in Makati')
             ->assertSee($makatiVenue->name)
             ->assertDontSee($cebuVenue->name);
 
@@ -277,6 +280,84 @@ class PublicMarketplaceTest extends TestCase
             ->assertNotFound();
         $this->get(route('marketplace.courts.city', 'inventory-free-city'))
             ->assertNotFound();
+    }
+
+    public function test_public_city_names_are_human_friendly_without_changing_canonical_location_data(): void
+    {
+        PsgcLocation::query()->create([
+            'code' => '1903617000',
+            'parent_code' => null,
+            'name' => 'City of Marawi',
+            'level' => 'city',
+            'type' => 'component_city',
+            'source_version' => 'test',
+        ]);
+        [$venue, , $sport] = $this->publicVenue([
+            'name' => 'Marawi Pickleball Center',
+            'slug' => 'marawi-pickleball-center',
+            'city' => 'City of Marawi',
+            'city_slug' => 'city-of-marawi',
+            'province' => 'Lanao del Sur',
+            'province_slug' => 'lanao-del-sur',
+            'psgc_city_municipality_code' => '1903617000',
+        ], [], [
+            'name' => 'Pickleball',
+            'slug' => 'pickleball',
+        ]);
+        $cityUrl = route('marketplace.courts.city', 'city-of-marawi');
+        $sportCityUrl = route('marketplace.courts.sport-city', [$sport->slug, 'city-of-marawi']);
+
+        $this->get($cityUrl)
+            ->assertOk()
+            ->assertSee('<title>Sports Courts in Marawi City | Find &amp; Book Courts | FinACourt</title>', false)
+            ->assertSee('<h1 class="mt-3 max-w-5xl text-4xl font-semibold tracking-[-0.035em] text-slate-950 sm:text-5xl">Sports Courts in Marawi City</h1>', false)
+            ->assertSee('<meta name="description" content="Find sports courts in Marawi City. Compare venues, prices, court settings, and availability, then book online with FinACourt.">', false)
+            ->assertSee('<link rel="canonical" href="'.$cityUrl.'">', false)
+            ->assertSee('Marawi City, Lanao del Sur')
+            ->assertSee('value="city-of-marawi"', false)
+            ->assertSee('Marawi City')
+            ->assertDontSee('/courts/marawi-city', false);
+
+        $this->get(route('marketplace.courts.index', ['city' => 'city-of-marawi']))
+            ->assertOk()
+            ->assertSee($venue->name)
+            ->assertSee('value="city-of-marawi" selected', false)
+            ->assertSee('Marawi City')
+            ->assertDontSee('/courts/marawi-city', false);
+
+        $this->get($sportCityUrl)
+            ->assertOk()
+            ->assertSee('<title>Pickleball Courts in Marawi City | Find &amp; Book | FinACourt</title>', false)
+            ->assertSee('Pickleball Courts in Marawi City')
+            ->assertSee('Looking for a pickleball court in Marawi City?')
+            ->assertSee('<link rel="canonical" href="'.$sportCityUrl.'">', false);
+
+        $this->get(route('marketplace.venues.show', $venue->slug))
+            ->assertOk()
+            ->assertSee('Marawi City, Lanao del Sur')
+            ->assertSee('"addressLocality":"City of Marawi"', false)
+            ->assertSee('"name":"Marawi City"', false);
+
+        $this->get(route('marketplace.sitemap'))
+            ->assertOk()
+            ->assertSee($cityUrl, false)
+            ->assertSee($sportCityUrl, false)
+            ->assertDontSee('/courts/marawi-city', false)
+            ->assertDontSee('/pickleball/marawi-city', false);
+
+        $venue->refresh();
+        $this->assertSame('City of Marawi', $venue->city);
+        $this->assertSame('city-of-marawi', $venue->city_slug);
+        $this->assertSame('1903617000', $venue->psgc_city_municipality_code);
+
+        $search = AnalyticsEvent::query()
+            ->where('event_type', AnalyticsEventType::MarketplaceSearch)
+            ->latest('id')
+            ->firstOrFail();
+        $this->assertSame('city-of-marawi', $search->demand_city_slug);
+
+        $this->get(route('marketplace.courts.city', 'marawi-city'))->assertNotFound();
+        $this->get(route('marketplace.courts.sport-city', [$sport->slug, 'marawi-city']))->assertNotFound();
     }
 
     public function test_discovery_filters_and_filtered_pages_are_not_indexed(): void

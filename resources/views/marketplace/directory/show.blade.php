@@ -19,7 +19,7 @@
                         <span class="text-xs text-slate-400">This page uses public information and does not mean the venue is a FinACourt partner.</span>
                     </div>
                     <h1 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">{{ $listing->name }}</h1>
-                    <p class="mt-3 text-base leading-7 text-slate-600">{{ $listing->address }}, {{ $listing->city }}, {{ $listing->province }}, {{ $listing->country }}</p>
+                    <p class="mt-3 text-base leading-7 text-slate-600">{{ $listing->address }}, {{ $listing->publicCityName() }}, {{ $listing->province }}, {{ $listing->country }}</p>
                     @if ($listing->description)<p class="mt-6 whitespace-pre-line text-sm leading-7 text-slate-600">{{ $listing->description }}</p>@endif
                     <div class="mt-6 flex flex-wrap gap-2">@foreach ($listing->sports as $sport)<span class="rounded-full bg-court-50 px-3 py-1.5 text-sm font-medium text-court-800">{{ $sport->name }}</span>@endforeach</div>
 

@@ -11,6 +11,7 @@ use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class CourtResourceManagementTest extends TestCase
@@ -47,6 +48,31 @@ class CourtResourceManagementTest extends TestCase
         $this->assertSame('725.50', $resource->base_hourly_rate);
         $this->assertFalse($resource->is_active);
         $this->assertSame(30, $resource->booking_increment_minutes);
+    }
+
+    public function test_onboarding_court_creation_returns_to_the_publication_step(): void
+    {
+        [$owner, $venue, $sport] = $this->ownerVenueAndSport();
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $venue->organization_id])
+            ->get(route('owner.venues.resources.create', ['venue' => $venue, 'onboarding' => 1]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Resources/Create')
+                ->where('returnToOnboarding', true));
+
+        $this->post(route('owner.venues.resources.store', $venue), [
+            ...$this->resourceData($sport),
+            'onboarding' => true,
+        ])->assertRedirect(route('owner.onboarding.venue'));
+
+        $this->get(route('owner.onboarding.venue'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/VenueOnboarding/Show')
+                ->where('onboarding.stage', 'request_publication')
+                ->where('onboarding.venue.resources_count', 1));
     }
 
     public function test_tenant_cannot_manage_another_tenants_resources(): void

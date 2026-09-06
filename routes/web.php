@@ -1,6 +1,7 @@
 <?php
 
 use App\Auth\OwnerClaimInvitationContext;
+use App\Enums\MembershipRole;
 use App\Http\Controllers\AccountPasswordResetController;
 use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -41,6 +42,7 @@ use App\Http\Controllers\Owner\ReactivationCampaignController;
 use App\Http\Controllers\Owner\SettlementController as OwnerSettlementController;
 use App\Http\Controllers\Owner\VenueClaimController;
 use App\Http\Controllers\Owner\VenueController;
+use App\Http\Controllers\Owner\VenueOnboardingController;
 use App\Http\Controllers\Owner\VenuePhotoController;
 use App\Http\Controllers\Owner\VenuePlaceController;
 use App\Http\Controllers\Owner\VisibilityController as OwnerVisibilityController;
@@ -61,6 +63,7 @@ use App\Http\Controllers\Platform\PaymentSettingsController as PlatformPaymentSe
 use App\Http\Controllers\Platform\SalesController as PlatformSalesController;
 use App\Http\Controllers\Platform\SalesLeadController as PlatformSalesLeadController;
 use App\Http\Controllers\Platform\SalesPartnerController as PlatformSalesPartnerController;
+use App\Http\Controllers\Platform\VenueApplicationController as PlatformVenueApplicationController;
 use App\Http\Controllers\Platform\VenueDirectoryController as PlatformVenueDirectoryController;
 use App\Http\Controllers\Platform\VenueReviewController as PlatformVenueReviewController;
 use App\Http\Controllers\Player\Auth\AuthenticatedSessionController as PlayerAuthenticatedSessionController;
@@ -191,9 +194,20 @@ Route::middleware('auth')->group(function () {
         $request->fulfill();
 
         $user = $request->user();
+        $ownerMembership = $user->memberships()->with('organization')->oldest('id')->first();
+
+        if ($ownerMembership !== null) {
+            $request->session()->put('tenant.organization_id', $ownerMembership->organization_id);
+        }
+
         $destination = $user->is_platform_admin
             ? route('platform.dashboard')
-            : ($user->memberships()->exists() ? route('owner.dashboard') : route('player.bookings.index'));
+            : ($ownerMembership !== null
+                ? ($ownerMembership->role === MembershipRole::Owner
+                    && ! $ownerMembership->organization->venues()->exists()
+                        ? route('owner.onboarding.venue')
+                        : route('owner.dashboard'))
+                : route('player.bookings.index'));
 
         return redirect()->intended($destination)
             ->with('status', 'Your account email is verified.');
@@ -248,6 +262,7 @@ Route::post('/venues/{venueSlug}/holds', [PlayerBookingController::class, 'store
     ->name('player.bookings.store');
 
 Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'owner.claim-workspace', 'throttle:authenticated'])->group(function () {
+    Route::get('/onboarding/venue', VenueOnboardingController::class)->name('onboarding.venue');
     Route::get('/account', [AccountSettingsController::class, 'ownerEdit'])->name('account.edit');
     Route::patch('/account/profile', [AccountSettingsController::class, 'updateProfile'])
         ->middleware('throttle:6,1')
@@ -383,6 +398,14 @@ Route::prefix('platform')->name('platform.')->middleware(['auth', 'platform.admi
     Route::get('/reviews', [PlatformVenueReviewController::class, 'index'])->name('reviews.index');
     Route::patch('/reviews/{review}', [PlatformVenueReviewController::class, 'update'])
         ->name('reviews.update');
+    Route::get('/venue-applications', [PlatformVenueApplicationController::class, 'index'])
+        ->name('venue-applications.index');
+    Route::post('/venue-applications/{application}/approve', [PlatformVenueApplicationController::class, 'approve'])
+        ->name('venue-applications.approve');
+    Route::post('/venue-applications/{application}/reject', [PlatformVenueApplicationController::class, 'reject'])
+        ->name('venue-applications.reject');
+    Route::post('/venue-applications/{application}/verify-marketplace', [PlatformVenueApplicationController::class, 'verifyMarketplace'])
+        ->name('venue-applications.verify-marketplace');
     Route::get('/location-options/cities', PsgcLocationController::class)
         ->name('location-options.cities');
     Route::get('/directory', [PlatformVenueDirectoryController::class, 'index'])->name('directory.index');

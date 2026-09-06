@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Locations\HasPublicLocationPresentation;
 use Database\Factories\VenueFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -40,7 +41,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class Venue extends Model
 {
     /** @use HasFactory<VenueFactory> */
-    use HasFactory;
+    use HasFactory, HasPublicLocationPresentation;
 
     /** @param Builder<Venue> $query */
     public function scopeMarketplace(Builder $query): void
@@ -52,8 +53,10 @@ class Venue extends Model
             // owner configures inventory. Platform verification is a separate
             // gate that owners cannot set through venue forms.
             ->where(function (Builder $query): void {
-                $query->whereDoesntHave('claimedDirectoryListings')
-                    ->orWhereNotNull('verified_at');
+                $query->where(function (Builder $query): void {
+                    $query->whereDoesntHave('claimedDirectoryListings')
+                        ->whereDoesntHave('application');
+                })->orWhereNotNull('verified_at');
             })
             ->whereHas('resources', fn (Builder $query) => $query->marketplace());
     }
@@ -154,6 +157,34 @@ class Venue extends Model
     public function claimedDirectoryListings(): HasMany
     {
         return $this->hasMany(VenueDirectoryListing::class, 'claimed_venue_id');
+    }
+
+    /** @return HasOne<VenueApplication, $this> */
+    public function application(): HasOne
+    {
+        return $this->hasOne(VenueApplication::class);
+    }
+
+    public function requiresPlatformReview(): bool
+    {
+        if (array_key_exists('requires_platform_review', $this->attributes)) {
+            return (bool) $this->getAttribute('requires_platform_review');
+        }
+
+        if ((bool) ($this->attributes['requires_claim_review'] ?? false)
+            || (bool) ($this->attributes['requires_application_review'] ?? false)) {
+            return true;
+        }
+
+        if ($this->relationLoaded('application') && $this->getRelation('application') !== null) {
+            return true;
+        }
+
+        if ($this->relationLoaded('claimedDirectoryListings')) {
+            return $this->getRelation('claimedDirectoryListings')->isNotEmpty();
+        }
+
+        return $this->application()->exists() || $this->claimedDirectoryListings()->exists();
     }
 
     protected function casts(): array

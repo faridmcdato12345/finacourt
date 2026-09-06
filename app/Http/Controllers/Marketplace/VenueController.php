@@ -115,8 +115,9 @@ class VenueController extends Controller
         }
 
         $canonical = route('marketplace.venues.show', $venue->slug);
+        $cityName = $venue->publicCitySeoName();
         $description = Str::limit(
-            $venue->description ?: "View active courts, sports, amenities, prices, and availability at {$venue->name} in {$venue->city}.",
+            $venue->description ?: "View active courts, sports, amenities, prices, and availability at {$venue->name} in {$cityName}.",
             155,
             '',
         );
@@ -132,7 +133,7 @@ class VenueController extends Controller
             'campaignPromotion' => $campaignPromotion,
             'map' => $maps->forVenue($venue),
             'seo' => [
-                'title' => "{$venue->name} courts in {$venue->city}",
+                'title' => "{$venue->name} courts in {$cityName}",
                 'description' => $description,
                 'canonical' => $canonical,
                 'robots' => $request->query() ? 'noindex,follow' : 'index,follow',
@@ -143,7 +144,7 @@ class VenueController extends Controller
                 $structuredData->breadcrumbs([
                     ['name' => 'Home', 'url' => route('marketplace.home')],
                     ['name' => 'Courts', 'url' => route('marketplace.courts.index')],
-                    ['name' => $venue->city, 'url' => route('marketplace.courts.city', $venue->city_slug)],
+                    ['name' => $cityName, 'url' => route('marketplace.courts.city', $venue->city_slug)],
                     ['name' => $venue->name, 'url' => $canonical],
                 ]),
             ],

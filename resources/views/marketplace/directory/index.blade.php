@@ -12,7 +12,7 @@
                     <select name="city" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800">
                         <option value="">Any city</option>
                         @foreach ($cities as $city)
-                            <option value="{{ $city->city_slug }}" @selected(($filters['city'] ?? null) === $city->city_slug)>{{ $city->city }}, {{ $city->province }}</option>
+                            <option value="{{ $city->city_slug }}" @selected(($filters['city'] ?? null) === $city->city_slug)>{{ $city->publicCityName() }}, {{ $city->province }}</option>
                         @endforeach
                     </select>
                 </label>
@@ -43,7 +43,7 @@
                         <span class="text-xs text-slate-400">Updated {{ $listing->last_verified_at->format('M Y') }}</span>
                     </div>
                     <h3 class="mt-5 text-xl font-semibold tracking-tight"><a class="hover:text-court-700" href="{{ route('marketplace.directory.show', $listing->slug) }}">{{ $listing->name }}</a></h3>
-                    <p class="mt-2 text-sm leading-6 text-slate-500">{{ $listing->address }}, {{ $listing->city }}, {{ $listing->province }}</p>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">{{ $listing->address }}, {{ $listing->publicCityName() }}, {{ $listing->province }}</p>
                     <div class="mt-5 flex flex-wrap gap-2">@foreach ($listing->sports as $sport)<span class="rounded-full bg-court-50 px-3 py-1 text-xs font-medium text-court-800">{{ $sport->name }}</span>@endforeach</div>
                     <div class="mt-auto border-t border-slate-100 pt-5"><a href="{{ route('marketplace.directory.show', $listing->slug) }}" class="inline-flex items-center gap-2 text-sm font-semibold text-court-700">View venue details <span aria-hidden="true">→</span></a><p class="mt-2 text-xs text-slate-400">Contact the venue to check availability</p></div>
                 </article>

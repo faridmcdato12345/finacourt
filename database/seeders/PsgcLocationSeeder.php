@@ -33,7 +33,12 @@ class PsgcLocationSeeder extends Seeder
 
                 foreach (array_chunk($locations, 500) as $chunk) {
                     $rows = array_map(fn (array $location) => [
-                        ...$location,
+                        'code' => $location['code'],
+                        'parent_code' => $location['parent_code'],
+                        'geographic_parent_code' => $location['geographic_parent_code'] ?? null,
+                        'name' => $location['name'],
+                        'level' => $location['level'],
+                        'type' => $location['type'],
                         'source_version' => $catalog['meta']['version'],
                         'created_at' => $now,
                         'updated_at' => $now,
@@ -42,7 +47,7 @@ class PsgcLocationSeeder extends Seeder
                     PsgcLocation::query()->upsert(
                         $rows,
                         ['code'],
-                        ['parent_code', 'name', 'level', 'type', 'source_version', 'updated_at'],
+                        ['parent_code', 'geographic_parent_code', 'name', 'level', 'type', 'source_version', 'updated_at'],
                     );
                 }
             }

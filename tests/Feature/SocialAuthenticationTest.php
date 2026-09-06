@@ -170,9 +170,10 @@ class SocialAuthenticationTest extends TestCase
         $organization = Organization::query()->where('name', 'Olivia Pickleball')->firstOrFail();
         $membership = Membership::query()->whereBelongsTo($user)->firstOrFail();
 
-        $response->assertRedirect(route('owner.dashboard'));
+        $response->assertRedirect(route('owner.onboarding.venue'));
         $this->assertSame(MembershipRole::Owner, $membership->role);
         $this->assertSame($organization->getKey(), $membership->organization_id);
+        $this->assertTrue($organization->requires_venue_claim_approval);
         $this->assertSame($organization->getKey(), session('tenant.organization_id'));
     }
 

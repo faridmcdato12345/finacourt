@@ -18,7 +18,7 @@
             <div class="flex items-center justify-between gap-4">
                 @include('marketplace.partials.breadcrumbs', ['breadcrumbs' => [
                     ['name' => 'Courts', 'url' => route('marketplace.courts.index')],
-                    ['name' => $venue->city, 'url' => route('marketplace.courts.city', $venue->city_slug)],
+                    ['name' => $venue->publicCityName(), 'url' => route('marketplace.courts.city', $venue->city_slug)],
                     ['name' => $venue->name, 'url' => route('marketplace.venues.show', $venue->slug)],
                 ]])
                 <button
@@ -75,7 +75,7 @@
                     </div>
                     <div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-slate-500">
                         @if ($venue->published_reviews_count > 0)<a href="#reviews" class="inline-flex items-center gap-1.5 font-semibold text-slate-700"><span class="text-amber-400">★</span> {{ number_format((float) $venue->published_reviews_avg_rating, 1) }} <span class="font-normal text-slate-400">({{ $venue->published_reviews_count }} {{ Str::plural('review', $venue->published_reviews_count) }})</span></a>@endif
-                        <span class="inline-flex items-center gap-1.5">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-4 text-court-600']) {{ $venue->city }}, {{ $venue->province }}</span>
+                        <span class="inline-flex items-center gap-1.5">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-4 text-court-600']) {{ $venue->publicCityName() }}, {{ $venue->province }}</span>
                         @if ($todayHours && ! $todayHours->is_closed)
                             <span class="inline-flex items-center gap-1.5 text-court-700">@include('marketplace.partials.icon', ['name' => 'clock', 'class' => 'size-4']) Open today {{ substr($todayHours->opens_at, 0, 5) }}–{{ substr($todayHours->closes_at, 0, 5) }}</span>
                         @else
@@ -183,7 +183,7 @@
                         <p class="border-y border-slate-100 px-5 py-2 text-[11px] text-slate-400">Map data © <a href="{{ $map['attribution_url'] }}" rel="noopener" target="_blank" class="font-semibold text-court-700">OpenStreetMap contributors</a></p>
                     @endif
                     <div class="p-5">
-                        <div class="flex items-start gap-3"><span class="grid size-10 shrink-0 place-items-center rounded-xl bg-court-50 text-court-700">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-5'])</span><address class="not-italic text-sm leading-6 text-slate-600">{{ $venue->address }}<br>{{ $venue->city }}, {{ $venue->province }}</address></div>
+                        <div class="flex items-start gap-3"><span class="grid size-10 shrink-0 place-items-center rounded-xl bg-court-50 text-court-700">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-5'])</span><address class="not-italic text-sm leading-6 text-slate-600">{{ $venue->address }}<br>{{ $venue->publicCityName() }}, {{ $venue->province }}</address></div>
                         <div class="mt-5 flex flex-wrap gap-2">
                             @if ($map)<a href="{{ $map['public_url'] }}" rel="nofollow noopener" target="_blank" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:border-court-300 hover:text-court-800">Open map ↗</a>@endif
                             @if ($venue->phone)<a href="tel:{{ preg_replace('/[^+0-9]/', '', $venue->phone) }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">Call venue</a>@endif

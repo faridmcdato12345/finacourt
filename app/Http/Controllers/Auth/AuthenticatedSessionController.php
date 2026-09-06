@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Auth\OwnerClaimInvitationContext;
 use App\Auth\SocialProviderRegistry;
+use App\Enums\MembershipRole;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -55,12 +56,20 @@ class AuthenticatedSessionController extends Controller
             return redirect()->intended(route('partner.dashboard'));
         }
 
-        if ($user->memberships()->exists()) {
+        $membership = $user->memberships()->with('organization')->oldest('id')->first();
+
+        if ($membership !== null) {
             if (! $user->hasVerifiedEmail()) {
                 return redirect()->route('verification.notice');
             }
 
-            return redirect()->intended(route('owner.dashboard'));
+            $request->session()->put('tenant.organization_id', $membership->organization_id);
+            $destination = $membership->role === MembershipRole::Owner
+                && ! $membership->organization->venues()->exists()
+                    ? route('owner.onboarding.venue')
+                    : route('owner.dashboard');
+
+            return redirect()->intended($destination);
         }
 
         return redirect()->intended(route('player.bookings.index'));

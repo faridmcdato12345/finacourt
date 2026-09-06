@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Auth\AuthenticateSocialUser;
 use App\Auth\SocialAuthenticationException;
 use App\Auth\SocialProviderRegistry;
+use App\Enums\MembershipRole;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -120,12 +121,15 @@ class SocialAuthenticationController extends Controller
             return redirect()->route('partner.dashboard');
         }
 
-        $membership = $user->memberships()->oldest('id')->first();
+        $membership = $user->memberships()->with('organization')->oldest('id')->first();
 
         if ($membership !== null) {
             $request->session()->put('tenant.organization_id', $membership->organization_id);
 
-            return redirect()->intended(route('owner.dashboard'));
+            return redirect()->intended($membership->role === MembershipRole::Owner
+                && ! $membership->organization->venues()->exists()
+                    ? route('owner.onboarding.venue')
+                    : route('owner.dashboard'));
         }
 
         $request->session()->put('social_auth.owner_setup_required', true);

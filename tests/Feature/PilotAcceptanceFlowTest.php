@@ -43,7 +43,7 @@ class PilotAcceptanceFlowTest extends TestCase
             now()->addMinutes(10),
             ['id' => $owner->getKey(), 'hash' => sha1($owner->email)],
         );
-        $this->get($verificationUrl)->assertRedirect(route('owner.dashboard'));
+        $this->get($verificationUrl)->assertRedirect(route('owner.onboarding.venue'));
         $owner->refresh();
 
         $sport = Sport::factory()->create(['name' => 'Badminton', 'slug' => 'badminton']);

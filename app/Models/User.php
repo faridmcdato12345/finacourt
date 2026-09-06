@@ -70,6 +70,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(VenueClaimRequest::class, 'requester_user_id');
     }
 
+    /** @return HasMany<VenueApplication, $this> */
+    public function venueApplications(): HasMany
+    {
+        return $this->hasMany(VenueApplication::class, 'submitted_by_user_id');
+    }
+
     /** @return BelongsToMany<Organization, $this> */
     public function organizations(): BelongsToMany
     {

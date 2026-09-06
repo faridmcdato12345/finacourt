@@ -9,7 +9,7 @@
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="default">
         <meta name="apple-mobile-web-app-title" content="FinACourt">
-        <title>{{ $seo['title'] }} · FinACourt</title>
+        <title>{{ $seo['document_title'] ?? $seo['title'].' · FinACourt' }}</title>
         <meta name="description" content="{{ $seo['description'] }}">
         <meta name="robots" content="{{ $seo['robots'] }}">
         <link rel="canonical" href="{{ $seo['canonical'] }}">

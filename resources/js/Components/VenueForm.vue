@@ -15,6 +15,7 @@ const props = defineProps({
     existingState: Object,
     mapTileUrl: String,
     allowPhotoUpload: { type: Boolean, default: false },
+    applicationMode: { type: Boolean, default: false },
 });
 
 defineEmits(['submit']);
@@ -274,7 +275,7 @@ function updateCoordinatesFromMap(coordinates) {
             </div>
         </section>
 
-        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <section v-if="!applicationMode" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <div class="flex items-start gap-4">
                 <input id="is_published" v-model="form.is_published" type="checkbox" class="mt-1 size-5 rounded border-slate-300 text-court-700" />
                 <div>
@@ -288,6 +289,11 @@ function updateCoordinatesFromMap(coordinates) {
                 <span v-if="existingState.is_verified" class="rounded-full bg-court-50 px-3 py-1.5 text-court-800">Final check completed</span>
                 <span v-else-if="existingState.requires_platform_review" class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">{{ existingState.marketplace_review_requested_at ? 'Final check requested' : 'Final check not requested' }}</span>
             </div>
+        </section>
+
+        <section v-else class="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm leading-6 text-amber-950 shadow-sm">
+            <h2 class="font-semibold">This application stays private</h2>
+            <p class="mt-1">Submitting these details starts FinACourt’s independent ownership review. After approval, you can add courts and request a separate final marketplace review.</p>
         </section>
 
         <div class="flex items-center justify-end gap-3">

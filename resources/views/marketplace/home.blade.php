@@ -40,7 +40,7 @@
             <form action="{{ route('marketplace.courts.index') }}" method="get" data-player-card class="app-card relative z-10 mt-10 grid max-w-6xl gap-3 p-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_1fr_0.9fr_0.8fr_auto] lg:gap-0 lg:p-2">
                 <div class="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 hover:border-slate-200 lg:gap-2 lg:rounded-none lg:border-0 lg:border-r lg:border-slate-200 lg:px-3 lg:py-0">
                     <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-court-50 text-court-700 lg:size-7 lg:bg-transparent">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-5 lg:size-4'])</span>
-                    <div class="min-w-0 flex-1"><span class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 lg:text-[9px]">Location</span>@include('marketplace.partials.public-select', ['name' => 'city', 'value' => '', 'options' => [['value' => '', 'label' => 'Any city'], ...$cities->map(fn ($city) => ['value' => $city->city_slug, 'label' => $city->city.', '.$city->province])->all()], 'placeholder' => 'Any city', 'ariaLabel' => 'Location', 'variant' => 'hero-slim', 'fallbackClass' => 'app-select app-select-quiet mt-1 font-semibold lg:h-8 lg:py-0 lg:text-xs'])</div>
+                    <div class="min-w-0 flex-1"><span class="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 lg:text-[9px]">Location</span>@include('marketplace.partials.public-select', ['name' => 'city', 'value' => '', 'options' => [['value' => '', 'label' => 'Any city'], ...$cities->map(fn ($city) => ['value' => $city->city_slug, 'label' => $city->publicCityName().', '.$city->province])->all()], 'placeholder' => 'Any city', 'ariaLabel' => 'Location', 'variant' => 'hero-slim', 'fallbackClass' => 'app-select app-select-quiet mt-1 font-semibold lg:h-8 lg:py-0 lg:text-xs'])</div>
                 </div>
                 <div class="flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 hover:border-slate-200 lg:gap-2 lg:rounded-none lg:border-0 lg:border-r lg:border-slate-200 lg:px-3 lg:py-0">
                     <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-court-50 text-court-700 lg:size-7 lg:bg-transparent">@include('marketplace.partials.icon', ['name' => 'sport', 'class' => 'size-5 lg:size-4'])</span>
@@ -172,7 +172,7 @@
                             </div>
                             <div class="flex flex-1 flex-col p-5">
                                 <h3 class="text-xl font-semibold tracking-tight text-slate-950"><a href="{{ route('marketplace.directory.show', $listing->slug) }}" class="hover:text-court-700">{{ $listing->name }}</a></h3>
-                                <p class="mt-2 flex items-start gap-2 text-sm text-slate-500">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'mt-0.5 size-4 shrink-0 text-court-600']) <span>{{ $listing->city }}, {{ $listing->province }}</span></p>
+                                <p class="mt-2 flex items-start gap-2 text-sm text-slate-500">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'mt-0.5 size-4 shrink-0 text-court-600']) <span>{{ $listing->publicCityName() }}, {{ $listing->province }}</span></p>
                                 <div class="mt-4 flex flex-wrap gap-2">
                                     @foreach ($listing->sports as $sport)
                                         <span class="rounded-full bg-court-50 px-3 py-1 text-xs font-medium text-court-800">{{ $sport->name }}</span>
@@ -191,6 +191,6 @@
     @endif
 
     @if ($cities->isNotEmpty())
-        <section class="border-t border-slate-200 bg-white"><div class="page-shell py-14"><h2 class="text-2xl font-semibold tracking-tight">Explore courts by city</h2><div class="mt-6 flex flex-wrap gap-3">@foreach ($cities as $city)<a href="{{ route('marketplace.courts.city', $city->city_slug) }}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-court-300 hover:text-court-800">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-4 text-court-600']) {{ $city->city }} <span class="font-normal text-slate-400">{{ $city->province }}</span></a>@endforeach</div></div></section>
+        <section class="border-t border-slate-200 bg-white"><div class="page-shell py-14"><h2 class="text-2xl font-semibold tracking-tight">Explore courts by city</h2><div class="mt-6 flex flex-wrap gap-3">@foreach ($cities as $city)<a href="{{ route('marketplace.courts.city', $city->city_slug) }}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-court-300 hover:text-court-800">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-4 text-court-600']) {{ $city->publicCityName() }} <span class="font-normal text-slate-400">{{ $city->province }}</span></a>@endforeach</div></div></section>
     @endif
 @endsection
