@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\OwnerClaimInvitationContext;
 use App\Auth\SocialProviderRegistry;
 use App\Enums\MembershipRole;
 use App\Http\Controllers\Controller;
@@ -21,15 +22,22 @@ use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
-    public function create(SocialProviderRegistry $providers): Response
-    {
+    public function create(
+        Request $request,
+        SocialProviderRegistry $providers,
+        OwnerClaimInvitationContext $claimInvitation,
+    ): Response {
         return Inertia::render('Auth/Register', [
             'socialProviders' => $providers->available('owner'),
+            'claimInvitation' => $claimInvitation->isPending($request),
         ]);
     }
 
-    public function store(Request $request, PartnerRegistrationAttributor $partnerAttribution): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        PartnerRegistrationAttributor $partnerAttribution,
+        OwnerClaimInvitationContext $claimInvitation,
+    ): RedirectResponse {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users'],
@@ -37,7 +45,9 @@ class RegisteredUserController extends Controller
             'password' => ['required', 'confirmed', Password::defaults()],
         ]);
 
-        [$user, $organization] = DB::transaction(function () use ($validated, $request, $partnerAttribution) {
+        $requiresVenueClaimApproval = $claimInvitation->isPending($request);
+
+        [$user, $organization] = DB::transaction(function () use ($validated, $request, $partnerAttribution, $requiresVenueClaimApproval) {
             $user = User::query()->create([
                 'name' => $validated['name'],
                 'email' => Str::lower($validated['email']),
@@ -47,6 +57,7 @@ class RegisteredUserController extends Controller
             $organization = Organization::query()->create([
                 'name' => $validated['organization_name'],
                 'slug' => $this->uniqueSlug($validated['organization_name']),
+                'requires_venue_claim_approval' => $requiresVenueClaimApproval,
             ]);
 
             Membership::query()->create([

@@ -130,10 +130,6 @@ class AppServiceProvider extends ServiceProvider
             ->by($request->ip()));
         RateLimiter::for('directory-claim', fn (Request $request) => Limit::perHour(3)
             ->by(($request->user()?->getKey() ?? 'guest').'|'.$request->ip()));
-        RateLimiter::for('directory-claim-proof', fn (Request $request) => [
-            Limit::perMinute(5)->by(($request->user()?->getKey() ?? 'guest').'|'.$request->ip()),
-            Limit::perDay(20)->by(($request->user()?->getKey() ?? 'guest').'|'.$request->ip()),
-        ]);
         RateLimiter::for('health', fn (Request $request) => Limit::perMinute(60)
             ->by($request->ip()));
         RateLimiter::for('authenticated', fn (Request $request) => Limit::perMinute(240)

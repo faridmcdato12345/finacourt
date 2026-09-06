@@ -7,6 +7,7 @@ const props = defineProps({
     email: { type: String, required: true },
     accountSettingsUrl: { type: String, required: true },
     isOwnerVerification: { type: Boolean, default: false },
+    claimInvitation: { type: Boolean, default: false },
     routes: {
         type: Object,
         required: true,
@@ -47,6 +48,10 @@ function signOut() {
 
             <div v-if="verificationSent" role="status" class="mt-6 rounded-xl border border-court-200 bg-court-50 p-4 text-sm text-court-900">
                 A fresh verification email is on its way. It may take a few minutes to arrive.
+            </div>
+
+            <div v-if="claimInvitation" class="mt-6 rounded-xl border border-court-200 bg-court-50 p-4 text-sm leading-6 text-court-900">
+                Your private venue invitation is waiting. After you verify this email, FinACourt will return you there automatically.
             </div>
 
             <form class="mt-7" @submit.prevent="resendVerification">

@@ -3,6 +3,7 @@
 use App\Http\Controllers\ReadinessController;
 use App\Http\Middleware\ApplyResponseCachePolicy;
 use App\Http\Middleware\ApplySecurityHeaders;
+use App\Http\Middleware\EnsureOwnerClaimWorkspaceAccess;
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsureSalesPartner;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -69,6 +70,7 @@ return Application::configure(basePath: dirname(__DIR__))
             : route('login'));
         $middleware->alias([
             'platform.admin' => EnsurePlatformAdmin::class,
+            'owner.claim-workspace' => EnsureOwnerClaimWorkspaceAccess::class,
             'sales.partner' => EnsureSalesPartner::class,
             'tenant' => ResolveTenant::class,
         ]);

@@ -24,7 +24,9 @@ class AuthenticationTest extends TestCase
         $this->get('/register')
             ->assertOk()
             ->assertSee('<script data-page="app" type="application/json">', false)
-            ->assertSee('"component":"Auth\\/Register"', false);
+            ->assertSee('"component":"Auth\\/Register"', false)
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('claimInvitation', false));
     }
 
     public function test_public_header_gives_players_and_court_owners_clear_login_paths(): void

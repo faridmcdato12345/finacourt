@@ -279,13 +279,14 @@ function updateCoordinatesFromMap(coordinates) {
                 <input id="is_published" v-model="form.is_published" type="checkbox" class="mt-1 size-5 rounded border-slate-300 text-court-700" />
                 <div>
                     <label for="is_published" class="font-semibold text-slate-950">Show this venue to players</label>
-                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ existingState?.requires_platform_review && !existingState?.is_verified ? 'This tells FinACourt that the venue is ready to be shown. Because it was claimed from the public guide, FinACourt must check it before players can find or book it.' : 'Players can find this venue after it has at least one sport and one court they can book.' }}</p>
+                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ existingState?.requires_platform_review && !existingState?.is_verified ? 'Select this and save to ask FinACourt for the final marketplace check. We will email you when players can find and book the venue.' : 'Players can find this venue after it has at least one sport and one court they can book.' }}</p>
                     <FormError :message="form.errors.is_published" />
                 </div>
             </div>
             <div v-if="existingState" class="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-5 text-xs font-semibold">
                 <span class="rounded-full bg-court-50 px-3 py-1.5 text-court-800">{{ existingState.is_claimed ? 'Claimed from the public guide' : 'Created in your account' }}</span>
-                <span class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">{{ existingState.is_verified ? 'Checked by FinACourt' : 'Waiting for FinACourt check' }}</span>
+                <span v-if="existingState.is_verified" class="rounded-full bg-court-50 px-3 py-1.5 text-court-800">Final check completed</span>
+                <span v-else-if="existingState.requires_platform_review" class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">{{ existingState.marketplace_review_requested_at ? 'Final check requested' : 'Final check not requested' }}</span>
             </div>
         </section>
 

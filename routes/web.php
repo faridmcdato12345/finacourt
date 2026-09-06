@@ -1,5 +1,6 @@
 <?php
 
+use App\Auth\OwnerClaimInvitationContext;
 use App\Http\Controllers\AccountPasswordResetController;
 use App\Http\Controllers\AccountSettingsController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -169,7 +170,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/owner/social/setup', [SocialOwnerSetupController::class, 'store'])
         ->middleware(['verified', 'throttle:6,1'])
         ->name('owner.social-setup.store');
-    Route::get('/email/verify', function (Request $request) {
+    Route::get('/email/verify', function (Request $request, OwnerClaimInvitationContext $claimInvitation) {
         $isOwner = $request->user()->memberships()->exists();
         $accountRoute = $isOwner
             ? 'owner.account.edit'
@@ -179,6 +180,7 @@ Route::middleware('auth')->group(function () {
             'email' => $request->user()->email,
             'accountSettingsUrl' => route($accountRoute, [], false),
             'isOwnerVerification' => $isOwner,
+            'claimInvitation' => $claimInvitation->isPending($request),
             'routes' => [
                 'resend' => route('verification.send', [], false),
                 'logout' => route('logout', [], false),
@@ -245,7 +247,7 @@ Route::post('/venues/{venueSlug}/holds', [PlayerBookingController::class, 'store
     ->middleware(['auth', 'throttle:player-booking'])
     ->name('player.bookings.store');
 
-Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:authenticated'])->group(function () {
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'owner.claim-workspace', 'throttle:authenticated'])->group(function () {
     Route::get('/account', [AccountSettingsController::class, 'ownerEdit'])->name('account.edit');
     Route::patch('/account/profile', [AccountSettingsController::class, 'updateProfile'])
         ->middleware('throttle:6,1')
@@ -258,7 +260,7 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:
         ->name('account.password-link.store');
 });
 
-Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant', 'throttle:authenticated'])->group(function () {
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant', 'owner.claim-workspace', 'throttle:authenticated'])->group(function () {
     Route::get('/google-business-profile/callback', [GoogleBusinessProfileController::class, 'callback'])
         ->middleware('throttle:google-business-profile')
         ->name('google-business-profile.callback');
@@ -281,12 +283,6 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
         ->where('invitationToken', '[a-f0-9]{64}')
         ->middleware(['verified', 'throttle:directory-claim'])
         ->name('directory-claims.invitations.store');
-    Route::post('/directory-claims/{claim}/proof/email', [VenueClaimController::class, 'resendEmailCode'])
-        ->middleware(['verified', 'throttle:directory-claim'])
-        ->name('directory-claims.proof.email');
-    Route::post('/directory-claims/{claim}/proof/verify', [VenueClaimController::class, 'verifyEmailCode'])
-        ->middleware(['verified', 'throttle:directory-claim-proof'])
-        ->name('directory-claims.proof.verify');
     Route::delete('/directory-claims/{claim}', [VenueClaimController::class, 'cancel'])
         ->name('directory-claims.cancel');
     Route::get('/location-options/cities', PsgcLocationController::class)

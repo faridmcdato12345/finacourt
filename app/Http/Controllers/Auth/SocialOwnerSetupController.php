@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Auth\OwnerClaimInvitationContext;
 use App\Enums\MembershipRole;
 use App\Http\Controllers\Controller;
 use App\Models\Membership;
@@ -16,8 +17,10 @@ use Inertia\Response;
 
 class SocialOwnerSetupController extends Controller
 {
-    public function create(Request $request): Response|RedirectResponse
-    {
+    public function create(
+        Request $request,
+        OwnerClaimInvitationContext $claimInvitation,
+    ): Response|RedirectResponse {
         if ($request->user()->memberships()->exists()) {
             return redirect()->route('owner.dashboard');
         }
@@ -26,18 +29,24 @@ class SocialOwnerSetupController extends Controller
 
         return Inertia::render('Auth/CompleteOwnerSetup', [
             'user' => $request->user()->only(['name', 'email']),
+            'claimInvitation' => $claimInvitation->isPending($request),
         ]);
     }
 
-    public function store(Request $request, PartnerRegistrationAttributor $partnerAttribution): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        PartnerRegistrationAttributor $partnerAttribution,
+        OwnerClaimInvitationContext $claimInvitation,
+    ): RedirectResponse {
         abort_unless((bool) $request->session()->get('social_auth.owner_setup_required', false), 403);
 
         $validated = $request->validate([
             'organization_name' => ['required', 'string', 'max:255'],
         ]);
 
-        $organization = DB::transaction(function () use ($request, $validated, $partnerAttribution): Organization {
+        $requiresVenueClaimApproval = $claimInvitation->isPending($request);
+
+        $organization = DB::transaction(function () use ($request, $validated, $partnerAttribution, $requiresVenueClaimApproval): Organization {
             $user = $request->user()->newQuery()->lockForUpdate()->findOrFail($request->user()->getKey());
             $existing = $user->memberships()->oldest('id')->first();
 
@@ -48,6 +57,7 @@ class SocialOwnerSetupController extends Controller
             $organization = Organization::query()->create([
                 'name' => $validated['organization_name'],
                 'slug' => $this->uniqueSlug($validated['organization_name']),
+                'requires_venue_claim_approval' => $requiresVenueClaimApproval,
             ]);
 
             Membership::query()->create([

@@ -3,7 +3,10 @@ import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import GuestLayout from '../../Layouts/GuestLayout.vue';
 import SocialLoginButtons from '../../Components/SocialLoginButtons.vue';
 
-defineProps({ socialProviders: { type: Array, default: () => [] } });
+defineProps({
+    socialProviders: { type: Array, default: () => [] },
+    claimInvitation: { type: Boolean, default: false },
+});
 
 const form = useForm({ email: '', password: '', remember: false });
 const page = usePage();
@@ -17,6 +20,12 @@ function submit() {
     <Head title="Sign in" />
     <GuestLayout>
         <div class="w-full">
+            <section v-if="claimInvitation" class="mb-7 rounded-2xl border border-court-200 bg-court-50 p-5 text-court-950">
+                <p class="text-xs font-semibold uppercase tracking-[0.16em] text-court-700">Private venue invitation</p>
+                <h1 class="mt-2 text-xl font-semibold">Continue with a court-owner account</h1>
+                <p class="mt-2 text-sm leading-6 text-court-900/80">Sign in below if you already manage courts on FinACourt. If you are not registered yet, create a court-owner account first. We will return you to the private invitation afterward.</p>
+                <Link href="/register" class="mt-4 inline-flex rounded-xl bg-court-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-court-800">Create court-owner account</Link>
+            </section>
             <p class="text-sm font-semibold text-court-700">Welcome back</p>
             <h1 class="mt-2 text-3xl font-semibold tracking-tight text-slate-950">Sign in to your workspace</h1>
             <p class="mt-3 text-slate-600">Use the account associated with your court organization.</p>

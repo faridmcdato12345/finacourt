@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Directory\OwnerClaimWorkspaceAccess;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -46,6 +47,9 @@ class HandleInertiaRequests extends Middleware
                 'manage_inventory' => $user?->can('manageInventory', $context->organization()) ?? false,
                 'manage_bookings' => $user?->can('manageBookings', $context->organization()) ?? false,
             ] : [],
+            'ownerClaimOnboarding' => fn () => $request->routeIs('owner.*') && $context->hasOrganization()
+                ? app(OwnerClaimWorkspaceAccess::class)->status($context->organization())
+                : ['restricted' => false, 'state' => null, 'message' => null],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
             ],

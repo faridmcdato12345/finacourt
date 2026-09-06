@@ -97,6 +97,12 @@ class SaveVenueDirectoryListingRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'source_url.required_without' => 'Add a public source link or a private source note.',
+            'source_reference.required_without' => 'Add a public source link or a private source note.',
+            'source_url.url' => 'Enter the full public source link, including https://.',
+            'website.url' => 'Enter the full public website address, including https://.',
+            'sports.required' => 'Select at least one sport offered at this venue.',
+            'sports.min' => 'Select at least one sport offered at this venue.',
             'rights_confirmed.accepted' => 'Confirm that the listing facts and text are lawful to publish and are not copied from a competitor dataset.',
         ];
     }

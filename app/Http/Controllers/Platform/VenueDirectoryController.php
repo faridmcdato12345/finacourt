@@ -66,6 +66,8 @@ class VenueDirectoryController extends Controller
                     'proof_verified_at' => $claim->proof_verified_at?->format('M j, Y H:i'),
                     'approval_available_at' => $claim->approval_available_at?->format('M j, Y H:i'),
                     'can_approve' => $claim->isApprovalAvailable(),
+                    'can_override_approval' => $claim->hasVerifiedOwnershipProof()
+                        && ! $claim->isApprovalAvailable(),
                     'verification_contact' => $claim->verification_contact,
                     'evidence_details' => $claim->evidence_details,
                     'created_at' => $claim->created_at->format('M j, Y H:i'),
@@ -167,6 +169,7 @@ class VenueDirectoryController extends Controller
                     'organization' => $directoryListing->claimedVenue->organization?->name,
                     'is_published' => $directoryListing->claimedVenue->is_published,
                     'is_marketplace_verified' => $directoryListing->claimedVenue->verified_at !== null,
+                    'marketplace_review_requested_at' => $directoryListing->claimedVenue->marketplace_review_requested_at?->format('M j, Y H:i'),
                     'verified_at' => $directoryListing->claimedVenue->verified_at?->format('M j, Y H:i'),
                     'active_resources_count' => $directoryListing->claimedVenue->active_resources_count,
                 ] : null,
@@ -255,10 +258,37 @@ class VenueDirectoryController extends Controller
 
     public function approveClaim(Request $request, VenueClaimRequest $claim, VenueClaimWorkflow $workflow): RedirectResponse
     {
-        $validated = $request->validate(['review_notes' => ['required', 'string', 'min:10', 'max:2000']]);
-        $venue = $workflow->approve($claim, $request->user(), $validated['review_notes']);
+        $bypassSafetyHold = $request->boolean('bypass_safety_hold');
+        $validated = $request->validate([
+            'review_notes' => ['required', 'string', 'min:10', 'max:2000'],
+            'bypass_safety_hold' => ['sometimes', 'boolean'],
+            'safety_hold_override_reason' => [
+                Rule::requiredIf($bypassSafetyHold),
+                'nullable',
+                'string',
+                'min:20',
+                'max:2000',
+            ],
+            'safety_hold_override_confirmed' => [
+                Rule::excludeIf(! $bypassSafetyHold),
+                Rule::requiredIf($bypassSafetyHold),
+                'accepted',
+            ],
+        ]);
+        $overrodeSafetyHold = $bypassSafetyHold && ! $claim->isApprovalAvailable();
+        $venue = $workflow->approve(
+            $claim,
+            $request->user(),
+            $validated['review_notes'],
+            $bypassSafetyHold,
+            $validated['safety_hold_override_reason'] ?? null,
+        );
 
-        return back()->with('status', "Request approved. {$venue->name} is now a private venue in the owner’s account, ready for setup.");
+        $status = $overrodeSafetyHold
+            ? "Safety hold overridden and request approved. {$venue->name} is now a private venue in the owner’s account."
+            : "Request approved. {$venue->name} is now a private venue in the owner’s account, ready for setup.";
+
+        return back()->with('status', $status);
     }
 
     public function verifyClaimProof(
