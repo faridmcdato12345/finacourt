@@ -23,6 +23,7 @@ class VenueClaimWorkflow
     public function __construct(
         private readonly VenueDirectoryAudit $audit,
         private readonly VenueSlug $venueSlug,
+        private readonly OwnerClaimWorkspaceAccess $workspaceAccess,
     ) {}
 
     /** @param array{relationship_to_venue: string, verification_contact: string, evidence_details: string} $data */
@@ -88,9 +89,22 @@ class VenueClaimWorkflow
         });
     }
 
-    public function approve(VenueClaimRequest $claim, User $administrator, string $reviewNotes): Venue
-    {
-        return DB::transaction(function () use ($claim, $administrator, $reviewNotes): Venue {
+    public function approve(
+        VenueClaimRequest $claim,
+        User $administrator,
+        string $reviewNotes,
+        bool $bypassSafetyHold = false,
+        ?string $safetyHoldOverrideReason = null,
+    ): Venue {
+        abort_unless($administrator->is_platform_admin, 403);
+
+        return DB::transaction(function () use (
+            $claim,
+            $administrator,
+            $reviewNotes,
+            $bypassSafetyHold,
+            $safetyHoldOverrideReason,
+        ): Venue {
             $lockedClaim = VenueClaimRequest::query()->lockForUpdate()->findOrFail($claim->getKey());
             $listing = VenueDirectoryListing::query()->lockForUpdate()->findOrFail(
                 $lockedClaim->venue_directory_listing_id,
@@ -103,9 +117,17 @@ class VenueClaimWorkflow
                 ]);
             }
 
-            if (! $lockedClaim->isApprovalAvailable()) {
+            $safetyHoldIsActive = ! $lockedClaim->isApprovalAvailable();
+
+            if ($safetyHoldIsActive && ! $bypassSafetyHold) {
                 throw ValidationException::withMessages([
-                    'claim' => 'The safety hold has not finished yet. Review any disputes before approving this request.',
+                    'claim' => 'The safety hold has not finished yet. Wait for it to finish or use the administrator override with a recorded reason.',
+                ]);
+            }
+
+            if ($safetyHoldIsActive && mb_strlen(trim((string) $safetyHoldOverrideReason)) < 20) {
+                throw ValidationException::withMessages([
+                    'safety_hold_override_reason' => 'Explain why immediate approval is necessary in at least 20 characters.',
                 ]);
             }
 
@@ -193,7 +215,18 @@ class VenueClaimWorkflow
                 'organization_id' => $venue->organization_id,
                 'venue_id' => $venue->getKey(),
                 'preclaim_profile_events_transferred' => $transferredEvents,
+                'safety_hold_overridden' => $safetyHoldIsActive,
             ]);
+
+            if ($safetyHoldIsActive) {
+                $this->audit->record($listing, 'claim_approval_hold_overridden', $administrator, $lockedClaim, [
+                    'reason' => Str::limit(trim((string) $safetyHoldOverrideReason), 2000),
+                    'scheduled_approval_available_at' => $lockedClaim->approval_available_at?->toISOString(),
+                    'proof_verified_at' => $lockedClaim->proof_verified_at?->toISOString(),
+                    'proof_method' => $lockedClaim->proof_method?->value,
+                ]);
+            }
+            $this->workspaceAccess->complete($membership->organization);
 
             return $venue;
         });

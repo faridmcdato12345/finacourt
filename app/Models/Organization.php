@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
-#[Fillable(['name', 'slug', 'timezone'])]
+#[Fillable(['name', 'slug', 'timezone', 'requires_venue_claim_approval'])]
 class Organization extends Model
 {
     /** @use HasFactory<OrganizationFactory> */
@@ -93,5 +93,12 @@ class Organization extends Model
     public function ownerPayouts(): HasMany
     {
         return $this->hasMany(OwnerPayout::class);
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'requires_venue_claim_approval' => 'boolean',
+        ];
     }
 }

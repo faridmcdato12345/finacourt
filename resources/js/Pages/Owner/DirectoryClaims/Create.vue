@@ -9,7 +9,14 @@ const props = defineProps({
     invitationToken: String,
     invitationExpiresAt: String,
 });
-const form = useForm({ relationship_to_venue: 'owner', verification_contact: '', evidence_details: '' });
+
+const form = useForm({
+    relationship_to_venue: 'owner',
+    verification_contact: '',
+    evidence_details: '',
+    venue_confirmation: false,
+});
+
 const relationships = [
     { value: 'owner', label: 'I own this venue' },
     { value: 'authorized_manager', label: 'I manage this venue' },
@@ -22,19 +29,103 @@ function submit() {
 </script>
 
 <template>
-    <Head :title="`Add ${listing.name}`" />
+    <Head :title="`Confirm and claim ${listing.name}`" />
     <OwnerLayout>
-        <div class="mx-auto max-w-3xl"><Link href="/owner/directory-claims" class="text-sm font-semibold text-court-700">← Your venue requests</Link><div class="mt-5"><p class="eyebrow">Private venue invitation</p><h1 class="mt-2 text-3xl font-semibold tracking-tight">Request access to {{ listing.name }}</h1><p class="mt-3 text-sm leading-6 text-slate-600">FinACourt sent this private link to start a check for <strong>{{ organization.name }}</strong>. The link works once and expires {{ invitationExpiresAt }}. It does not prove ownership by itself, and players cannot book the venue until FinACourt completes the ownership and venue checks.</p></div>
+        <div class="mx-auto max-w-3xl">
+            <Link href="/owner/directory-claims" class="text-sm font-semibold text-court-700">← Your venue requests</Link>
 
-            <div class="app-card mt-7 p-6"><p class="text-sm font-semibold">{{ listing.address }}</p><p class="mt-1 text-sm text-slate-500">{{ listing.city }}, {{ listing.province }}</p><div class="mt-3 flex flex-wrap gap-2"><span v-for="sport in listing.sports" :key="sport" class="rounded-full bg-court-50 px-3 py-1 text-xs font-medium text-court-800">{{ sport }}</span></div></div>
+            <header class="mt-5">
+                <p class="eyebrow">Private venue invitation</p>
+                <h1 class="mt-2 text-3xl font-semibold tracking-tight">Confirm and claim {{ listing.name }}</h1>
+                <p class="mt-3 text-sm leading-6 text-slate-600">
+                    FinACourt pre-created this public directory listing from information it checked before inviting
+                    <strong>{{ organization.name }}</strong>. It is not connected to your owner workspace yet.
+                    Confirm your relationship below so FinACourt can verify ownership safely.
+                </p>
+                <p class="mt-2 text-xs leading-5 text-slate-500">This one-time invitation expires {{ invitationExpiresAt }}.</p>
+            </header>
+
+            <section class="app-card mt-7 overflow-hidden" aria-labelledby="precreated-listing-heading">
+                <div class="border-b border-slate-100 bg-court-50 px-6 py-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-court-700">Pre-created directory listing</p>
+                    <h2 id="precreated-listing-heading" class="mt-1 text-lg font-semibold">Review the venue before confirming</h2>
+                </div>
+                <div class="p-6">
+                    <p class="font-semibold">{{ listing.name }}</p>
+                    <p class="mt-2 text-sm text-slate-600">{{ listing.address }}</p>
+                    <p class="mt-1 text-sm text-slate-500">{{ listing.city }}, {{ listing.province }}</p>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <span v-for="sport in listing.sports" :key="sport" class="rounded-full bg-court-50 px-3 py-1 text-xs font-medium text-court-800">{{ sport }}</span>
+                    </div>
+                    <p class="mt-5 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                        This listing contains public venue facts only. It has no owner access, court inventory, live availability, or booking controls yet.
+                    </p>
+                </div>
+            </section>
+
+            <section class="mt-5 rounded-2xl border border-slate-200 bg-white p-6" aria-labelledby="next-steps-heading">
+                <h2 id="next-steps-heading" class="text-lg font-semibold">What happens next</h2>
+                <ol class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                    <li class="rounded-xl bg-slate-50 p-4">
+                        <span class="flex size-7 items-center justify-center rounded-full bg-court-700 text-xs font-semibold text-white">1</span>
+                        <strong class="mt-3 block">You confirm</strong>
+                        <span class="mt-1 block leading-5 text-slate-500">Review the listing and submit your connection details.</span>
+                    </li>
+                    <li class="rounded-xl bg-slate-50 p-4">
+                        <span class="flex size-7 items-center justify-center rounded-full bg-court-700 text-xs font-semibold text-white">2</span>
+                        <strong class="mt-3 block">FinACourt verifies</strong>
+                        <span class="mt-1 block leading-5 text-slate-500">We use an independent venue contact or a documented manual check.</span>
+                    </li>
+                    <li class="rounded-xl bg-slate-50 p-4">
+                        <span class="flex size-7 items-center justify-center rounded-full bg-court-700 text-xs font-semibold text-white">3</span>
+                        <strong class="mt-3 block">You finish setup</strong>
+                        <span class="mt-1 block leading-5 text-slate-500">After approval, the venue is added privately to your workspace.</span>
+                    </li>
+                </ol>
+            </section>
 
             <form class="app-card mt-5 space-y-5 p-6" @submit.prevent="submit">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-court-700">Ownership confirmation</p>
+                    <h2 class="mt-1 text-xl font-semibold">Tell us how you are connected</h2>
+                    <p class="mt-2 text-sm leading-6 text-slate-500">These details help FinACourt choose a safe verification method. They do not prove ownership by themselves.</p>
+                </div>
+
                 <div v-if="form.errors.listing" class="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{{ form.errors.listing }}</div>
-                <label class="block text-sm font-semibold text-slate-700">How are you connected to this venue?<AppSelect v-model="form.relationship_to_venue" :options="relationships" class="mt-2" /><span v-if="form.errors.relationship_to_venue" class="mt-1 block text-xs text-red-600">{{ form.errors.relationship_to_venue }}</span></label>
-                <label class="block text-sm font-semibold text-slate-700">Your best contact for follow-up<input v-model="form.verification_contact" required maxlength="160" class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal" placeholder="A business email or phone number where FinACourt can reach you"><span v-if="form.errors.verification_contact" class="mt-1 block text-xs text-red-600">{{ form.errors.verification_contact }}</span></label>
-                <label class="block text-sm font-semibold text-slate-700">What can FinACourt check?<textarea v-model="form.evidence_details" required minlength="30" maxlength="3000" rows="7" class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal" placeholder="Tell us what can confirm your connection: business registration, lease, utility bill, official website, venue email, or public phone number. Do not upload or paste private IDs here."></textarea><span v-if="form.errors.evidence_details" class="mt-1 block text-xs text-red-600">{{ form.errors.evidence_details }}</span></label>
-                <div class="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">Your contact and explanation help FinACourt check the request, but they are not proof by themselves. When possible, FinACourt sends a code to a venue email already found from a public source. Otherwise, FinACourt checks an official phone number, venue email, business document, or in-person visit.</div>
-                <button :disabled="form.processing" class="w-full rounded-xl bg-court-700 px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50">Request venue check</button>
+
+                <label class="block text-sm font-semibold text-slate-700">
+                    Your role at this venue
+                    <AppSelect v-model="form.relationship_to_venue" :options="relationships" class="mt-2" />
+                    <span v-if="form.errors.relationship_to_venue" class="mt-1 block text-xs text-red-600">{{ form.errors.relationship_to_venue }}</span>
+                </label>
+
+                <label class="block text-sm font-semibold text-slate-700">
+                    Contact for verification
+                    <input v-model="form.verification_contact" required maxlength="160" class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal" placeholder="A business email or phone number where FinACourt can reach you">
+                    <span v-if="form.errors.verification_contact" class="mt-1 block text-xs text-red-600">{{ form.errors.verification_contact }}</span>
+                </label>
+
+                <label class="block text-sm font-semibold text-slate-700">
+                    How can FinACourt verify your connection?
+                    <textarea v-model="form.evidence_details" required minlength="30" maxlength="3000" rows="6" class="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 font-normal" placeholder="For example: business registration, lease, utility account, official website, public venue email, phone call, or an in-person visit. Do not upload or paste private IDs here."></textarea>
+                    <span v-if="form.errors.evidence_details" class="mt-1 block text-xs text-red-600">{{ form.errors.evidence_details }}</span>
+                </label>
+
+                <div class="rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                    When possible, FinACourt sends a code to a venue email already found from a public source. Otherwise, a platform administrator records an independent phone, document, or in-person check before approval.
+                </div>
+
+                <label class="flex items-start gap-3 rounded-xl border border-slate-200 p-4 text-sm leading-6 text-slate-700">
+                    <input v-model="form.venue_confirmation" required type="checkbox" class="mt-1 size-4 shrink-0 accent-court-700">
+                    <span>
+                        I confirm that this listing is the venue I own, manage, or am authorized to represent. I understand that submitting this form starts a verification review and does not give immediate access.
+                        <span v-if="form.errors.venue_confirmation" class="mt-1 block text-xs text-red-600">{{ form.errors.venue_confirmation }}</span>
+                    </span>
+                </label>
+
+                <button :disabled="form.processing" class="w-full rounded-xl bg-court-700 px-5 py-3.5 text-sm font-semibold text-white disabled:opacity-50">
+                    {{ form.processing ? 'Submitting confirmation…' : 'Submit ownership confirmation' }}
+                </button>
             </form>
         </div>
     </OwnerLayout>

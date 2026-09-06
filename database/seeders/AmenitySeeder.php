@@ -16,6 +16,7 @@ class AmenitySeeder extends Seeder
         ['name' => 'Seating', 'slug' => 'seating'],
         ['name' => 'Showers', 'slug' => 'showers'],
         ['name' => 'Water Station', 'slug' => 'water-station'],
+        ['name' => 'Cafe', 'slug' => 'cafe'],
     ];
 
     public function run(): void

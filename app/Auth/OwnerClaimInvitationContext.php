@@ -9,23 +9,28 @@ class OwnerClaimInvitationContext
 {
     public function isPending(Request $request): bool
     {
+        return $this->pendingInvitation($request) !== null;
+    }
+
+    public function pendingInvitation(Request $request): ?VenueClaimInvitation
+    {
         $intended = $request->session()->get('url.intended');
 
         if (! is_string($intended) || $intended === '') {
-            return false;
+            return null;
         }
 
         $host = parse_url($intended, PHP_URL_HOST);
 
         if (is_string($host) && strcasecmp($host, $request->getHost()) !== 0) {
-            return false;
+            return null;
         }
 
         $path = parse_url($intended, PHP_URL_PATH);
 
         if (! is_string($path)
             || preg_match('{^/owner/venue-invitations/([a-f0-9]{64})$}', $path, $matches) !== 1) {
-            return false;
+            return null;
         }
 
         $invitation = VenueClaimInvitation::query()
@@ -34,6 +39,8 @@ class OwnerClaimInvitationContext
             ->first();
 
         return $invitation?->isUsable() === true
-            && $invitation->listing?->isClaimable() === true;
+            && $invitation->listing?->isClaimable() === true
+                ? $invitation
+                : null;
     }
 }

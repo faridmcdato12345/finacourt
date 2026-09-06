@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Owner;
 
+use App\Directory\OwnerClaimWorkspaceAccess;
 use App\Directory\VenueClaimInvitationService;
 use App\Directory\VenueClaimProofService;
 use App\Directory\VenueClaimWorkflow;
@@ -55,10 +56,12 @@ class VenueClaimController extends Controller
         string $invitationToken,
         TenantContext $context,
         VenueClaimInvitationService $invitations,
+        OwnerClaimWorkspaceAccess $workspaceAccess,
     ): Response {
         $this->authorizeOwner($context);
         $invitation = $invitations->resolveUsable($invitationToken);
         $directoryListing = $invitation->listing;
+        $workspaceAccess->begin($context->organization());
 
         return Inertia::render('Owner/DirectoryClaims/Create', [
             'listing' => [
@@ -78,30 +81,36 @@ class VenueClaimController extends Controller
         VenueClaimInvitationService $invitations,
         VenueClaimWorkflow $workflow,
         VenueClaimProofService $proofs,
+        OwnerClaimWorkspaceAccess $workspaceAccess,
     ): RedirectResponse {
         $membership = $this->authorizeOwner($context);
         $invitation = $invitations->resolveUsable($invitationToken);
         $directoryListing = $invitation->listing;
+        $workspaceAccess->begin($context->organization());
         $claim = $workflow->requestFromInvitation(
             $invitationToken,
             $request->user(),
             $context->organization(),
             $membership,
-            $request->validated(),
+            $request->safe()->only([
+                'relationship_to_venue',
+                'verification_contact',
+                'evidence_details',
+            ]),
         );
 
-        $status = 'Request received. FinACourt must confirm ownership before anything is added to your account.';
+        $status = 'Ownership confirmation submitted. FinACourt must verify your connection before adding the venue to your account.';
 
         if (filter_var($directoryListing->email, FILTER_VALIDATE_EMAIL) !== false) {
             try {
                 $proofs->issuePublicEmailCode($claim, $request->user(), $context->organization());
-                $status = 'Request received. We sent a verification code to the venue email already shown in the public guide.';
+                $status = 'Ownership confirmation submitted. We sent a verification code to the venue email already shown in the public guide.';
             } catch (\Throwable $exception) {
                 Log::warning('Venue claim email challenge delivery failed.', [
                     'claim_id' => $claim->getKey(),
                     'exception' => $exception::class,
                 ]);
-                $status = 'Request received, but the venue email could not be reached. FinACourt must complete an independent manual check.';
+                $status = 'Ownership confirmation submitted, but the venue email could not be reached. FinACourt must complete an independent manual check.';
             }
         }
 

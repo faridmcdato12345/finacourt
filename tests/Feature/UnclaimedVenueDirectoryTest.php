@@ -206,6 +206,8 @@ class UnclaimedVenueDirectoryTest extends TestCase
         ])->assertRedirect(route('verification.notice'));
 
         $this->assertSame($invitationUrl, session('url.intended'));
+        $organization = Organization::query()->where('name', 'Invited Owner Courts')->sole();
+        $this->assertTrue($organization->requires_venue_claim_approval);
         $this->get(route('verification.notice'))
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Auth/VerifyEmail')
@@ -220,6 +222,63 @@ class UnclaimedVenueDirectoryTest extends TestCase
 
         $this->get($verificationUrl)->assertRedirect($invitationUrl);
         $this->assertTrue($owner->fresh()->hasVerifiedEmail());
+
+        $this->get($invitationUrl)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/DirectoryClaims/Create')
+                ->where('ownerClaimOnboarding.restricted', true)
+                ->where('ownerClaimOnboarding.state', 'confirmation_required'));
+        $this->get(route('owner.dashboard'))
+            ->assertRedirect(route('owner.directory-claims.index'));
+        $this->get(route('owner.account.edit'))->assertOk();
+    }
+
+    public function test_claimant_owner_routes_are_server_gated_until_platform_approval(): void
+    {
+        $sport = Sport::factory()->create();
+        $listing = $this->publishedListing($sport);
+        $invitationToken = $this->claimInvitationToken($listing);
+        [$owner, $organization] = $this->ownerWithOrganization();
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('owner.directory-claims.invitations.create', $invitationToken))
+            ->assertOk();
+
+        $this->assertTrue($organization->fresh()->requires_venue_claim_approval);
+
+        $this->get(route('owner.dashboard'))
+            ->assertRedirect(route('owner.directory-claims.index'))
+            ->assertSessionHas('status', fn (string $message): bool => str_contains($message, 'Owner tools unlock after'));
+        $this->get(route('owner.promotions.index'))
+            ->assertRedirect(route('owner.directory-claims.index'));
+        $this->get(route('owner.venues.index'))
+            ->assertRedirect(route('owner.directory-claims.index'));
+
+        $this->get(route('owner.directory-claims.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/DirectoryClaims/Index')
+                ->where('ownerClaimOnboarding.restricted', true));
+        $this->get(route('owner.account.edit'))->assertOk();
+    }
+
+    public function test_existing_owner_with_a_venue_is_not_locked_when_claiming_an_additional_listing(): void
+    {
+        $sport = Sport::factory()->create();
+        $listing = $this->publishedListing($sport);
+        $invitationToken = $this->claimInvitationToken($listing);
+        [$owner, $organization] = $this->ownerWithOrganization();
+        Venue::factory()->for($organization)->create();
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('owner.directory-claims.invitations.create', $invitationToken))
+            ->assertOk();
+
+        $this->assertFalse($organization->fresh()->requires_venue_claim_approval);
+        $this->get(route('owner.dashboard'))->assertOk();
     }
 
     public function test_admin_verification_publication_and_edits_follow_the_audited_state_machine(): void
@@ -382,6 +441,24 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->assertSame(0, VenueClaimRequest::query()->count());
     }
 
+    public function test_invited_owner_must_confirm_the_precreated_venue_before_requesting_ownership(): void
+    {
+        $sport = Sport::factory()->create();
+        $listing = $this->publishedListing($sport);
+        $invitationToken = $this->claimInvitationToken($listing);
+        [$owner, $organization] = $this->ownerWithOrganization();
+        $payload = $this->claimPayload();
+        unset($payload['venue_confirmation']);
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->post(route('owner.directory-claims.invitations.store', $invitationToken), $payload)
+            ->assertSessionHasErrors('venue_confirmation');
+
+        $this->assertDatabaseCount('venue_claim_requests', 0);
+        $this->assertNull(VenueClaimInvitation::query()->sole()->used_at);
+    }
+
     public function test_public_email_challenge_goes_only_to_the_independently_sourced_venue_email(): void
     {
         Notification::fake();
@@ -466,7 +543,7 @@ class UnclaimedVenueDirectoryTest extends TestCase
         ]);
     }
 
-    public function test_platform_cannot_approve_a_claim_without_independent_proof_or_during_the_safety_hold(): void
+    public function test_platform_cannot_approve_a_claim_without_independent_proof_or_during_the_safety_hold_without_an_override(): void
     {
         $sport = Sport::factory()->create();
         $listing = $this->publishedListing($sport);
@@ -504,6 +581,54 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->assertSame(1, Venue::query()->count());
     }
 
+    public function test_platform_admin_can_override_the_safety_hold_with_confirmation_and_an_audited_reason(): void
+    {
+        $sport = Sport::factory()->create();
+        $listing = $this->publishedListing($sport);
+        $invitationToken = $this->claimInvitationToken($listing);
+        [$owner, $organization] = $this->ownerWithOrganization();
+        $admin = User::factory()->platformAdmin()->create();
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload());
+        $claim = VenueClaimRequest::query()->sole();
+
+        $this->actingAs($admin)
+            ->post(route('platform.directory.claims.verify-proof', $claim), [
+                'proof_method' => VenueClaimProofMethod::OfficialPhoneCall->value,
+                'proof_notes' => 'Called the independently sourced public venue number and confirmed control with its manager.',
+            ])
+            ->assertRedirect();
+
+        $overrideReason = 'The venue manager was independently confirmed and needs immediate access for today’s launch.';
+
+        $this->post(route('platform.directory.claims.approve', $claim), [
+            'review_notes' => $overrideReason,
+            'bypass_safety_hold' => true,
+            'safety_hold_override_reason' => $overrideReason,
+        ])->assertSessionHasErrors('safety_hold_override_confirmed');
+        $this->assertDatabaseCount('venues', 0);
+
+        $this->post(route('platform.directory.claims.approve', $claim), [
+            'review_notes' => $overrideReason,
+            'bypass_safety_hold' => true,
+            'safety_hold_override_reason' => $overrideReason,
+            'safety_hold_override_confirmed' => true,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('venues', 1);
+        $this->assertFalse($organization->fresh()->requires_venue_claim_approval);
+        $audit = $listing->audits()
+            ->where('event_type', 'claim_approval_hold_overridden')
+            ->sole();
+        $this->assertSame($admin->getKey(), $audit->actor_user_id);
+        $this->assertSame($claim->getKey(), $audit->venue_claim_request_id);
+        $this->assertSame($overrideReason, $audit->changes['reason']);
+        $this->assertNotNull($audit->changes['scheduled_approval_available_at']);
+        $this->assertNotNull($audit->changes['proof_verified_at']);
+    }
+
     public function test_approved_claim_attaches_an_unpublished_unverified_venue_and_transfers_aggregate_activity(): void
     {
         $this->seedDirectoryLocationHierarchy();
@@ -531,6 +656,10 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $claim = VenueClaimRequest::query()->sole();
         $usersBefore = User::query()->count();
 
+        $this->assertTrue($organization->fresh()->requires_venue_claim_approval);
+        $this->get(route('owner.dashboard'))
+            ->assertRedirect(route('owner.directory-claims.index'));
+
         $this->verifyClaimProofAndFinishSafetyHold($claim, $admin);
 
         $this->actingAs($admin)
@@ -540,6 +669,7 @@ class UnclaimedVenueDirectoryTest extends TestCase
             ->assertRedirect();
 
         $venue = Venue::query()->sole();
+        $this->assertFalse($organization->fresh()->requires_venue_claim_approval);
         $this->assertSame($usersBefore, User::query()->count());
         $this->assertSame($organization->getKey(), $venue->organization_id);
         $this->assertFalse($venue->is_published);
@@ -569,6 +699,11 @@ class UnclaimedVenueDirectoryTest extends TestCase
             ->assertOk()
             ->assertSee('Owner setup in progress')
             ->assertDontSee('Yes, this is my venue');
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('owner.dashboard'))
+            ->assertOk();
 
         [$otherOwner, $otherOrganization] = $this->ownerWithOrganization();
         $this->actingAs($otherOwner)
@@ -809,6 +944,7 @@ class UnclaimedVenueDirectoryTest extends TestCase
             'relationship_to_venue' => 'owner',
             'verification_contact' => 'owner-business@example.com',
             'evidence_details' => 'I own and operate this venue and can provide business registration and utility documents.',
+            'venue_confirmation' => true,
         ];
     }
 }

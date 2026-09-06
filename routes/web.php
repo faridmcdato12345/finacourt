@@ -247,7 +247,7 @@ Route::post('/venues/{venueSlug}/holds', [PlayerBookingController::class, 'store
     ->middleware(['auth', 'throttle:player-booking'])
     ->name('player.bookings.store');
 
-Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:authenticated'])->group(function () {
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'owner.claim-workspace', 'throttle:authenticated'])->group(function () {
     Route::get('/account', [AccountSettingsController::class, 'ownerEdit'])->name('account.edit');
     Route::patch('/account/profile', [AccountSettingsController::class, 'updateProfile'])
         ->middleware('throttle:6,1')
@@ -260,7 +260,7 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'tenant', 'throttle:
         ->name('account.password-link.store');
 });
 
-Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant', 'throttle:authenticated'])->group(function () {
+Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant', 'owner.claim-workspace', 'throttle:authenticated'])->group(function () {
     Route::get('/google-business-profile/callback', [GoogleBusinessProfileController::class, 'callback'])
         ->middleware('throttle:google-business-profile')
         ->name('google-business-profile.callback');

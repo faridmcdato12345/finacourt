@@ -23,6 +23,14 @@ class StoreVenueClaimRequest extends FormRequest
             ])],
             'verification_contact' => ['required', 'string', 'max:160'],
             'evidence_details' => ['required', 'string', 'min:30', 'max:3000'],
+            'venue_confirmation' => ['accepted'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'venue_confirmation.accepted' => 'Confirm that this listing is the venue you own, manage, or are authorized to represent.',
         ];
     }
 }

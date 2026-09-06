@@ -33,15 +33,20 @@ class SocialOwnerSetupController extends Controller
         ]);
     }
 
-    public function store(Request $request, PartnerRegistrationAttributor $partnerAttribution): RedirectResponse
-    {
+    public function store(
+        Request $request,
+        PartnerRegistrationAttributor $partnerAttribution,
+        OwnerClaimInvitationContext $claimInvitation,
+    ): RedirectResponse {
         abort_unless((bool) $request->session()->get('social_auth.owner_setup_required', false), 403);
 
         $validated = $request->validate([
             'organization_name' => ['required', 'string', 'max:255'],
         ]);
 
-        $organization = DB::transaction(function () use ($request, $validated, $partnerAttribution): Organization {
+        $requiresVenueClaimApproval = $claimInvitation->isPending($request);
+
+        $organization = DB::transaction(function () use ($request, $validated, $partnerAttribution, $requiresVenueClaimApproval): Organization {
             $user = $request->user()->newQuery()->lockForUpdate()->findOrFail($request->user()->getKey());
             $existing = $user->memberships()->oldest('id')->first();
 
@@ -52,6 +57,7 @@ class SocialOwnerSetupController extends Controller
             $organization = Organization::query()->create([
                 'name' => $validated['organization_name'],
                 'slug' => $this->uniqueSlug($validated['organization_name']),
+                'requires_venue_claim_approval' => $requiresVenueClaimApproval,
             ]);
 
             Membership::query()->create([

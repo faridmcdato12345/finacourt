@@ -24,7 +24,7 @@ function resendCode(claim) {
     <Head title="Your venue requests" />
     <OwnerLayout>
         <div class="mx-auto max-w-5xl space-y-7">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="eyebrow">Bring your venue to FinACourt</p><h1 class="mt-2 text-3xl font-semibold tracking-tight">Claim a listed venue</h1><p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600">A request does not give instant access. FinACourt checks that you are connected to the venue before adding it to your account.</p></div><a href="/directory" class="rounded-xl bg-court-700 px-4 py-3 text-sm font-semibold text-white">Find my venue</a></div>
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"><div><p class="eyebrow">Bring your venue to FinACourt</p><h1 class="mt-2 text-3xl font-semibold tracking-tight">Your venue ownership requests</h1><p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600">FinACourt checks your connection before adding a pre-created directory venue to your workspace. Approval adds it privately so you can finish setup before publishing.</p></div><a href="/directory" class="rounded-xl bg-court-700 px-4 py-3 text-sm font-semibold text-white">Find my venue</a></div>
 
             <section class="space-y-4">
                 <article v-for="claim in claims" :key="claim.id" class="app-card p-5 sm:p-6">
