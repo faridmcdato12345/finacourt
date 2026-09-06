@@ -23,8 +23,7 @@ class PsgcLocationController extends Controller
 
         return response()->json([
             'data' => PsgcLocation::query()
-                ->where('parent_code', $validated['parent_code'])
-                ->whereIn('level', ['city', 'municipality'])
+                ->selectableUnder($validated['parent_code'])
                 ->orderBy('name')
                 ->get(['code', 'name', 'level', 'type']),
         ]);

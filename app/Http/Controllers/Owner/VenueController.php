@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Owner;
 
 use App\Directory\VenueClaimNotifier;
+use App\Enums\MembershipRole;
+use App\Enums\VenueApplicationStatus;
 use App\Enums\Weekday;
 use App\Google\BusinessProfile\GoogleBusinessProfilePanel;
 use App\Http\Controllers\Controller;
@@ -14,9 +16,13 @@ use App\Models\CourtResource;
 use App\Models\PsgcLocation;
 use App\Models\Sport;
 use App\Models\Venue;
+use App\Models\VenueApplication;
+use App\Onboarding\VenueApplicationNotifier;
+use App\Onboarding\VenueApplicationWorkflow;
 use App\Support\VenueSlug;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -38,7 +44,10 @@ class VenueController extends Controller
                 'sports:id,name',
                 'photos:id,venue_id,storage_path,alt_text,sort_order,is_primary',
             ])
-            ->withExists('claimedDirectoryListings as requires_platform_review')
+            ->withExists([
+                'claimedDirectoryListings as requires_claim_review',
+                'application as requires_application_review',
+            ])
             ->withCount([
                 'resources',
                 'resources as active_resources_count' => fn ($query) => $query->where('is_active', true),
@@ -58,7 +67,8 @@ class VenueController extends Controller
                     'province' => $venue->province,
                     'is_published' => $venue->is_published,
                     'is_verified' => $venue->verified_at !== null,
-                    'requires_platform_review' => (bool) $venue->requires_platform_review,
+                    'requires_platform_review' => (bool) $venue->requires_claim_review
+                        || (bool) $venue->requires_application_review,
                     'sports' => $venue->sports->pluck('name'),
                     'resources_count' => $venue->resources_count,
                     'active_resources_count' => $venue->active_resources_count,
@@ -80,11 +90,14 @@ class VenueController extends Controller
         ]);
     }
 
-    public function create(TenantContext $context): Response
+    public function create(Request $request, TenantContext $context): Response
     {
         Gate::authorize('create', [Venue::class, $context->organization()]);
 
-        return Inertia::render('Owner/Venues/Create', $this->catalogOptions());
+        return Inertia::render('Owner/Venues/Create', [
+            ...$this->catalogOptions(),
+            'returnToOnboarding' => $request->boolean('onboarding'),
+        ]);
     }
 
     public function store(
@@ -92,6 +105,7 @@ class VenueController extends Controller
         TenantContext $context,
         VenueSlug $venueSlug,
         ResolveVenueLocation $resolveVenueLocation,
+        VenueApplicationNotifier $applicationNotifier,
     ): RedirectResponse {
         $data = $request->validated();
         /** @var array<int, UploadedFile> $photos */
@@ -107,11 +121,32 @@ class VenueController extends Controller
         $data['province_slug'] = Str::slug($data['province']);
         $data['claimed_at'] = now();
         $data = $this->withCoordinateVerification($data);
+        $submitAsApplication = $context->membership()?->role === MembershipRole::Owner
+            && ! $context->organization()->venues()->exists()
+            && ($request->boolean('onboarding')
+                || $context->organization()->requires_venue_claim_approval);
+
+        if ($submitAsApplication) {
+            // A self-submitted venue never becomes public before both platform
+            // checks, even if a forged form tries to publish it immediately.
+            $data['is_published'] = false;
+        }
 
         $storedPaths = [];
+        $application = null;
 
         try {
-            $venue = DB::transaction(function () use ($context, $data, $sportIds, $amenityIds, $photos, &$storedPaths) {
+            $venue = DB::transaction(function () use (
+                $context,
+                $request,
+                $data,
+                $sportIds,
+                $amenityIds,
+                $photos,
+                $submitAsApplication,
+                &$storedPaths,
+                &$application,
+            ) {
                 $venue = $context->organization()->venues()->create($data);
                 $venue->sports()->sync($sportIds);
                 $venue->amenities()->sync($amenityIds);
@@ -141,6 +176,18 @@ class VenueController extends Controller
                     ]);
                 }
 
+                if ($submitAsApplication) {
+                    $application = $venue->application()->create([
+                        'organization_id' => $venue->organization_id,
+                        'submitted_by_user_id' => $request->user()->getKey(),
+                        'status' => VenueApplicationStatus::Pending,
+                        'submitted_at' => now('UTC'),
+                    ]);
+                    $context->organization()
+                        ->forceFill(['requires_venue_claim_approval' => true])
+                        ->save();
+                }
+
                 return $venue;
             });
         } catch (Throwable $exception) {
@@ -149,8 +196,17 @@ class VenueController extends Controller
             throw $exception;
         }
 
-        return redirect()->route('owner.venues.show', $venue)
-            ->with('status', 'Venue created. Add courts and opening hours next.');
+        if ($application instanceof VenueApplication) {
+            $applicationNotifier->submitted($application);
+        }
+
+        return redirect()->route(
+            $submitAsApplication || $request->boolean('onboarding') ? 'owner.onboarding.venue' : 'owner.venues.show',
+            $submitAsApplication || $request->boolean('onboarding') ? [] : ['venue' => $venue],
+        )
+            ->with('status', $submitAsApplication
+                ? 'Venue application submitted. FinACourt was notified and your progress is saved while ownership is reviewed.'
+                : 'Venue created. Add courts and opening hours next.');
     }
 
     public function show(Venue $venue): Response
@@ -164,7 +220,7 @@ class VenueController extends Controller
             'resources' => fn ($query) => $query->with('sport:id,name')->orderBy('name'),
             'photos',
         ]);
-        $requiresPlatformReview = $venue->claimedDirectoryListings()->exists();
+        $requiresPlatformReview = $venue->requiresPlatformReview();
 
         return Inertia::render('Owner/Venues/Show', [
             'venue' => [
@@ -217,7 +273,7 @@ class VenueController extends Controller
         ]);
     }
 
-    public function edit(Venue $venue, GoogleBusinessProfilePanel $googleBusinessProfile): Response
+    public function edit(Request $request, Venue $venue, GoogleBusinessProfilePanel $googleBusinessProfile): Response
     {
         Gate::authorize('update', $venue);
         $venue->load(
@@ -229,7 +285,7 @@ class VenueController extends Controller
             'operatingHours:id,venue_id,day_of_week,is_closed,opens_at,closes_at',
             'googleBusinessProfileConnection',
         );
-        $requiresPlatformReview = $venue->claimedDirectoryListings()->exists();
+        $requiresPlatformReview = $venue->requiresPlatformReview();
 
         return Inertia::render('Owner/Venues/Edit', [
             ...$this->catalogOptions(),
@@ -259,12 +315,13 @@ class VenueController extends Controller
                     'sort_order' => $photo->sort_order,
                     'is_primary' => $photo->is_primary,
                 ]),
-                'is_claimed' => $venue->claimed_at !== null,
+                'is_claimed' => $venue->claimedDirectoryListings()->exists(),
                 'is_verified' => $venue->verified_at !== null,
                 'marketplace_review_requested_at' => $venue->marketplace_review_requested_at?->toISOString(),
                 'requires_platform_review' => $requiresPlatformReview,
             ],
             'googleBusinessProfile' => $googleBusinessProfile->forVenue($venue),
+            'returnToOnboarding' => $request->boolean('onboarding'),
         ]);
     }
 
@@ -273,6 +330,7 @@ class VenueController extends Controller
         Venue $venue,
         ResolveVenueLocation $resolveVenueLocation,
         VenueClaimNotifier $claimNotifier,
+        VenueApplicationWorkflow $applicationWorkflow,
     ): RedirectResponse {
         $data = $request->validated();
         $sportIds = $data['sports'];
@@ -284,6 +342,7 @@ class VenueController extends Controller
         $data = $this->withCoordinateVerification($data);
 
         $marketplaceReviewRequested = false;
+        $applicationNeedsResubmission = false;
 
         DB::transaction(function () use (
             $venue,
@@ -291,11 +350,22 @@ class VenueController extends Controller
             $sportIds,
             $amenityIds,
             &$marketplaceReviewRequested,
+            &$applicationNeedsResubmission,
         ): void {
             $lockedVenue = Venue::query()->lockForUpdate()->findOrFail($venue->getKey());
-            $requiresPlatformReview = $lockedVenue->claimedDirectoryListings()->exists();
+            $application = $lockedVenue->application()->first();
+            $requiresPlatformReview = $application !== null
+                || $lockedVenue->claimedDirectoryListings()->exists();
 
-            if ($requiresPlatformReview && $lockedVenue->verified_at === null) {
+            if ($application?->status === VenueApplicationStatus::Rejected) {
+                $data['is_published'] = false;
+                $data['marketplace_review_requested_at'] = null;
+                $applicationNeedsResubmission = true;
+            }
+
+            if ($requiresPlatformReview
+                && $application?->status !== VenueApplicationStatus::Rejected
+                && $lockedVenue->verified_at === null) {
                 if (($data['is_published'] ?? false) && $lockedVenue->marketplace_review_requested_at === null) {
                     $data['marketplace_review_requested_at'] = now('UTC');
                     $marketplaceReviewRequested = true;
@@ -311,11 +381,22 @@ class VenueController extends Controller
 
         $venue->refresh();
 
+        if ($applicationNeedsResubmission) {
+            $application = $venue->application()->firstOrFail();
+            $applicationWorkflow->resubmit($application);
+
+            return redirect()->route('owner.onboarding.venue')
+                ->with('status', 'Venue application updated and resubmitted. FinACourt was notified.');
+        }
+
         if ($marketplaceReviewRequested) {
             $claimNotifier->submittedForMarketplaceReview($venue, $request->user());
         }
 
-        return redirect()->route('owner.venues.show', $venue)
+        return redirect()->route(
+            $request->boolean('onboarding') ? 'owner.onboarding.venue' : 'owner.venues.show',
+            $request->boolean('onboarding') ? [] : ['venue' => $venue],
+        )
             ->with('status', $marketplaceReviewRequested
                 ? 'Venue saved. FinACourt was notified that it is ready for the final marketplace check.'
                 : 'Venue details updated.');
@@ -402,7 +483,9 @@ class VenueController extends Controller
             'amenities' => Amenity::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'locationParents' => PsgcLocation::query()
                 ->whereIn('level', ['province', 'region', 'area'])
-                ->whereHas('children', fn ($query) => $query->whereIn('level', ['city', 'municipality']))
+                ->where(fn ($query) => $query
+                    ->whereHas('children', fn ($query) => $query->whereIn('level', ['city', 'municipality']))
+                    ->orWhereHas('geographicChildren', fn ($query) => $query->whereIn('level', ['city', 'municipality'])))
                 ->orderBy('name')
                 ->get(['code', 'name', 'level'])
                 ->map(fn (PsgcLocation $location) => [

@@ -30,6 +30,7 @@
         {
             "code": "0330100000",
             "parent_code": "0300000000",
+            "geographic_parent_code": "0305400000",
             "name": "City of Angeles",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -44,6 +45,7 @@
         {
             "code": "1830200000",
             "parent_code": "1800000000",
+            "geographic_parent_code": "1804500000",
             "name": "City of Bacolod",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -65,6 +67,7 @@
         {
             "code": "1430300000",
             "parent_code": "1400000000",
+            "geographic_parent_code": "1401100000",
             "name": "City of Baguio",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -149,6 +152,7 @@
         {
             "code": "1630400000",
             "parent_code": "1600000000",
+            "geographic_parent_code": "1600200000",
             "name": "City of Butuan",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -184,6 +188,7 @@
         {
             "code": "1030500000",
             "parent_code": "1000000000",
+            "geographic_parent_code": "1004300000",
             "name": "City of Cagayan De Oro",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -275,6 +280,7 @@
         {
             "code": "0730600000",
             "parent_code": "0700000000",
+            "geographic_parent_code": "0702200000",
             "name": "City of Cebu",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -310,6 +316,7 @@
         {
             "code": "1130700000",
             "parent_code": "1100000000",
+            "geographic_parent_code": "1102400000",
             "name": "City of Davao",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -359,6 +366,7 @@
         {
             "code": "1230800000",
             "parent_code": "1200000000",
+            "geographic_parent_code": "1206300000",
             "name": "City of General Santos",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -401,6 +409,7 @@
         {
             "code": "1030900000",
             "parent_code": "1000000000",
+            "geographic_parent_code": "1003500000",
             "name": "City of Iligan",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -408,6 +417,7 @@
         {
             "code": "0631000000",
             "parent_code": "0600000000",
+            "geographic_parent_code": "0603000000",
             "name": "City of Iloilo",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -429,6 +439,7 @@
         {
             "code": "0990100000",
             "parent_code": "0900000000",
+            "geographic_parent_code": "1900700000",
             "name": "City of Isabela (Not a Province)",
             "level": "city",
             "type": "independent_component_city"
@@ -478,6 +489,7 @@
         {
             "code": "0731100000",
             "parent_code": "0700000000",
+            "geographic_parent_code": "0702200000",
             "name": "City of Lapu-Lapu",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -513,6 +525,7 @@
         {
             "code": "0431200000",
             "parent_code": "0400000000",
+            "geographic_parent_code": "0405600000",
             "name": "City of Lucena",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -562,6 +575,7 @@
         {
             "code": "0731300000",
             "parent_code": "0700000000",
+            "geographic_parent_code": "0702200000",
             "name": "City of Mandaue",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -639,6 +653,7 @@
         {
             "code": "0331400000",
             "parent_code": "0300000000",
+            "geographic_parent_code": "0307100000",
             "name": "City of Olongapo",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -702,6 +717,7 @@
         {
             "code": "1731500000",
             "parent_code": "1700000000",
+            "geographic_parent_code": "1705300000",
             "name": "City of Puerto Princesa",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -842,6 +858,7 @@
         {
             "code": "0831600000",
             "parent_code": "0800000000",
+            "geographic_parent_code": "0803700000",
             "name": "City of Tacloban",
             "level": "city",
             "type": "highly_urbanized_city"
@@ -989,6 +1006,7 @@
         {
             "code": "0931700000",
             "parent_code": "0900000000",
+            "geographic_parent_code": "0907300000",
             "name": "City of Zamboanga",
             "level": "city",
             "type": "highly_urbanized_city"

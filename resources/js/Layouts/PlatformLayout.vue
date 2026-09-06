@@ -21,6 +21,7 @@ const page = usePage();
                     <Link href="/platform/owner-payouts" class="text-slate-300 hover:text-white">Owner payouts</Link>
                     <Link href="/platform/growth" class="text-slate-300 hover:text-white">Growth rules</Link>
                     <Link href="/platform/reviews" class="text-slate-300 hover:text-white">Reviews</Link>
+                    <Link href="/platform/venue-applications" class="text-slate-300 hover:text-white">Venue applications</Link>
                     <Link href="/platform/directory" class="text-slate-300 hover:text-white">Venue guide</Link>
                     <Link href="/platform/sales" class="text-slate-300 hover:text-white">Sales partners</Link>
                     <span class="hidden text-slate-300 sm:inline">{{ page.props.auth.user.name }}</span>

@@ -4,6 +4,12 @@
 Philippine regions, provinces, special geographic areas, cities, and
 municipalities needed by the venue form. Barangays are intentionally excluded.
 
+The official PSGC parent is retained in `parent_code`. Highly urbanized and
+independent cities that sit outside a province administratively may also have a
+`geographic_parent_code`, allowing people to find them under the province they
+commonly use in postal and venue addresses without changing the official PSGC
+hierarchy.
+
 The records were normalized from the MIT-licensed `barangay` data package
 snapshot dated 2026-07-13. That package publishes PSGC identifiers and
 hierarchies derived from Philippine Statistics Authority releases. The JSON

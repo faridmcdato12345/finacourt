@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreVenueClaimRequest;
 use App\Models\Membership;
 use App\Models\VenueClaimRequest;
+use App\Onboarding\OwnerVenueOnboarding;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
@@ -49,20 +50,19 @@ class VenueClaimController extends Controller
         TenantContext $context,
         VenueClaimInvitationService $invitations,
         OwnerClaimWorkspaceAccess $workspaceAccess,
+        OwnerVenueOnboarding $onboarding,
     ): Response {
         $this->authorizeOwner($context);
         $invitation = $invitations->resolveUsable($invitationToken);
-        $directoryListing = $invitation->listing;
         $workspaceAccess->begin($context->organization());
 
-        return Inertia::render('Owner/DirectoryClaims/Create', [
-            'listing' => [
-                ...$directoryListing->only(['name', 'slug', 'address', 'city', 'province']),
-                'sports' => $directoryListing->sports->pluck('name'),
-            ],
-            'organization' => $context->organization()->only(['id', 'name']),
-            'invitationToken' => $invitationToken,
-            'invitationExpiresAt' => $invitation->expires_at->format('M j, Y H:i'),
+        return Inertia::render('Owner/VenueOnboarding/Show', [
+            'onboarding' => $onboarding->data(
+                request()->user(),
+                $context->organization(),
+                $invitation,
+                $invitationToken,
+            ),
         ]);
     }
 
@@ -89,7 +89,7 @@ class VenueClaimController extends Controller
             ]),
         );
 
-        return redirect()->route('owner.directory-claims.index')
+        return redirect()->route('owner.onboarding.venue')
             ->with('status', 'Ownership request submitted. Your account email is already verified, so no additional code is required. FinACourt will now complete an independent venue check.');
     }
 

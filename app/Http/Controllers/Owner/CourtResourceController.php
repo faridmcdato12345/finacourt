@@ -10,6 +10,7 @@ use App\Http\Requests\UpdateCourtResourceRequest;
 use App\Models\CourtResource;
 use App\Models\Venue;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -17,12 +18,13 @@ use Inertia\Response;
 
 class CourtResourceController extends Controller
 {
-    public function create(Venue $venue): Response
+    public function create(Request $request, Venue $venue): Response
     {
         Gate::authorize('create', [CourtResource::class, $venue]);
 
         return Inertia::render('Owner/Resources/Create', [
             'venue' => ['id' => $venue->getKey(), 'name' => $venue->name],
+            'returnToOnboarding' => $request->boolean('onboarding'),
             ...$this->formOptions($venue),
         ]);
     }
@@ -34,7 +36,10 @@ class CourtResourceController extends Controller
             'currency' => 'PHP',
         ]);
 
-        return redirect()->route('owner.venues.show', $venue)
+        return redirect()->route(
+            $request->boolean('onboarding') ? 'owner.onboarding.venue' : 'owner.venues.show',
+            $request->boolean('onboarding') ? [] : ['venue' => $venue],
+        )
             ->with('status', 'Court created with its normal price.');
     }
 

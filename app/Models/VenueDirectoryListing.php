@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\DirectoryListingStatus;
 use App\Enums\DirectorySourceType;
+use App\Locations\HasPublicLocationPresentation;
 use Database\Factories\VenueDirectoryListingFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -53,7 +54,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class VenueDirectoryListing extends Model
 {
     /** @use HasFactory<VenueDirectoryListingFactory> */
-    use HasFactory;
+    use HasFactory, HasPublicLocationPresentation;
 
     /** @param Builder<VenueDirectoryListing> $query */
     public function scopeDiscoverable(Builder $query): void

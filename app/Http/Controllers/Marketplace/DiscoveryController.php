@@ -70,6 +70,7 @@ class DiscoveryController extends Controller
         $analytics->recordVenueImpressions($request, $venues);
         $this->trackPromotions($request, $venues, $tracker);
         $location = $venues->first();
+        $cityName = $location->publicCitySeoName();
         $canonical = route('marketplace.courts.city', $citySlug);
 
         return view('marketplace.discovery', [
@@ -79,17 +80,18 @@ class DiscoveryController extends Controller
             'filters' => ['city' => $citySlug, 'duration_minutes' => 60],
             'settings' => ResourceSetting::cases(),
             'eyebrow' => $location->province,
-            'heading' => "Sports courts in {$location->city}",
-            'introduction' => "Compare active courts, sports, settings, and hourly prices at published venues in {$location->city}.",
+            'heading' => "Sports Courts in {$cityName}",
+            'introduction' => "Find sports courts in {$cityName}. Compare nearby venues, court types, hourly rates, and availability for pickleball, badminton, basketball, and more.",
             'breadcrumbs' => [
                 ['name' => 'Courts', 'url' => route('marketplace.courts.index')],
-                ['name' => $location->city, 'url' => $canonical],
+                ['name' => $cityName, 'url' => $canonical],
             ],
             'lockedCity' => true,
             'lockedSport' => false,
             'seo' => [
-                'title' => "Sports courts in {$location->city}",
-                'description' => "Find published sports venues and active courts in {$location->city}, {$location->province}. Compare real hourly prices and court details.",
+                'title' => "Sports Courts in {$cityName}",
+                'document_title' => "Sports Courts in {$cityName} | Find & Book Courts | FinACourt",
+                'description' => "Find sports courts in {$cityName}. Compare venues, prices, court settings, and availability, then book online with FinACourt.",
                 'canonical' => $canonical,
                 'robots' => 'index,follow',
                 'type' => 'website',
@@ -97,7 +99,7 @@ class DiscoveryController extends Controller
             'structuredData' => [$structuredData->breadcrumbs([
                 ['name' => 'Home', 'url' => route('marketplace.home')],
                 ['name' => 'Courts', 'url' => route('marketplace.courts.index')],
-                ['name' => $location->city, 'url' => $canonical],
+                ['name' => $cityName, 'url' => $canonical],
             ])],
         ]);
     }
@@ -124,6 +126,9 @@ class DiscoveryController extends Controller
         $analytics->recordVenueImpressions($request, $venues);
         $this->trackPromotions($request, $venues, $tracker);
         $location = $venues->first();
+        $cityName = $location->publicCitySeoName();
+        $sportName = $sport->name;
+        $sportNameLower = str($sportName)->lower();
         $canonical = route('marketplace.courts.sport-city', [$sportSlug, $citySlug]);
 
         return view('marketplace.discovery', [
@@ -133,18 +138,19 @@ class DiscoveryController extends Controller
             'filters' => ['city' => $citySlug, 'sport' => $sportSlug, 'duration_minutes' => 60],
             'settings' => ResourceSetting::cases(),
             'eyebrow' => $location->province,
-            'heading' => "{$sport->name} courts in {$location->city}",
-            'introduction' => "Explore active {$sport->name} courts at published venues in {$location->city}, with real settings and hourly prices.",
+            'heading' => "{$sportName} Courts in {$cityName}",
+            'introduction' => "Looking for a {$sportNameLower} court in {$cityName}? Compare local venues, prices, court settings, and availability, then book online with FinACourt.",
             'breadcrumbs' => [
                 ['name' => 'Courts', 'url' => route('marketplace.courts.index')],
-                ['name' => $location->city, 'url' => route('marketplace.courts.city', $citySlug)],
-                ['name' => $sport->name, 'url' => $canonical],
+                ['name' => $cityName, 'url' => route('marketplace.courts.city', $citySlug)],
+                ['name' => $sportName, 'url' => $canonical],
             ],
             'lockedCity' => true,
             'lockedSport' => true,
             'seo' => [
-                'title' => "{$sport->name} courts in {$location->city}",
-                'description' => "Find active {$sport->name} courts in {$location->city}, {$location->province}. Compare published venues and real hourly rates.",
+                'title' => "{$sportName} Courts in {$cityName}",
+                'document_title' => "{$sportName} Courts in {$cityName} | Find & Book | FinACourt",
+                'description' => "Find {$sportNameLower} courts in {$cityName}. Compare local venues, prices, schedules, and availability, then book online with FinACourt.",
                 'canonical' => $canonical,
                 'robots' => 'index,follow',
                 'type' => 'website',
@@ -152,8 +158,8 @@ class DiscoveryController extends Controller
             'structuredData' => [$structuredData->breadcrumbs([
                 ['name' => 'Home', 'url' => route('marketplace.home')],
                 ['name' => 'Courts', 'url' => route('marketplace.courts.index')],
-                ['name' => $location->city, 'url' => route('marketplace.courts.city', $citySlug)],
-                ['name' => $sport->name, 'url' => $canonical],
+                ['name' => $cityName, 'url' => route('marketplace.courts.city', $citySlug)],
+                ['name' => $sportName, 'url' => $canonical],
             ])],
         ]);
     }

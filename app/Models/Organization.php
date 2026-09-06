@@ -78,6 +78,12 @@ class Organization extends Model
         return $this->hasMany(VenueClaimRequest::class);
     }
 
+    /** @return HasMany<VenueApplication, $this> */
+    public function venueApplications(): HasMany
+    {
+        return $this->hasMany(VenueApplication::class);
+    }
+
     public function payoutProfile(): HasOne
     {
         return $this->hasOne(OwnerPayoutProfile::class);

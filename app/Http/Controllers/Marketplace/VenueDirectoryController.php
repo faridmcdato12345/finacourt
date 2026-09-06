@@ -85,8 +85,9 @@ class VenueDirectoryController extends Controller
         }
 
         $canonical = route('marketplace.directory.show', $listing->slug);
+        $cityName = $listing->publicCitySeoName();
         $description = Str::limit(
-            $listing->description ?: "Public directory information for {$listing->name} in {$listing->city}. No live booking availability is claimed.",
+            $listing->description ?: "Public directory information for {$listing->name} in {$cityName}. No live booking availability is claimed.",
             155,
             '',
         );
@@ -95,7 +96,7 @@ class VenueDirectoryController extends Controller
             'listing' => $listing,
             'directionsUrl' => $directions->forDirectoryListing($listing),
             'seo' => [
-                'title' => "{$listing->name} in {$listing->city}",
+                'title' => "{$listing->name} in {$cityName}",
                 'description' => $description,
                 'canonical' => $canonical,
                 'robots' => $listing->isIndexable() ? 'index,follow' : 'noindex,follow',

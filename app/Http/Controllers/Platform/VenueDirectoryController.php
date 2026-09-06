@@ -383,7 +383,9 @@ class VenueDirectoryController extends Controller
             'sports' => Sport::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'locationParents' => PsgcLocation::query()
                 ->whereIn('level', ['province', 'region', 'area'])
-                ->whereHas('children', fn ($query) => $query->whereIn('level', ['city', 'municipality']))
+                ->where(fn ($query) => $query
+                    ->whereHas('children', fn ($query) => $query->whereIn('level', ['city', 'municipality']))
+                    ->orWhereHas('geographicChildren', fn ($query) => $query->whereIn('level', ['city', 'municipality'])))
                 ->orderBy('name')
                 ->get(['code', 'name', 'level'])
                 ->map(fn (PsgcLocation $location) => [

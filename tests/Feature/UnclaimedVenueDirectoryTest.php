@@ -228,11 +228,13 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->get($invitationUrl)
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Owner/DirectoryClaims/Create')
+                ->component('Owner/VenueOnboarding/Show')
+                ->where('onboarding.source', 'invited')
+                ->where('onboarding.stage', 'confirm_invitation')
                 ->where('ownerClaimOnboarding.restricted', true)
                 ->where('ownerClaimOnboarding.state', 'confirmation_required'));
         $this->get(route('owner.dashboard'))
-            ->assertRedirect(route('owner.directory-claims.index'));
+            ->assertRedirect(route('owner.onboarding.venue'));
         $this->get(route('owner.account.edit'))->assertOk();
     }
 
@@ -251,12 +253,12 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->assertTrue($organization->fresh()->requires_venue_claim_approval);
 
         $this->get(route('owner.dashboard'))
-            ->assertRedirect(route('owner.directory-claims.index'))
+            ->assertRedirect(route('owner.onboarding.venue'))
             ->assertSessionHas('status', fn (string $message): bool => str_contains($message, 'Owner tools unlock after'));
         $this->get(route('owner.promotions.index'))
-            ->assertRedirect(route('owner.directory-claims.index'));
+            ->assertRedirect(route('owner.onboarding.venue'));
         $this->get(route('owner.venues.index'))
-            ->assertRedirect(route('owner.directory-claims.index'));
+            ->assertRedirect(route('owner.onboarding.venue'));
 
         $this->get(route('owner.directory-claims.index'))
             ->assertOk()
@@ -409,7 +411,7 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
             ->post(route('owner.directory-claims.invitations.store', $invitationToken), $payload)
-            ->assertRedirect(route('owner.directory-claims.index'));
+            ->assertRedirect(route('owner.onboarding.venue'));
 
         $claim = VenueClaimRequest::query()->sole();
         $this->assertSame($organization->getKey(), $claim->organization_id);
@@ -475,7 +477,7 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
             ->post(route('owner.directory-claims.invitations.store', $invitationToken), $this->claimPayload())
-            ->assertRedirect(route('owner.directory-claims.index'))
+            ->assertRedirect(route('owner.onboarding.venue'))
             ->assertSessionHas('status', fn (string $message): bool => str_contains($message, 'no additional code is required'));
 
         $claim = VenueClaimRequest::query()->sole();
@@ -503,6 +505,14 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->assertNull($claim->proof_sent_at);
         $this->assertNull($claim->proof_verified_at);
         $this->assertNull($claim->approval_available_at);
+
+        $this->get(route('owner.onboarding.venue'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/VenueOnboarding/Show')
+                ->where('onboarding.source', 'invited')
+                ->where('onboarding.stage', 'ownership_review')
+                ->where('onboarding.claim.id', $claim->getKey()));
 
         $this->get(route('owner.directory-claims.index'))
             ->assertOk()
@@ -658,7 +668,7 @@ class UnclaimedVenueDirectoryTest extends TestCase
 
         $this->assertTrue($organization->fresh()->requires_venue_claim_approval);
         $this->get(route('owner.dashboard'))
-            ->assertRedirect(route('owner.directory-claims.index'));
+            ->assertRedirect(route('owner.onboarding.venue'));
 
         $this->verifyClaimProofAndFinishSafetyHold($claim, $admin);
 
@@ -704,6 +714,13 @@ class UnclaimedVenueDirectoryTest extends TestCase
             ->withSession(['tenant.organization_id' => $organization->getKey()])
             ->get(route('owner.dashboard'))
             ->assertOk();
+        $this->get(route('owner.onboarding.venue'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/VenueOnboarding/Show')
+                ->where('onboarding.source', 'invited')
+                ->where('onboarding.stage', 'add_court')
+                ->where('onboarding.venue.id', $venue->getKey()));
 
         [$otherOwner, $otherOrganization] = $this->ownerWithOrganization();
         $this->actingAs($otherOwner)
@@ -851,7 +868,7 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->actingAs($owner)
             ->withSession(['tenant.organization_id' => $organization->getKey()])
             ->post(route('owner.directory-claims.invitations.store', $secondInvitationToken), $this->claimPayload())
-            ->assertRedirect(route('owner.directory-claims.index'));
+            ->assertRedirect(route('owner.onboarding.venue'));
         $second = VenueClaimRequest::query()->latest('id')->firstOrFail();
         $this->delete(route('owner.directory-claims.cancel', $second))->assertRedirect();
         $this->assertSame(DirectoryClaimStatus::Cancelled, $second->fresh()->status);

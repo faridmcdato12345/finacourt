@@ -13,7 +13,7 @@ const abilities = computed(() => page.props.abilities || {});
 const claimOnboarding = computed(() => page.props.ownerClaimOnboarding || { restricted: false });
 const isEmailVerified = computed(() => Boolean(user.value?.email_verified));
 const isWorkspaceRestricted = computed(() => isEmailVerified.value && Boolean(claimOnboarding.value.restricted));
-const ownerLandingUrl = computed(() => isWorkspaceRestricted.value ? '/owner/directory-claims' : (isEmailVerified.value ? '/owner/dashboard' : '/owner/account'));
+const ownerLandingUrl = computed(() => isWorkspaceRestricted.value ? '/owner/onboarding/venue' : (isEmailVerified.value ? '/owner/dashboard' : '/owner/account'));
 
 function isActive(prefix) {
     return page.url.startsWith(prefix);
@@ -40,6 +40,7 @@ function switchOrganization(id) {
                 </div>
             </div>
             <nav class="owner-mobile-navigation scrollbar-none flex gap-1 overflow-x-auto px-3 pb-3 text-sm" aria-label="Mobile owner navigation">
+                <Link v-if="isEmailVerified && organization?.role === 'owner'" href="/owner/onboarding/venue" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/onboarding') ? 'bg-white text-court-950' : 'text-court-100']">Setup progress</Link>
                 <template v-if="isEmailVerified && !isWorkspaceRestricted">
                     <Link href="/owner/dashboard" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/dashboard') ? 'bg-white text-court-950' : 'text-court-100']">Home</Link>
                     <Link v-if="abilities.manage_inventory" href="/owner/venues" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/venues') ? 'bg-white text-court-950' : 'text-court-100']">Venues</Link>
@@ -83,6 +84,7 @@ function switchOrganization(id) {
             </div>
 
             <nav v-if="isEmailVerified" class="owner-sidebar-navigation mt-6 space-y-1.5" aria-label="Owner navigation">
+                <Link v-if="organization?.role === 'owner'" href="/owner/onboarding/venue" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/onboarding') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12.5 9 16l10-10M4 4h16v16H4V4Z" /></svg>Setup progress</Link>
                 <template v-if="!isWorkspaceRestricted">
                     <Link href="/owner/dashboard" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/dashboard') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-12h6V4h-6v4Z" /></svg>Home</Link>
                     <Link v-if="abilities.manage_inventory" href="/owner/venues" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/venues') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20V8l8-4 8 4v12M8 20v-6h8v6M9 10h.01M15 10h.01" /></svg>Venues & courts</Link>
@@ -117,7 +119,7 @@ function switchOrganization(id) {
             <main id="main-content" tabindex="-1" class="px-4 py-6 sm:px-6 sm:py-8 xl:px-10 xl:py-9">
                 <div v-if="isWorkspaceRestricted" role="status" class="mb-6 flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between">
                     <div><strong class="block">Owner workspace awaiting approval</strong><span class="mt-1 block leading-6">{{ claimOnboarding.message }}</span></div>
-                    <Link href="/owner/directory-claims" class="shrink-0 font-semibold text-amber-950 underline underline-offset-4">Review venue request</Link>
+                    <Link href="/owner/onboarding/venue" class="shrink-0 font-semibold text-amber-950 underline underline-offset-4">Review setup progress</Link>
                 </div>
                 <div v-if="page.props.flash?.status" role="status" class="mb-6 flex items-start gap-3 rounded-xl border border-court-200 bg-court-50 px-4 py-3 text-sm font-medium text-court-900"><span aria-hidden="true">✓</span><span>{{ page.props.flash.status }}</span></div>
                 <slot />

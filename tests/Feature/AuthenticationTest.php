@@ -64,6 +64,7 @@ class AuthenticationTest extends TestCase
         $this->assertSame($organization->getKey(), $membership->organization_id);
         $this->assertSame($user->getKey(), $membership->user_id);
         $this->assertSame(MembershipRole::Owner, $membership->role);
+        $this->assertTrue($organization->requires_venue_claim_approval);
         $this->assertSame($organization->getKey(), session('tenant.organization_id'));
         Notification::assertSentTo(
             $user,
@@ -177,7 +178,7 @@ class AuthenticationTest extends TestCase
             'password' => 'secure-password',
         ]);
 
-        $response->assertRedirect(route('owner.dashboard'));
+        $response->assertRedirect(route('owner.onboarding.venue'));
         $this->assertAuthenticatedAs($owner);
         $this->get(route('owner.dashboard'))
             ->assertOk()
@@ -186,6 +187,26 @@ class AuthenticationTest extends TestCase
                 ->has('inventory')
                 ->has('today')
                 ->has('marketplace'));
+    }
+
+    public function test_new_owner_can_resume_the_shared_venue_onboarding(): void
+    {
+        $owner = User::factory()->create();
+        $organization = Organization::factory()->create();
+        Membership::factory()->owner()->for($owner)->for($organization)->create();
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('owner.onboarding.venue'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/VenueOnboarding/Show')
+                ->where('onboarding.source', 'self_service')
+                ->where('onboarding.stage', 'choose_venue')
+                ->where('onboarding.completed_steps', 1)
+                ->where('onboarding.total_steps', 7)
+                ->where('onboarding.steps.1.state', 'current')
+                ->where('onboarding.invitation', null));
     }
 
     public function test_invalid_credentials_do_not_authenticate_a_user(): void

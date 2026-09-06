@@ -3,6 +3,7 @@
 namespace App\Directory;
 
 use App\Enums\DirectoryClaimStatus;
+use App\Enums\VenueApplicationStatus;
 use App\Models\Organization;
 
 class OwnerClaimWorkspaceAccess
@@ -21,6 +22,32 @@ class OwnerClaimWorkspaceAccess
         $latestClaim = $organization->venueClaimRequests()
             ->latest('id')
             ->first(['status']);
+        $latestApplication = $organization->venueApplications()
+            ->latest('id')
+            ->first(['status']);
+
+        if ($latestApplication !== null) {
+            [$state, $message] = match ($latestApplication->status) {
+                VenueApplicationStatus::Pending => [
+                    'under_review',
+                    'FinACourt is reviewing your new venue application. Private setup unlocks after ownership approval.',
+                ],
+                VenueApplicationStatus::Rejected => [
+                    'not_approved',
+                    'Your venue application needs changes. Update the venue details and save to resubmit it.',
+                ],
+                VenueApplicationStatus::Approved => [
+                    'finishing_approval',
+                    'Your venue application was approved and FinACourt is finishing workspace access.',
+                ],
+            };
+
+            return [
+                'restricted' => true,
+                'state' => $state,
+                'message' => $message,
+            ];
+        }
 
         [$state, $message] = match ($latestClaim?->status) {
             DirectoryClaimStatus::Pending => [
@@ -41,7 +68,7 @@ class OwnerClaimWorkspaceAccess
             ],
             default => [
                 'confirmation_required',
-                'Confirm the venue from your private invitation to start FinACourt’s ownership review. Owner tools unlock after approval.',
+                'Finish venue onboarding to submit or confirm your venue. Owner tools unlock after FinACourt approves ownership.',
             ],
         };
 

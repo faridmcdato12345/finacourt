@@ -8,6 +8,7 @@ use App\Models\PsgcLocation;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
+use Database\Seeders\PsgcLocationSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -48,6 +49,63 @@ class PsgcVenueLocationTest extends TestCase
                     'type' => 'component_city',
                 ]],
             ]);
+    }
+
+    public function test_independent_city_is_available_under_its_geographic_province(): void
+    {
+        [$owner, $organization] = $this->ownerWithOrganization();
+        $this->seedLocationHierarchy();
+        PsgcLocation::query()->create([
+            'code' => '1130700000',
+            'parent_code' => '1100000000',
+            'geographic_parent_code' => '1102400000',
+            'name' => 'City of Davao',
+            'level' => 'city',
+            'type' => 'highly_urbanized_city',
+            'source_version' => 'test',
+        ]);
+
+        $this->actingAs($owner)
+            ->getJson(route('owner.location-options.cities', ['parent_code' => '1102400000']))
+            ->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.code', '1130700000')
+            ->assertJsonPath('data.0.name', 'City of Davao');
+
+        $sport = Sport::factory()->create();
+
+        $this->post(route('owner.venues.store'), [
+            ...$this->venueData($sport),
+            'psgc_parent_code' => '1102400000',
+            'psgc_city_municipality_code' => '1130700000',
+        ])->assertRedirect();
+
+        $venue = Venue::query()->sole();
+        $this->assertSame($organization->getKey(), $venue->organization_id);
+        $this->assertSame('City of Davao', $venue->city);
+        $this->assertSame('Davao del Sur', $venue->province);
+        $this->assertSame('1100000000', $venue->psgc_region_code);
+        $this->assertSame('1102400000', $venue->psgc_province_code);
+    }
+
+    public function test_bundled_catalog_imports_geographic_province_aliases_idempotently(): void
+    {
+        $this->seed(PsgcLocationSeeder::class);
+        $this->seed(PsgcLocationSeeder::class);
+
+        $this->assertSame(1743, PsgcLocation::query()->count());
+        $this->assertDatabaseHas('psgc_locations', [
+            'code' => '0730600000',
+            'parent_code' => '0700000000',
+            'geographic_parent_code' => '0702200000',
+            'name' => 'City of Cebu',
+        ]);
+        $this->assertDatabaseHas('psgc_locations', [
+            'code' => '0330100000',
+            'parent_code' => '0300000000',
+            'geographic_parent_code' => '0305400000',
+            'name' => 'City of Angeles',
+        ]);
     }
 
     public function test_location_names_and_hierarchy_are_server_derived_from_psgc_codes(): void

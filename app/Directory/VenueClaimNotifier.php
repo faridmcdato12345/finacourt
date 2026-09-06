@@ -27,8 +27,9 @@ class VenueClaimNotifier
                 ->find($venueId);
             $requestedBy = User::query()->find($requesterId);
             $listing = $fresh?->claimedDirectoryListings()->first(['id', 'slug']);
+            $application = $fresh?->application()->first(['id']);
 
-            if (! $fresh || ! $fresh->organization || ! $requestedBy || ! $listing) {
+            if (! $fresh || ! $fresh->organization || ! $requestedBy || (! $listing && ! $application)) {
                 return;
             }
 
@@ -53,7 +54,9 @@ class VenueClaimNotifier
                     organizationName: $fresh->organization->name,
                     requesterName: $requestedBy->name,
                     requesterEmail: $requestedBy->email,
-                    url: route('platform.directory.edit', $listing),
+                    url: $listing
+                        ? route('platform.directory.edit', $listing)
+                        : route('platform.venue-applications.index'),
                 ));
             } catch (\Throwable $exception) {
                 Log::error('Claimed venue final review notification could not be queued.', [

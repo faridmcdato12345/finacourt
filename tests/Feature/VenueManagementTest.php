@@ -10,6 +10,7 @@ use App\Models\Organization;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
+use App\Models\VenueApplication;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -46,6 +47,37 @@ class VenueManagementTest extends TestCase
         $this->assertEqualsCanonicalizing([$sport->getKey()], $venue->sports()->pluck('sports.id')->all());
         $this->assertEqualsCanonicalizing($amenities->modelKeys(), $venue->amenities()->pluck('amenities.id')->all());
         $this->assertCount(7, $venue->operatingHours);
+    }
+
+    public function test_onboarding_venue_creation_returns_to_the_saved_setup_progress(): void
+    {
+        [$owner, $organization] = $this->ownerWithOrganization();
+        $sport = Sport::factory()->create();
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('owner.venues.create', ['onboarding' => 1]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Venues/Create')
+                ->where('returnToOnboarding', true));
+
+        $this->post(route('owner.venues.store'), [
+            ...$this->venueData($sport),
+            'onboarding' => true,
+        ])->assertRedirect(route('owner.onboarding.venue'));
+
+        $venue = Venue::query()->sole();
+        $this->get(route('owner.onboarding.venue'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/VenueOnboarding/Show')
+                ->where('onboarding.stage', 'ownership_review')
+                ->where('onboarding.venue.id', $venue->getKey())
+                ->where('onboarding.venue.resources_count', 0));
+
+        $this->assertTrue($organization->fresh()->requires_venue_claim_approval);
+        $this->assertSame('pending', VenueApplication::query()->sole()->status->value);
     }
 
     public function test_venue_index_only_returns_the_current_tenants_venues(): void

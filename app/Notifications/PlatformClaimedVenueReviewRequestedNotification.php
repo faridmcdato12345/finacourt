@@ -36,7 +36,7 @@ class PlatformClaimedVenueReviewRequestedNotification extends Notification imple
     {
         return [
             'kind' => 'platform_claimed_venue_review_requested',
-            'title' => 'A claimed venue is ready for its final check',
+            'title' => 'A venue is ready for its final check',
             'message' => "{$this->requesterName} asked FinACourt to make {$this->venueName} visible to players.",
             'url' => $this->url,
             'venue_id' => $this->venueId,
@@ -54,8 +54,8 @@ class PlatformClaimedVenueReviewRequestedNotification extends Notification imple
             ->line("{$this->requesterName} ({$this->requesterEmail}) saved {$this->venueName} as ready to show to players.")
             ->line("Owner account: {$this->organizationName}")
             ->line("Venue location: {$this->venueLocation}")
-            ->line('The claimed venue remains private until a platform administrator completes the final marketplace check.')
+            ->line('The venue remains private until a platform administrator completes the final marketplace check.')
             ->action('Complete final venue check', $this->url)
-            ->line('Review its public details, active courts, prices, and ownership audit before approval.');
+            ->line('Review its public details, active courts, prices, and ownership record before approval.');
     }
 }

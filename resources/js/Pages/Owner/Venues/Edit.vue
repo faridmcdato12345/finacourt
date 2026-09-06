@@ -5,7 +5,7 @@ import VenuePhotoManager from '../../../Components/VenuePhotoManager.vue';
 import GoogleBusinessProfilePanel from '../../../Components/GoogleBusinessProfilePanel.vue';
 import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
 
-const props = defineProps({ venue: Object, sports: Array, amenities: Array, locationParents: Array, mapTileUrl: String, googleBusinessProfile: Object });
+const props = defineProps({ venue: Object, sports: Array, amenities: Array, locationParents: Array, mapTileUrl: String, googleBusinessProfile: Object, returnToOnboarding: Boolean });
 
 const form = useForm({
     name: props.venue.name,
@@ -24,6 +24,7 @@ const form = useForm({
     is_published: props.venue.is_published,
     sports: props.venue.sports,
     amenities: props.venue.amenities,
+    onboarding: props.returnToOnboarding,
 });
 
 function submit() {
@@ -41,7 +42,7 @@ function destroyVenue() {
     <Head :title="`Edit ${venue.name}`" />
     <OwnerLayout>
         <div class="mx-auto max-w-5xl">
-            <Link :href="`/owner/venues/${venue.id}`" class="text-sm font-semibold text-court-700 hover:text-court-800">← Back to venue</Link>
+            <Link :href="returnToOnboarding ? '/owner/onboarding/venue' : `/owner/venues/${venue.id}`" class="text-sm font-semibold text-court-700 hover:text-court-800">← {{ returnToOnboarding ? 'Back to setup progress' : 'Back to venue' }}</Link>
             <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Edit {{ venue.name }}</h2>
             <p class="mt-2 text-slate-600">Update photos, location, sports, facilities, contact details, and whether players can see it.</p>
             <div class="mt-8 space-y-7">
