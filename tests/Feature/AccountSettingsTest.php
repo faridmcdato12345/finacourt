@@ -26,6 +26,43 @@ class AccountSettingsTest extends TestCase
         $this->get(route('owner.account.edit'))->assertRedirect(route('login'));
     }
 
+    public function test_player_and_owner_can_open_password_recovery_from_sign_in(): void
+    {
+        $this->get(route('player.login'))
+            ->assertOk()
+            ->assertSee('Forgot password?')
+            ->assertSee(route('password.request', ['audience' => 'player']), false);
+
+        $this->get(route('password.request', ['audience' => 'owner']))
+            ->assertOk()
+            ->assertSee('Forgot your password?')
+            ->assertSee('Back to owner sign in')
+            ->assertSee('action="'.route('password.email', [], false).'"', false);
+    }
+
+    public function test_guest_password_recovery_sends_a_link_without_disclosing_account_existence(): void
+    {
+        Notification::fake();
+        $player = User::factory()->create(['email' => 'recover@example.com']);
+        $genericStatus = 'If a FinACourt account uses that email address, a secure password reset link has been sent.';
+
+        $this->post(route('password.email'), [
+            'email' => strtoupper($player->email),
+            'audience' => 'player',
+        ])->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', $genericStatus);
+
+        Notification::assertSentTo($player, ResetPassword::class);
+
+        $this->post(route('password.email'), [
+            'email' => 'missing@example.com',
+            'audience' => 'owner',
+        ])->assertRedirect()
+            ->assertSessionHasNoErrors()
+            ->assertSessionHas('status', $genericStatus);
+    }
+
     public function test_player_can_open_account_settings_from_the_player_experience(): void
     {
         $player = User::factory()->create([

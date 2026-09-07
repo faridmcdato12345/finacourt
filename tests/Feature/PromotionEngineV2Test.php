@@ -10,6 +10,7 @@ use App\Enums\PromotionStatus;
 use App\Enums\PromotionType;
 use App\Models\AnalyticsEvent;
 use App\Models\Booking;
+use App\Models\CourtAvailabilityBlock;
 use App\Models\CourtResource;
 use App\Models\Membership;
 use App\Models\OperatingHour;
@@ -269,7 +270,7 @@ class PromotionEngineV2Test extends TestCase
 
     public function test_slot_validation_rejects_cross_tenant_outside_campaign_and_overlapping_windows(): void
     {
-        [, $venueA, $resourceA, $ownerA] = $this->setupInventory();
+        [$organizationA, $venueA, $resourceA, $ownerA] = $this->setupInventory();
         [, , $resourceB] = $this->setupInventory(['slug' => 'other-promotion-venue']);
         $date = $this->futureDate();
 
@@ -288,6 +289,20 @@ class PromotionEngineV2Test extends TestCase
             'ends_on' => $date,
             'slots' => [$this->slotData($resourceA, now('Asia/Manila')->addDays(8)->toDateString(), '09:00', '10:00')],
         ]))->assertSessionHasErrors('slots.0.slot_date');
+
+        $blockedStart = CarbonImmutable::parse($date.' 09:00', 'Asia/Manila');
+        CourtAvailabilityBlock::query()->create([
+            'organization_id' => $organizationA->getKey(),
+            'venue_id' => $venueA->getKey(),
+            'resource_id' => $resourceA->getKey(),
+            'starts_at' => $blockedStart->utc(),
+            'ends_at' => $blockedStart->addHour()->utc(),
+            'timezone' => 'Asia/Manila',
+            'reason' => 'Court maintenance',
+        ]);
+        $this->actingAs($ownerA)->post(route('owner.promotions.store'), $this->campaignData($venueA, [
+            'slots' => [$this->slotData($resourceA, $date, '09:00', '10:00')],
+        ]))->assertSessionHasErrors('slots.0.starts_at_time');
 
         $this->assertDatabaseCount('promotions', 0);
         $this->assertDatabaseCount('promotion_slots', 0);
@@ -360,6 +375,16 @@ class PromotionEngineV2Test extends TestCase
         PromotionSlot::factory()->for($promotion)->create(
             $this->slotData($resource, '2026-09-01', '18:00', '19:00'),
         );
+        $blockedStart = CarbonImmutable::parse('2026-09-01 19:00', 'Asia/Manila');
+        CourtAvailabilityBlock::query()->create([
+            'organization_id' => $organization->getKey(),
+            'venue_id' => $venue->getKey(),
+            'resource_id' => $resource->getKey(),
+            'starts_at' => $blockedStart->utc(),
+            'ends_at' => $blockedStart->addHour()->utc(),
+            'timezone' => 'Asia/Manila',
+            'reason' => 'Owner use',
+        ]);
 
         $slots = app(EmptySlotFinder::class)->upcoming($organization, horizonDays: 1, limit: 40, at: $now);
 
@@ -368,7 +393,8 @@ class PromotionEngineV2Test extends TestCase
         $this->assertFalse($slots->contains(fn (array $slot) => $slot['resource_id'] === $otherResource->getKey()));
         $this->assertFalse($slots->contains(fn (array $slot) => $slot['starts_at_time'] === '17:00'));
         $this->assertFalse($slots->contains(fn (array $slot) => $slot['starts_at_time'] === '18:00'));
-        $this->assertTrue($slots->contains(fn (array $slot) => $slot['starts_at_time'] === '19:00'
+        $this->assertFalse($slots->contains(fn (array $slot) => $slot['starts_at_time'] === '19:00'));
+        $this->assertTrue($slots->contains(fn (array $slot) => $slot['starts_at_time'] === '20:00'
             && $slot['is_last_minute']
             && $slot['reason'] === 'available_within_24_hours'));
     }

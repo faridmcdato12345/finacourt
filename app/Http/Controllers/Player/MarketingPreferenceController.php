@@ -22,14 +22,17 @@ class MarketingPreferenceController extends Controller
         $request->validate([
             'marketing_opt_in' => ['nullable', 'boolean'],
             'in_app_marketing_enabled' => ['nullable', 'boolean'],
+            'email_marketing_enabled' => ['nullable', 'boolean'],
         ]);
         $optedIn = $request->boolean('marketing_opt_in');
         $inApp = $optedIn && $request->boolean('in_app_marketing_enabled');
+        $email = $optedIn && $request->boolean('email_marketing_enabled');
         $existing = $request->user()->marketingPreference;
 
         $request->user()->marketingPreference()->updateOrCreate([], [
             'marketing_opt_in' => $optedIn,
             'in_app_marketing_enabled' => $inApp,
+            'email_marketing_enabled' => $email,
             'opted_in_at' => $optedIn ? ($existing?->opted_in_at ?? now('UTC')) : $existing?->opted_in_at,
             'opted_out_at' => $optedIn ? null : now('UTC'),
             'unsubscribed_at' => $optedIn ? null : now('UTC'),

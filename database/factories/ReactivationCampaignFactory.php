@@ -24,7 +24,7 @@ class ReactivationCampaignFactory extends Factory
             'title' => fake()->sentence(4),
             'message' => fake()->sentence(12),
             'segment' => ReactivationSegment::Inactive30,
-            'channel' => 'in_app',
+            'channel' => 'in_app,email',
             'status' => ReactivationCampaignStatus::Draft,
         ];
     }

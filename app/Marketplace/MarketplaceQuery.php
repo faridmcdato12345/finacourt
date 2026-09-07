@@ -134,7 +134,12 @@ class MarketplaceQuery
                         $query->with(['bookings' => fn ($query) => $query
                             ->blocking()
                             ->where('start_at', '<', $day->addDays(2))
-                            ->where('end_at', '>', $day->subDay())]);
+                            ->where('end_at', '>', $day->subDay()),
+                            'availabilityBlocks' => fn ($query) => $query
+                                ->active()
+                                ->where('starts_at', '<', $day->addDays(2))
+                                ->where('ends_at', '>', $day->subDay()),
+                        ]);
                     }
                 },
             ])
@@ -449,10 +454,17 @@ class MarketplaceQuery
             return false;
         }
 
-        return ! $resource->bookings->contains(
+        $hasBooking = $resource->bookings->contains(
             fn (Booking $booking) => $booking->start_at->lessThan($window->utcEnd)
                 && $booking->end_at->greaterThan($window->utcStart),
         );
+
+        $hasCourtBlock = $resource->availabilityBlocks->contains(
+            fn ($block) => $block->starts_at->lessThan($window->utcEnd)
+                && $block->ends_at->greaterThan($window->utcStart),
+        );
+
+        return ! $hasBooking && ! $hasCourtBlock;
     }
 
     /** @return callable(Builder<Booking>): void */

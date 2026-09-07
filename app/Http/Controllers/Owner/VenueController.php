@@ -273,8 +273,12 @@ class VenueController extends Controller
         ]);
     }
 
-    public function edit(Request $request, Venue $venue, GoogleBusinessProfilePanel $googleBusinessProfile): Response
-    {
+    public function edit(
+        Request $request,
+        Venue $venue,
+        GoogleBusinessProfilePanel $googleBusinessProfile,
+        ResolveVenueLocation $resolveVenueLocation,
+    ): Response {
         Gate::authorize('update', $venue);
         $venue->load(
             'sports:id,name,is_active',
@@ -286,6 +290,7 @@ class VenueController extends Controller
             'googleBusinessProfileConnection',
         );
         $requiresPlatformReview = $venue->requiresPlatformReview();
+        $locationSelection = $resolveVenueLocation->selectionFor($venue);
 
         return Inertia::render('Owner/Venues/Edit', [
             ...$this->catalogOptions(),
@@ -297,8 +302,8 @@ class VenueController extends Controller
                 'address' => $venue->address,
                 'city' => $venue->city,
                 'province' => $venue->province,
-                'psgc_parent_code' => $venue->psgc_province_code ?: $venue->psgc_region_code,
-                'psgc_city_municipality_code' => $venue->psgc_city_municipality_code,
+                'psgc_parent_code' => $locationSelection['parent_code'],
+                'psgc_city_municipality_code' => $locationSelection['city_municipality_code'],
                 'latitude' => $venue->latitude,
                 'longitude' => $venue->longitude,
                 'coordinates_verified_at' => $venue->coordinates_verified_at?->toISOString(),

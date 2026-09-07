@@ -361,6 +361,29 @@ class UnclaimedVenueDirectoryTest extends TestCase
             ->assertDontSee(route('marketplace.directory.show', $draft->slug), false);
     }
 
+    public function test_public_directory_uses_progressive_scroll_loading_instead_of_page_controls(): void
+    {
+        VenueDirectoryListing::factory()->published()->count(25)->create();
+
+        $firstPage = $this->get(route('marketplace.directory.index'))
+            ->assertOk()
+            ->assertSee('data-directory-infinite-scroll', false)
+            ->assertSee('data-directory-scroll-sentinel', false)
+            ->assertSee('data-directory-load-more', false)
+            ->assertSee('More load as you scroll.')
+            ->assertDontSee('Pagination Navigation');
+
+        $this->assertSame(24, substr_count($firstPage->getContent(), 'data-directory-card'));
+
+        $secondPage = $this->get(route('marketplace.directory.index', ['page' => 2]))
+            ->assertOk()
+            ->assertSee('Showing 25–25 of 25 venues.')
+            ->assertDontSee('data-directory-load-more', false)
+            ->assertDontSee('Pagination Navigation');
+
+        $this->assertSame(1, substr_count($secondPage->getContent(), 'data-directory-card'));
+    }
+
     public function test_homepage_surfaces_published_directory_venues_without_mixing_them_into_bookable_results(): void
     {
         $sport = Sport::factory()->create(['name' => 'Pickleball', 'slug' => 'pickleball']);

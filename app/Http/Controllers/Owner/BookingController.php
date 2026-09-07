@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\CancelBookingRequest;
 use App\Http\Requests\StoreBookingRequest;
 use App\Models\Booking;
+use App\Models\CourtAvailabilityBlock;
 use App\Models\CourtResource;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
@@ -47,10 +48,25 @@ class BookingController extends Controller
             ->get()
             ->map(fn (Booking $booking) => $this->bookingPayload($booking));
 
+        $courtBlocks = $organization->availabilityBlocks()
+            ->active()
+            ->with([
+                'venue:id,name',
+                'resource:id,name,sport_id',
+                'resource.sport:id,name',
+                'createdBy:id,name',
+            ])
+            ->where('starts_at', '<', $localEnd->utc())
+            ->where('ends_at', '>', $localStart->utc())
+            ->orderBy('starts_at')
+            ->get()
+            ->map(fn (CourtAvailabilityBlock $block) => $this->courtBlockPayload($block));
+
         return Inertia::render('Owner/Bookings/Index', [
             'date' => $date,
             'timezone' => $timezone,
             'bookings' => $bookings,
+            'courtBlocks' => $courtBlocks,
         ]);
     }
 
@@ -177,6 +193,27 @@ class BookingController extends Controller
                 && $booking->payment_status === PaymentStatus::Paid,
             'created_by' => $booking->createdBy?->name,
             'can_cancel' => in_array($effectiveStatus, [BookingStatus::Hold, BookingStatus::Confirmed], true),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function courtBlockPayload(CourtAvailabilityBlock $block): array
+    {
+        $start = $block->starts_at->setTimezone($block->timezone);
+        $end = $block->ends_at->setTimezone($block->timezone);
+
+        return [
+            'id' => $block->getKey(),
+            'venue' => $block->venue->name,
+            'resource' => $block->resource->name,
+            'sport' => $block->resource->sport->name,
+            'start_time' => $block->is_all_day ? 'All day' : $start->format('H:i'),
+            'end_time' => $block->is_all_day ? null : $end->format('H:i'),
+            'is_all_day' => $block->is_all_day,
+            'reason' => $block->reason,
+            'is_recurring' => $block->series_token !== null,
+            'created_by' => $block->createdBy?->name,
+            'can_remove' => $block->ends_at->isFuture(),
         ];
     }
 }

@@ -91,7 +91,7 @@ class BookingController extends Controller
             }
 
             if ($availability->hasConflict($resource->getKey(), $window->utcStart, $window->utcEnd)) {
-                $availabilityError = 'That time has just been reserved. Choose another available slot.';
+                $availabilityError = 'That time is no longer available. Choose another available slot.';
             }
         } catch (ValidationException $exception) {
             $availabilityError = collect($exception->errors())->flatten()->first();

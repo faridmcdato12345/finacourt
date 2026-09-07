@@ -51,6 +51,29 @@ class PsgcVenueLocationTest extends TestCase
             ]);
     }
 
+    public function test_edit_form_recovers_a_legacy_city_selection_from_its_saved_name(): void
+    {
+        [$owner, $organization] = $this->ownerWithOrganization();
+        $this->seedLocationHierarchy();
+        $venue = Venue::factory()->for($organization)->create([
+            'city' => 'City of Digos',
+            'city_slug' => 'city-of-digos',
+            'province' => 'Davao del Sur',
+            'province_slug' => 'davao-del-sur',
+            'psgc_region_code' => '1100000000',
+            'psgc_province_code' => '1102400000',
+            'psgc_city_municipality_code' => null,
+        ]);
+
+        $this->actingAs($owner)
+            ->get(route('owner.venues.edit', $venue))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Venues/Edit')
+                ->where('venue.psgc_parent_code', '1102400000')
+                ->where('venue.psgc_city_municipality_code', '1102403000'));
+    }
+
     public function test_independent_city_is_available_under_its_geographic_province(): void
     {
         [$owner, $organization] = $this->ownerWithOrganization();

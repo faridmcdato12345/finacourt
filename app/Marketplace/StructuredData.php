@@ -3,9 +3,30 @@
 namespace App\Marketplace;
 
 use App\Models\Venue;
+use Illuminate\Support\Collection;
 
 class StructuredData
 {
+    /**
+     * @param  Collection<int, Venue>  $venues
+     * @return array<string, mixed>
+     */
+    public function venueList(Collection $venues, string $name): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'ItemList',
+            'name' => $name,
+            'numberOfItems' => $venues->count(),
+            'itemListElement' => $venues->values()->map(fn (Venue $venue, int $index) => [
+                '@type' => 'ListItem',
+                'position' => $index + 1,
+                'name' => $venue->name,
+                'url' => route('marketplace.venues.show', $venue->slug),
+            ])->all(),
+        ];
+    }
+
     /** @param array<int, array{name: string, url: string}> $items
      * @return array<string, mixed>
      */

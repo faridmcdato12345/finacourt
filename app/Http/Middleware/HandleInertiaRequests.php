@@ -3,6 +3,9 @@
 namespace App\Http\Middleware;
 
 use App\Directory\OwnerClaimWorkspaceAccess;
+use App\Enums\MembershipRole;
+use App\Models\User;
+use App\Onboarding\OwnerVenueOnboarding;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -50,9 +53,28 @@ class HandleInertiaRequests extends Middleware
             'ownerClaimOnboarding' => fn () => $request->routeIs('owner.*') && $context->hasOrganization()
                 ? app(OwnerClaimWorkspaceAccess::class)->status($context->organization())
                 : ['restricted' => false, 'state' => null, 'message' => null],
+            'ownerVenueSetup' => fn () => $this->ownerVenueSetup($request, $user, $context),
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
             ],
+        ];
+    }
+
+    /** @return array{stage: string|null, is_complete: bool} */
+    private function ownerVenueSetup(Request $request, ?User $user, TenantContext $context): array
+    {
+        if (! $request->routeIs('owner.*')
+            || $user === null
+            || ! $context->hasOrganization()
+            || $context->membership()?->role !== MembershipRole::Owner) {
+            return ['stage' => null, 'is_complete' => false];
+        }
+
+        $onboarding = app(OwnerVenueOnboarding::class)->data($user, $context->organization());
+
+        return [
+            'stage' => $onboarding['stage'],
+            'is_complete' => $onboarding['stage'] === 'complete',
         ];
     }
 }

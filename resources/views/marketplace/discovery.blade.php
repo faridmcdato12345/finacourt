@@ -7,6 +7,22 @@
             <p class="eyebrow mt-6">{{ $eyebrow }}</p>
             <h1 class="mt-3 max-w-5xl text-4xl font-semibold tracking-[-0.035em] text-slate-950 sm:text-5xl">{{ $heading }}</h1>
             <p class="mt-4 max-w-3xl text-base leading-7 text-slate-600">{{ $introduction }}</p>
+
+            @if ($locationSummary)
+                <dl data-location-summary @class(['mt-7 grid max-w-5xl grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 sm:grid-cols-3', 'lg:grid-cols-5' => $locationSummary['formatted_minimum_hourly_price'], 'lg:grid-cols-4' => ! $locationSummary['formatted_minimum_hourly_price']])>
+                    <div data-location-stat="venues" class="border-b border-r border-slate-200 px-4 py-4 sm:border-b-0"><dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Venues</dt><dd class="mt-1 text-sm font-semibold text-slate-950">{{ $locationSummary['venue_label'] }}</dd></div>
+                    <div data-location-stat="courts" class="border-b border-slate-200 px-4 py-4 sm:border-b-0 sm:border-r"><dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Bookable courts</dt><dd class="mt-1 text-sm font-semibold text-slate-950">{{ $locationSummary['court_label'] }}</dd></div>
+                    @if ($locationSummary['summary_sports'])
+                        <div data-location-stat="sports" class="border-b border-r border-slate-200 px-4 py-4 sm:border-b-0"><dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Sports</dt><dd class="mt-1 text-sm font-semibold text-slate-950">{{ $locationSummary['summary_sports'] }}</dd></div>
+                    @endif
+                    @if ($locationSummary['summary_settings'])
+                        <div data-location-stat="settings" class="border-b border-slate-200 px-4 py-4 sm:border-b-0 lg:border-r"><dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Court settings</dt><dd class="mt-1 text-sm font-semibold text-slate-950">{{ $locationSummary['summary_settings'] }}</dd></div>
+                    @endif
+                    @if ($locationSummary['formatted_minimum_hourly_price'])
+                        <div data-location-stat="minimum-price" data-minimum-hourly-price="{{ number_format($locationSummary['minimum_hourly_price'], 2, '.', '') }}" class="px-4 py-4"><dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Hourly price</dt><dd class="mt-1 text-sm font-semibold text-slate-950">From ₱{{ $locationSummary['formatted_minimum_hourly_price'] }}/hour</dd></div>
+                    @endif
+                </dl>
+            @endif
         </div>
     </section>
 
@@ -38,7 +54,52 @@
                     <div class="app-card mt-6 px-6 py-16 text-center"><div class="mx-auto grid size-14 place-items-center rounded-2xl bg-court-50 text-2xl text-court-700">⌕</div><h2 class="mt-5 text-xl font-semibold">No matching courts yet</h2><p class="mx-auto mt-2 max-w-lg text-sm leading-6 text-slate-500">Try another city, sport, setting, time, or price ceiling.</p><a href="{{ route('marketplace.courts.index') }}" class="mt-5 inline-block rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white">Browse all courts</a></div>
                 @endif
 
-                @if ($cities->isNotEmpty() && $sports->isNotEmpty())
+                @if ($locationSummary)
+                    <section aria-labelledby="location-sports-heading" class="mt-12 border-t border-slate-200 pt-8">
+                        <p class="eyebrow">Local inventory</p>
+                        <h2 id="location-sports-heading" class="mt-2 text-2xl font-semibold tracking-tight">Sports available in {{ $locationSummary['city_name'] }}</h2>
+                        <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                            @foreach ($locationSummary['sports'] as $sportSummary)
+                                <a data-location-sport="{{ $sportSummary['slug'] }}" href="{{ route('marketplace.courts.sport-city', [$sportSummary['slug'], $filters['city']]) }}" class="group rounded-2xl border border-slate-200 bg-white p-5 transition hover:border-court-300 hover:shadow-lg hover:shadow-slate-900/5">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div>
+                                            <h3 class="font-semibold text-slate-950 group-hover:text-court-800">{{ $sportSummary['name'] }} Courts in {{ $locationSummary['city_name'] }}</h3>
+                                            <p class="mt-2 text-sm text-slate-500">{{ $sportSummary['venue_label'] }} · {{ $sportSummary['court_label'] }}</p>
+                                            @if ($sportSummary['formatted_minimum_hourly_price'])
+                                                <p class="mt-2 text-sm font-semibold text-court-800">From ₱{{ $sportSummary['formatted_minimum_hourly_price'] }}/hour</p>
+                                            @endif
+                                        </div>
+                                        <span aria-hidden="true" class="text-court-700 transition-transform group-hover:translate-x-1">→</span>
+                                    </div>
+                                </a>
+                            @endforeach
+                        </div>
+                    </section>
+
+                    <section aria-labelledby="location-inventory-heading" class="app-card mt-8 p-6 sm:p-8">
+                        <p class="eyebrow">Local court guide</p>
+                        <h2 id="location-inventory-heading" class="mt-2 text-2xl font-semibold tracking-tight">Sports courts in {{ $locationSummary['city_name'] }}</h2>
+                        <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-600">{{ $locationSummary['inventory_copy'] }}</p>
+                        <p class="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{{ $locationSummary['near_me_copy'] }}</p>
+                        @if ($locationSummary['price_copy'] || $locationSummary['setting_copy'])
+                            <div class="mt-5 grid gap-3 border-t border-slate-100 pt-5 sm:grid-cols-2">
+                                @if ($locationSummary['price_copy'])<p class="text-sm font-medium leading-6 text-slate-700">{{ $locationSummary['price_copy'] }}</p>@endif
+                                @if ($locationSummary['setting_copy'])<p class="text-sm font-medium leading-6 text-slate-700">{{ $locationSummary['setting_copy'] }}</p>@endif
+                            </div>
+                        @endif
+                    </section>
+
+                    @if ($relatedCities->isNotEmpty())
+                        <section aria-labelledby="related-cities-heading" class="mt-8 border-t border-slate-200 pt-8">
+                            <h2 id="related-cities-heading" class="text-xl font-semibold">More courts in {{ $locationSummary['province'] }}</h2>
+                            <div class="mt-4 flex flex-wrap gap-2">
+                                @foreach ($relatedCities as $relatedCity)
+                                    <a href="{{ route('marketplace.courts.city', $relatedCity->city_slug) }}" class="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:border-court-300 hover:text-court-800">Sports Courts in {{ $relatedCity->publicCityName() }}</a>
+                                @endforeach
+                            </div>
+                        </section>
+                    @endif
+                @elseif ($cities->isNotEmpty() && $sports->isNotEmpty())
                     @php
                         $guides = $venues->flatMap(fn ($venue) => $venue->resources->map(fn ($resource) => ['sport' => $resource->sport, 'city' => $venue->publicCityName(), 'city_slug' => $venue->city_slug]))->unique(fn ($guide) => $guide['sport']->slug.'|'.$guide['city_slug'])->take(18);
                     @endphp

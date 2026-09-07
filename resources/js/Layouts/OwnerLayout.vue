@@ -11,8 +11,14 @@ const organization = computed(() => page.props.currentOrganization);
 const organizations = computed(() => page.props.organizations || []);
 const abilities = computed(() => page.props.abilities || {});
 const claimOnboarding = computed(() => page.props.ownerClaimOnboarding || { restricted: false });
+const venueSetup = computed(() => page.props.ownerVenueSetup || { is_complete: false });
 const isEmailVerified = computed(() => Boolean(user.value?.email_verified));
 const isWorkspaceRestricted = computed(() => isEmailVerified.value && Boolean(claimOnboarding.value.restricted));
+const showSetupProgress = computed(() => (
+    isEmailVerified.value
+    && organization.value?.role === 'owner'
+    && !venueSetup.value.is_complete
+));
 const ownerLandingUrl = computed(() => isWorkspaceRestricted.value ? '/owner/onboarding/venue' : (isEmailVerified.value ? '/owner/dashboard' : '/owner/account'));
 
 function isActive(prefix) {
@@ -40,7 +46,7 @@ function switchOrganization(id) {
                 </div>
             </div>
             <nav class="owner-mobile-navigation scrollbar-none flex gap-1 overflow-x-auto px-3 pb-3 text-sm" aria-label="Mobile owner navigation">
-                <Link v-if="isEmailVerified && organization?.role === 'owner'" href="/owner/onboarding/venue" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/onboarding') ? 'bg-white text-court-950' : 'text-court-100']">Setup progress</Link>
+                <Link v-if="showSetupProgress" href="/owner/onboarding/venue" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/onboarding') ? 'bg-white text-court-950' : 'text-court-100']">Setup progress</Link>
                 <template v-if="isEmailVerified && !isWorkspaceRestricted">
                     <Link href="/owner/dashboard" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/dashboard') ? 'bg-white text-court-950' : 'text-court-100']">Home</Link>
                     <Link v-if="abilities.manage_inventory" href="/owner/venues" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/venues') ? 'bg-white text-court-950' : 'text-court-100']">Venues</Link>
@@ -84,7 +90,7 @@ function switchOrganization(id) {
             </div>
 
             <nav v-if="isEmailVerified" class="owner-sidebar-navigation mt-6 space-y-1.5" aria-label="Owner navigation">
-                <Link v-if="organization?.role === 'owner'" href="/owner/onboarding/venue" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/onboarding') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12.5 9 16l10-10M4 4h16v16H4V4Z" /></svg>Setup progress</Link>
+                <Link v-if="showSetupProgress" href="/owner/onboarding/venue" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/onboarding') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M5 12.5 9 16l10-10M4 4h16v16H4V4Z" /></svg>Setup progress</Link>
                 <template v-if="!isWorkspaceRestricted">
                     <Link href="/owner/dashboard" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/dashboard') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-12h6V4h-6v4Z" /></svg>Home</Link>
                     <Link v-if="abilities.manage_inventory" href="/owner/venues" :class="['flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium', isActive('/owner/venues') ? 'bg-white text-court-900 shadow-sm' : 'text-court-50 hover:bg-white/10']"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 20V8l8-4 8 4v12M8 20v-6h8v6M9 10h.01M15 10h.01" /></svg>Venues & courts</Link>

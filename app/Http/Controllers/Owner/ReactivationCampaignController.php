@@ -86,7 +86,7 @@ class ReactivationCampaignController extends Controller
             ...$request->validated(),
             'created_by_user_id' => $request->user()->getKey(),
             'campaign_token' => 'RETURN-'.Str::upper(Str::random(20)),
-            'channel' => 'in_app',
+            'channel' => 'in_app,email',
             'status' => ReactivationCampaignStatus::Draft,
         ]);
 
@@ -97,10 +97,12 @@ class ReactivationCampaignController extends Controller
     public function show(
         ReactivationCampaign $campaign,
         TenantContext $context,
+        SendReactivationCampaign $sender,
     ): Response {
         $this->authorizeTenant($campaign, $context);
         Gate::authorize('view', $campaign);
         $campaign->load(['venue:id,name', 'sport:id,name']);
+        $suppressionReasons = $this->suppressionReasons($campaign);
 
         return Inertia::render('Owner/Reactivation/Show', [
             'campaign' => [
@@ -117,9 +119,13 @@ class ReactivationCampaignController extends Controller
                 'sent' => $campaign->sent_count,
                 'delivered' => $campaign->delivered_count,
                 'suppressed' => $campaign->suppressed_count,
+                'suppression_reasons' => $suppressionReasons,
                 'clicks' => $campaign->recipients()->whereNotNull('clicked_at')->count(),
                 'sent_at' => $campaign->sent_at?->toIso8601String(),
             ],
+            'eligibility' => $campaign->status === ReactivationCampaignStatus::Draft
+                ? $sender->preview($campaign)
+                : null,
         ]);
     }
 
@@ -130,10 +136,10 @@ class ReactivationCampaignController extends Controller
     ): RedirectResponse {
         $this->authorizeTenant($campaign, $context);
         Gate::authorize('send', $campaign);
-        $sender->handle($campaign);
+        $campaign = $sender->handle($campaign)->refresh();
 
         return redirect()->route('owner.reactivation.show', $campaign)
-            ->with('status', 'Message sent only to past players who agreed to receive messages and have not been contacted too recently.');
+            ->with('status', $this->sendResultMessage($campaign));
     }
 
     public function cancel(
@@ -158,5 +164,59 @@ class ReactivationCampaignController extends Controller
     private function authorizeTenant(ReactivationCampaign $campaign, TenantContext $context): void
     {
         abort_unless($campaign->organization_id === $context->organization()->getKey(), 404);
+    }
+
+    /** @return array{marketing_opt_out: int, frequency_cooldown: int, other: int} */
+    private function suppressionReasons(ReactivationCampaign $campaign): array
+    {
+        $grouped = $campaign->recipients()
+            ->whereNotNull('suppressed_at')
+            ->selectRaw('suppression_reason, COUNT(*) as aggregate')
+            ->groupBy('suppression_reason')
+            ->pluck('aggregate', 'suppression_reason');
+        $marketingOptOut = (int) $grouped->get('marketing_opt_out', 0);
+        $frequencyCooldown = (int) $grouped->get('frequency_cooldown', 0);
+
+        return [
+            'marketing_opt_out' => $marketingOptOut,
+            'frequency_cooldown' => $frequencyCooldown,
+            'other' => max(0, (int) $campaign->suppressed_count - $marketingOptOut - $frequencyCooldown),
+        ];
+    }
+
+    private function sendResultMessage(ReactivationCampaign $campaign): string
+    {
+        if ($campaign->sent_count === 0) {
+            $reasons = $this->suppressionReasons($campaign);
+
+            if ($reasons['marketing_opt_out'] > 0 && $reasons['frequency_cooldown'] === 0) {
+                $players = $reasons['marketing_opt_out'] === 1
+                    ? 'The matching past player has'
+                    : "{$reasons['marketing_opt_out']} matching past players have";
+
+                return "No messages were sent. {$players} not enabled comeback messages in their FinACourt notification preferences.";
+            }
+
+            if ($reasons['frequency_cooldown'] > 0 && $reasons['marketing_opt_out'] === 0) {
+                $players = $reasons['frequency_cooldown'] === 1
+                    ? 'The matching past player is'
+                    : "{$reasons['frequency_cooldown']} matching past players are";
+
+                return "No messages were sent. {$players} still inside the contact cooldown.";
+            }
+
+            return 'No messages were sent because no matching past player is currently eligible. Review the delivery details below.';
+        }
+
+        $message = "Message queued for {$campaign->sent_count} ".Str::plural('player', $campaign->sent_count)
+            .' through each player’s enabled in-app or email channels.';
+
+        if ($campaign->suppressed_count > 0) {
+            $message .= " {$campaign->suppressed_count} "
+                .($campaign->suppressed_count === 1 ? 'player was' : 'players were')
+                .' not included because of notification preferences or the contact cooldown.';
+        }
+
+        return $message;
     }
 }

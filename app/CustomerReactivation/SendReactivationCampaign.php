@@ -80,9 +80,58 @@ class SendReactivationCampaign
         }, 3);
     }
 
+    /**
+     * Show an aggregate owner eligibility summary without exposing individual
+     * player preferences or recording a send attempt.
+     *
+     * @return array{
+     *     audience: int,
+     *     eligible: int,
+     *     email: int,
+     *     in_app: int,
+     *     suppressed: int,
+     *     suppression_reasons: array{marketing_opt_out: int, frequency_cooldown: int}
+     * }
+     */
+    public function preview(ReactivationCampaign $campaign): array
+    {
+        $campaign->loadMissing(['organization', 'venue']);
+        $audience = $this->history->audience($campaign);
+        $summary = [
+            'audience' => $audience->count(),
+            'eligible' => 0,
+            'email' => 0,
+            'in_app' => 0,
+            'suppressed' => 0,
+            'suppression_reasons' => [
+                'marketing_opt_out' => 0,
+                'frequency_cooldown' => 0,
+            ],
+        ];
+
+        $audience->each(function (array $member) use ($campaign, &$summary): void {
+            /** @var User $user */
+            $user = $member['user'];
+            $reason = $this->suppressionReason($campaign, $user);
+
+            if ($reason !== null) {
+                $summary['suppressed']++;
+                $summary['suppression_reasons'][$reason]++;
+
+                return;
+            }
+
+            $summary['eligible']++;
+            $summary['email'] += (int) $user->marketingPreference->canReceiveEmailMarketing();
+            $summary['in_app'] += (int) $user->marketingPreference->canReceiveInAppMarketing();
+        });
+
+        return $summary;
+    }
+
     private function suppressionReason(ReactivationCampaign $campaign, User $user): ?string
     {
-        if (! $user->marketingPreference?->canReceiveInAppMarketing()) {
+        if (! $user->marketingPreference?->hasEnabledMarketingChannel()) {
             return 'marketing_opt_out';
         }
 

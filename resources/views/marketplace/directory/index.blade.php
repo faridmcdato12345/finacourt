@@ -29,15 +29,21 @@
         </div>
     </section>
 
-    <section class="page-shell py-10 sm:py-14">
+    <section
+        class="page-shell py-10 sm:py-14"
+        data-directory-infinite-scroll
+        data-next-url="{{ $listings->nextPageUrl() }}"
+        data-shown="{{ $listings->lastItem() ?? 0 }}"
+        data-total="{{ $listings->total() }}"
+    >
         <div class="mb-6 flex items-end justify-between gap-4">
             <div><p class="text-sm text-slate-500">Venue details last checked by FinACourt</p><h2 class="mt-1 text-2xl font-semibold tracking-tight">{{ $listings->total() }} {{ Str::plural('venue', $listings->total()) }}</h2></div>
             @if (request()->query())<a href="{{ route('marketplace.directory.index') }}" class="text-sm font-semibold text-court-700">Clear filters</a>@endif
         </div>
 
-        <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3" data-directory-results>
             @forelse ($listings as $listing)
-                <article class="flex min-h-72 flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <article data-directory-card data-listing-key="{{ $listing->public_id }}" class="flex min-h-72 flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
                     <div class="flex items-start justify-between gap-4">
                         <span class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800">Not yet managed on FinACourt</span>
                         <span class="text-xs text-slate-400">Updated {{ $listing->last_verified_at->format('M Y') }}</span>
@@ -52,6 +58,25 @@
             @endforelse
         </div>
 
-        @if ($listings->hasPages())<div class="mt-8">{{ $listings->links() }}</div>@endif
+        @if ($listings->isNotEmpty())
+            <div class="mt-10 flex min-h-20 items-center justify-center text-center" data-directory-scroll-sentinel aria-busy="false">
+                <div>
+                    <span data-directory-loading-indicator hidden class="mx-auto size-8 animate-spin rounded-full border-4 border-court-100 border-t-court-700" aria-hidden="true"></span>
+                    <p data-directory-scroll-status role="status" aria-live="polite" class="mt-3 text-sm text-slate-500">
+                        @if ($listings->hasMorePages())
+                            Showing {{ $listings->lastItem() }} of {{ $listings->total() }} venues. More load as you scroll.
+                        @elseif ($listings->currentPage() > 1)
+                            Showing {{ $listings->firstItem() }}–{{ $listings->lastItem() }} of {{ $listings->total() }} venues.
+                        @else
+                            All {{ $listings->total() }} venues are shown.
+                        @endif
+                    </p>
+                    @if ($listings->hasMorePages())
+                        <a data-directory-load-more rel="next" href="{{ $listings->nextPageUrl() }}" class="mt-4 inline-flex rounded-xl border border-court-200 bg-white px-5 py-3 text-sm font-semibold text-court-800 shadow-sm hover:bg-court-50">Load more venues</a>
+                        <button data-directory-retry type="button" hidden class="mt-4 rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-court-800">Try loading again</button>
+                    @endif
+                </div>
+            </div>
+        @endif
     </section>
 @endsection

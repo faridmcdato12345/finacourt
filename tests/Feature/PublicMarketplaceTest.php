@@ -7,6 +7,7 @@ use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
 use App\Models\AnalyticsEvent;
 use App\Models\Booking;
+use App\Models\CourtAvailabilityBlock;
 use App\Models\CourtResource;
 use App\Models\OperatingHour;
 use App\Models\Organization;
@@ -282,6 +283,145 @@ class PublicMarketplaceTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_city_landing_uses_only_real_public_inventory_for_local_content(): void
+    {
+        [$firstVenue, , $pickleball] = $this->publicVenue([
+            'name' => 'Bunawan Pickleball Center',
+            'slug' => 'bunawan-pickleball-center',
+            'city' => 'Bunawan',
+            'city_slug' => 'bunawan',
+            'province' => 'Agusan del Sur',
+            'province_slug' => 'agusan-del-sur',
+        ], [
+            'setting' => 'indoor',
+            'base_hourly_rate' => '100.00',
+        ], [
+            'name' => 'Pickleball',
+            'slug' => 'pickleball',
+        ]);
+        $badminton = Sport::query()->firstOrCreate(
+            ['slug' => 'badminton'],
+            ['name' => 'Badminton', 'is_active' => true],
+        );
+        CourtResource::factory()->for($firstVenue)->for($badminton)->create([
+            'name' => 'Badminton Court',
+            'setting' => 'covered',
+            'base_hourly_rate' => '225.00',
+        ]);
+        [$secondVenue] = $this->publicVenue([
+            'name' => 'Bunawan Outdoor Courts',
+            'slug' => 'bunawan-outdoor-courts',
+            'city' => 'Bunawan',
+            'city_slug' => 'bunawan',
+            'province' => 'Agusan del Sur',
+            'province_slug' => 'agusan-del-sur',
+        ], [
+            'setting' => 'outdoor',
+            'base_hourly_rate' => '150.00',
+        ], [
+            'name' => 'Pickleball',
+            'slug' => 'pickleball',
+        ]);
+        [$hiddenVenue] = $this->publicVenue([
+            'name' => 'Hidden Bunawan Venue',
+            'slug' => 'hidden-bunawan-venue',
+            'city' => 'Bunawan',
+            'city_slug' => 'bunawan',
+            'province' => 'Agusan del Sur',
+            'province_slug' => 'agusan-del-sur',
+            'is_published' => false,
+        ], [
+            'base_hourly_rate' => '20.00',
+        ], [
+            'name' => 'Tennis',
+            'slug' => 'tennis',
+        ]);
+        $basketball = Sport::query()->firstOrCreate(
+            ['slug' => 'basketball'],
+            ['name' => 'Basketball', 'is_active' => true],
+        );
+        CourtResource::factory()->inactive()->for($firstVenue)->for($basketball)->create([
+            'name' => 'Hidden Basketball Court',
+            'base_hourly_rate' => '10.00',
+        ]);
+        [$relatedVenue] = $this->publicVenue([
+            'name' => 'Prosperidad Sports Hub',
+            'slug' => 'prosperidad-sports-hub',
+            'city' => 'Prosperidad',
+            'city_slug' => 'prosperidad',
+            'province' => 'Agusan del Sur',
+            'province_slug' => 'agusan-del-sur',
+        ]);
+        $canonical = route('marketplace.courts.city', 'bunawan');
+
+        $this->get($canonical)
+            ->assertOk()
+            ->assertSee('<link rel="canonical" href="'.$canonical.'">', false)
+            ->assertSee('Sports Courts in Bunawan')
+            ->assertSee('Find sports courts in Bunawan, Agusan del Sur. Compare 2 venues')
+            ->assertSee('data-location-summary', false)
+            ->assertSee('data-location-stat="venues"', false)
+            ->assertSee('2 venues')
+            ->assertSee('3 courts')
+            ->assertSee('Badminton &amp; Pickleball', false)
+            ->assertSee('3 court settings')
+            ->assertSee('data-minimum-hourly-price="100.00"', false)
+            ->assertSee('From ₱100/hour')
+            ->assertSee('Sports available in Bunawan')
+            ->assertSee('Badminton Courts in Bunawan')
+            ->assertSee('Pickleball Courts in Bunawan')
+            ->assertSee('href="'.route('marketplace.courts.sport-city', [$badminton->slug, 'bunawan']).'"', false)
+            ->assertSee('href="'.route('marketplace.courts.sport-city', [$pickleball->slug, 'bunawan']).'"', false)
+            ->assertSee('1 venue · 1 court')
+            ->assertSee('2 venues · 2 courts')
+            ->assertSee('FinACourt currently lists 2 active sports venues in Bunawan, Agusan del Sur, with 3 bookable courts.')
+            ->assertSee('Current local inventory includes badminton and pickleball, with rates starting from ₱100 per hour.')
+            ->assertSee('Looking for a court near you in Bunawan?')
+            ->assertSee('Indoor, outdoor and covered outdoor courts are currently listed in Bunawan.')
+            ->assertSee('More courts in Agusan del Sur')
+            ->assertSee('href="'.route('marketplace.courts.city', 'prosperidad').'"', false)
+            ->assertSee('"@type":"ItemList"', false)
+            ->assertSee('"numberOfItems":2', false)
+            ->assertSee(route('marketplace.venues.show', $firstVenue->slug), false)
+            ->assertSee(route('marketplace.venues.show', $secondVenue->slug), false)
+            ->assertDontSee($hiddenVenue->name)
+            ->assertDontSee('data-location-sport="tennis"', false)
+            ->assertDontSee('data-location-sport="basketball"', false)
+            ->assertDontSee('data-minimum-hourly-price="20.00"', false)
+            ->assertDontSee(route('marketplace.venues.show', $hiddenVenue->slug), false)
+            ->assertSee('<meta name="description" content="Find sports courts in Bunawan, Agusan del Sur. Compare 2 venues and 3 courts, including badminton and pickleball, from ₱100/hour on FinACourt.">', false);
+
+        $this->assertNotSame($firstVenue->getKey(), $secondVenue->getKey());
+        $this->assertNotSame($firstVenue->getKey(), $relatedVenue->getKey());
+    }
+
+    public function test_city_landing_omits_price_claims_when_no_positive_public_rate_exists(): void
+    {
+        $this->publicVenue([
+            'name' => 'Free Community Court',
+            'slug' => 'free-community-court',
+            'city' => 'Bunawan',
+            'city_slug' => 'bunawan',
+            'province' => 'Agusan del Sur',
+            'province_slug' => 'agusan-del-sur',
+        ], [
+            'base_hourly_rate' => '0.00',
+        ], [
+            'name' => 'Pickleball',
+            'slug' => 'pickleball',
+        ]);
+
+        $this->get(route('marketplace.courts.city', 'bunawan'))
+            ->assertOk()
+            ->assertSee('1 venue')
+            ->assertSee('1 court')
+            ->assertSee('Pickleball Courts in Bunawan')
+            ->assertDontSee('data-location-stat="minimum-price"', false)
+            ->assertDontSee('data-minimum-hourly-price=', false)
+            ->assertDontSee('From ₱0/hour')
+            ->assertDontSee('rates starting from ₱0');
+    }
+
     public function test_public_city_names_are_human_friendly_without_changing_canonical_location_data(): void
     {
         PsgcLocation::query()->create([
@@ -311,9 +451,14 @@ class PublicMarketplaceTest extends TestCase
             ->assertOk()
             ->assertSee('<title>Sports Courts in Marawi City | Find &amp; Book Courts | FinACourt</title>', false)
             ->assertSee('<h1 class="mt-3 max-w-5xl text-4xl font-semibold tracking-[-0.035em] text-slate-950 sm:text-5xl">Sports Courts in Marawi City</h1>', false)
-            ->assertSee('<meta name="description" content="Find sports courts in Marawi City. Compare venues, prices, court settings, and availability, then book online with FinACourt.">', false)
+            ->assertSee('<meta name="description" content="Find sports courts in Marawi City, Lanao del Sur. Compare 1 venue and 1 court, including pickleball, from ₱650/hour on FinACourt.">', false)
             ->assertSee('<link rel="canonical" href="'.$cityUrl.'">', false)
             ->assertSee('Marawi City, Lanao del Sur')
+            ->assertSee('data-location-summary', false)
+            ->assertSee('1 venue')
+            ->assertSee('1 court')
+            ->assertSee('Sports available in Marawi City')
+            ->assertSee('1 venue · 1 court')
             ->assertSee('value="city-of-marawi"', false)
             ->assertSee('Marawi City')
             ->assertDontSee('/courts/marawi-city', false);
@@ -529,6 +674,42 @@ class PublicMarketplaceTest extends TestCase
             ->assertSee('data-unavailable-slot data-start="18:00"', false)
             ->assertDontSee('aria-label="Select 17:00 to 18:00"', false)
             ->assertDontSee('aria-label="Select 18:00 to 19:00"', false);
+    }
+
+    public function test_court_blocks_are_hidden_from_public_availability_and_filtered_search(): void
+    {
+        [$venue, $resource] = $this->publicVenue();
+        $date = CarbonImmutable::now('Asia/Manila')->addDays(7);
+        $start = $date->setTime(17, 0);
+
+        CourtAvailabilityBlock::query()->create([
+            'organization_id' => $venue->organization_id,
+            'venue_id' => $venue->getKey(),
+            'resource_id' => $resource->getKey(),
+            'starts_at' => $start->utc(),
+            'ends_at' => $start->addHour()->utc(),
+            'timezone' => 'Asia/Manila',
+            'is_all_day' => false,
+            'reason' => 'Court maintenance',
+        ]);
+
+        $this->get(route('marketplace.venues.show', [
+            'venueSlug' => $venue->slug,
+            'resource' => $resource->getKey(),
+            'date' => $date->toDateString(),
+        ]))
+            ->assertOk()
+            ->assertSee('data-unavailable-slot data-start="17:00"', false)
+            ->assertDontSee('aria-label="Select 17:00 to 18:00"', false)
+            ->assertDontSee('Court maintenance');
+
+        $this->get(route('marketplace.courts.index', [
+            'date' => $date->toDateString(),
+            'start_time' => '17:00',
+            'duration_minutes' => 60,
+        ]))
+            ->assertOk()
+            ->assertDontSee($venue->name);
     }
 
     public function test_sitemap_only_contains_meaningful_public_inventory(): void

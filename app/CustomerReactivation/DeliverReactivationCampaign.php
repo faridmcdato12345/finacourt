@@ -19,7 +19,7 @@ class DeliverReactivationCampaign
         $campaign->recipients()
             ->whereNull('suppressed_at')
             ->whereNull('delivered_at')
-            ->with(['user', 'campaign'])
+            ->with(['user.marketingPreference', 'campaign.venue', 'suggestedResource:id,name'])
             ->chunkById(100, function ($recipients): void {
                 foreach ($recipients as $recipient) {
                     $recipient->user->notify(new ReactivationNotification($recipient));

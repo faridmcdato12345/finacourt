@@ -78,7 +78,9 @@ class VenueApplicationOnboardingTest extends TestCase
                 ->component('Owner/VenueOnboarding/Show')
                 ->where('onboarding.source', 'self_service')
                 ->where('onboarding.stage', 'ownership_review')
-                ->where('onboarding.application.status', 'pending'));
+                ->where('onboarding.application.status', 'pending')
+                ->where('ownerVenueSetup.stage', 'ownership_review')
+                ->where('ownerVenueSetup.is_complete', false));
     }
 
     public function test_platform_ownership_approval_unlocks_setup_but_final_review_controls_discovery(): void
@@ -132,6 +134,14 @@ class VenueApplicationOnboardingTest extends TestCase
         $this->assertNotNull($venue->fresh()->verified_at);
         $this->assertTrue(Venue::query()->marketplace()->whereKey($venue)->exists());
         Notification::assertSentToTimes($owner, OwnerVenuePublishedNotification::class, 1);
+
+        $this->actingAs($owner)
+            ->withSession(['tenant.organization_id' => $organization->getKey()])
+            ->get(route('owner.dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('ownerVenueSetup.stage', 'complete')
+                ->where('ownerVenueSetup.is_complete', true));
     }
 
     public function test_rejected_application_shows_reason_and_owner_can_correct_and_resubmit(): void

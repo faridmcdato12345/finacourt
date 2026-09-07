@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'user_id',
     'marketing_opt_in',
     'in_app_marketing_enabled',
+    'email_marketing_enabled',
     'opted_in_at',
     'opted_out_at',
     'unsubscribed_at',
@@ -29,9 +30,26 @@ class MarketingPreference extends Model
 
     public function canReceiveInAppMarketing(): bool
     {
+        return $this->canReceiveMarketing()
+            && $this->in_app_marketing_enabled;
+    }
+
+    public function canReceiveEmailMarketing(): bool
+    {
+        return $this->canReceiveMarketing()
+            && $this->email_marketing_enabled;
+    }
+
+    public function canReceiveMarketing(): bool
+    {
         return $this->marketing_opt_in
-            && $this->in_app_marketing_enabled
             && $this->unsubscribed_at === null;
+    }
+
+    public function hasEnabledMarketingChannel(): bool
+    {
+        return $this->canReceiveInAppMarketing()
+            || $this->canReceiveEmailMarketing();
     }
 
     protected function casts(): array
@@ -39,6 +57,7 @@ class MarketingPreference extends Model
         return [
             'marketing_opt_in' => 'boolean',
             'in_app_marketing_enabled' => 'boolean',
+            'email_marketing_enabled' => 'boolean',
             'opted_in_at' => 'immutable_datetime',
             'opted_out_at' => 'immutable_datetime',
             'unsubscribed_at' => 'immutable_datetime',
