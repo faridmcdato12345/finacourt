@@ -40,7 +40,10 @@ function submit() {
                     <p v-if="form.errors.email" class="mt-2 text-sm text-red-600">{{ form.errors.email }}</p>
                 </div>
                 <div>
-                    <label for="password" class="mb-2 block text-sm font-medium text-slate-800">Password</label>
+                    <div class="mb-2 flex items-center justify-between gap-4">
+                        <label for="password" class="text-sm font-medium text-slate-800">Password</label>
+                        <Link href="/forgot-password?audience=owner" class="text-sm font-semibold text-court-700 hover:text-court-800">Forgot password?</Link>
+                    </div>
                     <input id="password" v-model="form.password" type="password" autocomplete="current-password" required class="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 shadow-sm focus:border-court-600" />
                     <p v-if="form.errors.password" class="mt-2 text-sm text-red-600">{{ form.errors.password }}</p>
                 </div>

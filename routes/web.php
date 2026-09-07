@@ -145,6 +145,11 @@ Route::middleware('guest')->group(function () {
         ->name('player.register');
     Route::post('/player/register', [PlayerRegisteredUserController::class, 'store'])
         ->middleware('throttle:6,1');
+    Route::get('/forgot-password', [AccountPasswordResetController::class, 'requestForm'])
+        ->name('password.request');
+    Route::post('/forgot-password', [AccountPasswordResetController::class, 'email'])
+        ->middleware('throttle:3,60')
+        ->name('password.email');
     Route::get('/auth/{audience}/{provider}/redirect', [SocialAuthenticationController::class, 'redirect'])
         ->whereIn('audience', ['owner', 'player'])
         ->whereIn('provider', ['google', 'facebook', 'apple'])

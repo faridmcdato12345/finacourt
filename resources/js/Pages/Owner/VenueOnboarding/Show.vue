@@ -37,7 +37,7 @@ function submitInvitation() {
                             {{ onboarding.stage === 'complete' ? 'Your venue is ready for players' : 'Let’s get your venue ready' }}
                         </h1>
                         <p class="mt-3 max-w-2xl text-sm leading-6 text-court-100 sm:text-base">
-                            Your progress is saved automatically. Complete the current step now, or return to this page later from Setup progress.
+                            {{ onboarding.stage === 'complete' ? 'Setup is complete. Use the owner workspace to manage availability, bookings, and growth.' : 'Your progress is saved automatically. Complete the current step now, or return to this page later from Setup progress.' }}
                         </p>
                     </div>
                     <div class="shrink-0 rounded-2xl border border-white/15 bg-white/10 px-5 py-4">
@@ -200,7 +200,7 @@ function submitInvitation() {
                     <section v-else class="app-card p-6 sm:p-8">
                         <span class="inline-flex rounded-full bg-court-50 px-3 py-1 text-xs font-semibold text-court-800">Setup complete</span>
                         <h2 class="mt-4 text-2xl font-semibold">{{ onboarding.venue?.name }} is ready for players</h2>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">You can now manage availability and bookings from the owner workspace. Return here whenever you want to review the setup path.</p>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">You can now manage availability and bookings from the owner workspace.</p>
                         <div class="mt-6 flex flex-wrap gap-3">
                             <a v-if="onboarding.venue?.public_url" :href="onboarding.venue.public_url" class="rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white">View public venue</a>
                             <Link href="/owner/dashboard" class="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700">Go to owner dashboard</Link>

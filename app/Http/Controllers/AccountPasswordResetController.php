@@ -9,12 +9,57 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password as PasswordRule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class AccountPasswordResetController extends Controller
 {
+    public function requestForm(Request $request): View
+    {
+        $audience = $request->query('audience') === 'owner' ? 'owner' : 'player';
+        $return = $request->query('return');
+        $return = is_string($return)
+            && Str::startsWith($return, '/')
+            && ! Str::startsWith($return, '//')
+                ? $return
+                : null;
+
+        return view('auth.forgot-password', [
+            'audience' => $audience,
+            'return' => $return,
+            'signInUrl' => $audience === 'owner'
+                ? route('login')
+                : route('player.login', array_filter(['return' => $return])),
+            'seo' => [
+                'title' => 'Reset your password',
+                'description' => 'Request a secure password reset link for your FinACourt account.',
+                'canonical' => route('password.request'),
+                'robots' => 'noindex,nofollow',
+                'type' => 'website',
+            ],
+            'structuredData' => [],
+        ]);
+    }
+
+    public function email(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'email' => ['required', 'string', 'email', 'max:255'],
+            'audience' => ['nullable', 'string', Rule::in(['owner', 'player'])],
+            'return' => ['nullable', 'string', 'max:2048'],
+        ]);
+
+        Password::sendResetLink([
+            'email' => Str::lower(trim($validated['email'])),
+        ]);
+
+        return back()
+            ->withInput($request->only(['email', 'audience', 'return']))
+            ->with('status', 'If a FinACourt account uses that email address, a secure password reset link has been sent.');
+    }
+
     public function send(Request $request): RedirectResponse
     {
         $status = Password::sendResetLink(['email' => $request->user()->email]);

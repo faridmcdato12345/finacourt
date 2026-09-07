@@ -120,6 +120,107 @@ function bindCourtCarousels() {
     });
 }
 
+function bindDirectoryInfiniteScroll() {
+    const root = document.querySelector('[data-directory-infinite-scroll]');
+    if (!root) return;
+
+    const results = root.querySelector('[data-directory-results]');
+    const sentinel = root.querySelector('[data-directory-scroll-sentinel]');
+    const status = root.querySelector('[data-directory-scroll-status]');
+    const loadingIndicator = root.querySelector('[data-directory-loading-indicator]');
+    const fallbackLink = root.querySelector('[data-directory-load-more]');
+    const retryButton = root.querySelector('[data-directory-retry]');
+    let nextUrl = root.dataset.nextUrl || '';
+    let shown = Number(root.dataset.shown || results?.children.length || 0);
+    const total = Number(root.dataset.total || shown);
+    let loading = false;
+    let observer;
+
+    if (!results || !sentinel || !status || !nextUrl) return;
+
+    const finish = () => {
+        nextUrl = '';
+        root.dataset.nextUrl = '';
+        observer?.disconnect();
+        if (fallbackLink) fallbackLink.hidden = true;
+        if (retryButton) retryButton.hidden = true;
+        status.textContent = `All ${total} ${total === 1 ? 'venue is' : 'venues are'} shown.`;
+    };
+
+    const loadNextPage = async () => {
+        if (loading || !nextUrl) return;
+
+        loading = true;
+        sentinel.setAttribute('aria-busy', 'true');
+        status.textContent = 'Loading more venues…';
+        if (loadingIndicator) loadingIndicator.hidden = false;
+        if (retryButton) retryButton.hidden = true;
+
+        try {
+            const response = await fetch(nextUrl, {
+                credentials: 'same-origin',
+                headers: { Accept: 'text/html' },
+            });
+
+            if (!response.ok) throw new Error(`Directory page returned ${response.status}.`);
+
+            const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const nextResults = page.querySelector('[data-directory-results]');
+            const nextSentinel = page.querySelector('[data-directory-infinite-scroll]');
+            const existingKeys = new Set(
+                [...results.querySelectorAll('[data-directory-card]')]
+                    .map((card) => card.dataset.listingKey),
+            );
+            const cards = nextResults
+                ? [...nextResults.querySelectorAll('[data-directory-card]')]
+                : [];
+
+            if (!cards.length) throw new Error('The next directory page did not contain venues.');
+
+            let added = 0;
+            cards.forEach((card) => {
+                if (existingKeys.has(card.dataset.listingKey)) return;
+
+                const importedCard = document.importNode(card, true);
+                importedCard.classList.add('player-card-motion', 'player-reveal', 'is-visible');
+                results.append(importedCard);
+                existingKeys.add(card.dataset.listingKey);
+                added += 1;
+            });
+
+            shown = Math.min(total, shown + added);
+            nextUrl = nextSentinel?.dataset.nextUrl || '';
+            root.dataset.nextUrl = nextUrl;
+
+            if (!nextUrl || shown >= total) {
+                finish();
+            } else {
+                status.textContent = `Showing ${shown} of ${total} venues. Keep scrolling for more.`;
+                if (fallbackLink) fallbackLink.href = nextUrl;
+            }
+        } catch (error) {
+            console.warn('Loading more directory venues failed.', error);
+            status.textContent = 'More venues could not be loaded. Check your connection and try again.';
+            if (retryButton) retryButton.hidden = false;
+        } finally {
+            loading = false;
+            sentinel.setAttribute('aria-busy', 'false');
+            if (loadingIndicator) loadingIndicator.hidden = true;
+        }
+    };
+
+    retryButton?.addEventListener('click', loadNextPage);
+
+    if (!('IntersectionObserver' in window)) return;
+
+    root.dataset.infiniteScroll = 'ready';
+    if (fallbackLink) fallbackLink.hidden = true;
+    observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadNextPage();
+    }, { rootMargin: '600px 0px', threshold: 0 });
+    observer.observe(sentinel);
+}
+
 function bindPlayerExperience() {
     const root = document.querySelector('.player-experience');
     if (!root) return;
@@ -292,6 +393,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindConsecutiveSlotPickers();
     bindPageSharing();
     bindCourtCarousels();
+    bindDirectoryInfiniteScroll();
     bindPlayerExperience();
     bindInstallPrompt();
     const registration = await registerServiceWorker();

@@ -1,6 +1,5 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import AppSelect from './AppSelect.vue';
 import SearchableSelect from './SearchableSelect.vue';
 import DraggableVenueMap from './DraggableVenueMap.vue';
 import FormError from './FormError.vue';
@@ -31,6 +30,36 @@ const detectingLocation = ref(false);
 const detectedLocationMessage = ref('');
 const detectedLocationError = ref('');
 let locationRequest = 0;
+
+const cityOptionsKey = computed(() => [
+    props.form.psgc_parent_code || 'no-parent',
+    cityMunicipalities.value.map((location) => location.code).join(','),
+].join(':'));
+
+const needsMarketplaceReview = computed(() => (
+    props.existingState?.requires_platform_review
+    && !props.existingState?.is_verified
+));
+
+const isMarketplaceReviewRequested = computed(() => (
+    needsMarketplaceReview.value
+    && Boolean(props.existingState?.marketplace_review_requested_at)
+));
+
+const visibilityActionLabel = computed(() => {
+    if (!props.form.is_published) return 'Action needed: turn this on before saving';
+    if (needsMarketplaceReview.value && !isMarketplaceReviewRequested.value) return 'Ready to request the final FinACourt check';
+    if (isMarketplaceReviewRequested.value) return 'Final FinACourt check requested';
+
+    return 'Ready to show once a bookable court is added';
+});
+
+const effectiveSubmitLabel = computed(() => {
+    if (props.applicationMode || !props.form.is_published) return props.submitLabel;
+    if (needsMarketplaceReview.value && !isMarketplaceReviewRequested.value) return 'Save and request final check';
+
+    return props.submitLabel;
+});
 
 watch(
     () => props.form.psgc_parent_code,
@@ -174,7 +203,7 @@ function updateCoordinatesFromMap(coordinates) {
                 </div>
                 <div>
                     <label for="psgc_city_municipality_code" class="mb-2 block text-sm font-medium text-slate-800">City / municipality</label>
-                    <SearchableSelect id="psgc_city_municipality_code" v-model="form.psgc_city_municipality_code" :options="cityMunicipalities" option-value="code" option-label="name" :placeholder="locationOptionsLoading ? 'Loading locations…' : form.psgc_parent_code ? 'Search for a city or municipality' : 'Select a province or region first'" search-label="City or municipality" empty-label="No matching city or municipality found." required autocomplete="address-level2" :disabled="!form.psgc_parent_code || locationOptionsLoading" aria-label="Search for a city or municipality" />
+                    <SearchableSelect :key="cityOptionsKey" id="psgc_city_municipality_code" v-model="form.psgc_city_municipality_code" :options="cityMunicipalities" option-value="code" option-label="name" :placeholder="locationOptionsLoading ? 'Loading locations…' : form.psgc_parent_code ? 'Search for a city or municipality' : 'Select a province or region first'" search-label="City or municipality" empty-label="No matching city or municipality found." required autocomplete="address-level2" :disabled="!form.psgc_parent_code || locationOptionsLoading" aria-label="Search for a city or municipality" />
                     <FormError :message="form.errors.psgc_city_municipality_code" />
                     <p v-if="locationOptionsError" class="mt-2 text-sm text-red-600" role="alert">{{ locationOptionsError }}</p>
                 </div>
@@ -276,19 +305,54 @@ function updateCoordinatesFromMap(coordinates) {
             </div>
         </section>
 
-        <section v-if="!applicationMode" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div class="flex items-start gap-4">
-                <input id="is_published" v-model="form.is_published" type="checkbox" class="mt-1 size-5 rounded border-slate-300 text-court-700" />
-                <div>
-                    <label for="is_published" class="font-semibold text-slate-950">Show this venue to players</label>
-                    <p class="mt-1 text-sm leading-6 text-slate-500">{{ existingState?.requires_platform_review && !existingState?.is_verified ? 'Select this and save to ask FinACourt for the final marketplace check. We will email you when players can find and book the venue.' : 'Players can find this venue after it has at least one sport and one court they can book.' }}</p>
-                    <FormError :message="form.errors.is_published" />
+        <section
+            v-if="!applicationMode"
+            :class="[
+                'relative overflow-hidden rounded-3xl border-2 p-6 shadow-sm ring-4 transition sm:p-7',
+                form.is_published
+                    ? 'border-court-300 bg-court-50 ring-court-100/70'
+                    : 'border-amber-300 bg-amber-50 ring-amber-100/80',
+            ]"
+        >
+            <div aria-hidden="true" :class="['absolute -right-10 -top-10 size-36 rounded-full border-[24px]', form.is_published ? 'border-court-200/50' : 'border-amber-200/60']"></div>
+            <div class="relative">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div class="flex items-start gap-4">
+                        <div :class="['grid size-12 shrink-0 place-items-center rounded-2xl shadow-sm', form.is_published ? 'bg-court-700 text-white' : 'bg-amber-400 text-amber-950']">
+                            <svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+                                <circle cx="12" cy="12" r="2.5" />
+                            </svg>
+                        </div>
+                        <div>
+                            <p :class="['text-xs font-bold uppercase tracking-[0.18em]', form.is_published ? 'text-court-700' : 'text-amber-800']">{{ form.onboarding ? 'Final onboarding step' : 'Marketplace visibility' }}</p>
+                            <h2 class="mt-1 text-xl font-semibold text-slate-950">Make this venue discoverable</h2>
+                            <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Players cannot find or book this venue until you choose to show it and complete any required FinACourt check.</p>
+                        </div>
+                    </div>
+                    <span :class="['inline-flex rounded-full px-3 py-1.5 text-xs font-bold', form.is_published ? 'bg-court-700 text-white' : 'bg-amber-200 text-amber-950']">{{ visibilityActionLabel }}</span>
                 </div>
-            </div>
-            <div v-if="existingState" class="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-5 text-xs font-semibold">
-                <span class="rounded-full bg-court-50 px-3 py-1.5 text-court-800">{{ existingState.is_claimed ? 'Claimed from the public guide' : 'Created in your account' }}</span>
-                <span v-if="existingState.is_verified" class="rounded-full bg-court-50 px-3 py-1.5 text-court-800">Final check completed</span>
-                <span v-else-if="existingState.requires_platform_review" class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-600">{{ existingState.marketplace_review_requested_at ? 'Final check requested' : 'Final check not requested' }}</span>
+
+                <label
+                    for="is_published"
+                    :class="[
+                        'mt-6 flex cursor-pointer items-start gap-4 rounded-2xl border bg-white p-5 shadow-sm transition hover:shadow-md',
+                        form.is_published ? 'border-court-300' : 'border-amber-300',
+                    ]"
+                >
+                    <input id="is_published" v-model="form.is_published" type="checkbox" class="mt-0.5 size-6 shrink-0 rounded border-slate-300 text-court-700 focus:ring-court-500" />
+                    <span>
+                        <span class="block text-base font-bold text-slate-950">Show this venue to players</span>
+                        <span class="mt-1 block text-sm leading-6 text-slate-600">{{ needsMarketplaceReview ? 'Turn this on and save to ask FinACourt for the final marketplace check. We will email you when players can find and book the venue.' : 'Players can find this venue after it has at least one sport and one active court they can book.' }}</span>
+                    </span>
+                </label>
+                <FormError :message="form.errors.is_published" />
+
+                <div v-if="existingState" class="mt-5 flex flex-wrap gap-2 border-t border-slate-900/10 pt-5 text-xs font-semibold">
+                    <span class="rounded-full bg-white px-3 py-1.5 text-court-800 shadow-sm">{{ existingState.is_claimed ? 'Claimed from the public guide' : 'Created in your account' }}</span>
+                    <span v-if="existingState.is_verified" class="rounded-full bg-white px-3 py-1.5 text-court-800 shadow-sm">Final check completed</span>
+                    <span v-else-if="existingState.requires_platform_review" class="rounded-full bg-white px-3 py-1.5 text-slate-700 shadow-sm">{{ existingState.marketplace_review_requested_at ? 'Final check requested' : 'Final check not requested' }}</span>
+                </div>
             </div>
         </section>
 
@@ -298,7 +362,7 @@ function updateCoordinatesFromMap(coordinates) {
         </section>
 
         <div class="flex items-center justify-end gap-3">
-            <button type="submit" :disabled="form.processing" class="rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-court-800 disabled:opacity-60">{{ form.processing ? 'Saving…' : submitLabel }}</button>
+            <button type="submit" :disabled="form.processing" class="rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-court-800 disabled:opacity-60">{{ form.processing ? 'Saving…' : effectiveSubmitLabel }}</button>
         </div>
     </form>
 </template>
