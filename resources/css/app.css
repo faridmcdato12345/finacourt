@@ -499,7 +499,7 @@ button:disabled,
     animation: player-hold-glow 2.8s ease-in-out infinite;
 }
 
-.player-experience details[open] summary span {
+.player-experience details[open] summary [data-details-icon] {
     display: inline-block;
     transform: rotate(45deg);
 }

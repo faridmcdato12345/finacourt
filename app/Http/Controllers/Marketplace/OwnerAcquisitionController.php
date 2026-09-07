@@ -14,21 +14,36 @@ class OwnerAcquisitionController extends Controller
 {
     public function show(PlatformServiceFeeCalculator $serviceFees): View
     {
+        $canonical = route('marketplace.for-owners');
+        $description = 'FinACourt is court booking software for Philippine sports venues. Manage reservations, get discovered, fill empty court hours, and track booking sources.';
+        $faq = $this->ownerFaq();
+
         return view('marketplace.owners', [
             'supply' => $this->publicSupply(),
             'pricing' => $this->ownerPricing($serviceFees),
+            'faq' => $faq,
             'seo' => [
-                'title' => 'Get more players and court bookings with FinACourt',
-                'description' => 'Help nearby players discover your venue, turn empty court hours into bookable deals, bring past customers back, and see what generated confirmed bookings.',
-                'canonical' => route('marketplace.for-owners'),
+                'document_title' => 'Court Booking Software for Sports Venue Owners Philippines | FinACourt',
+                'title' => 'Court Booking Software for Sports Venue Owners | FinACourt',
+                'description' => $description,
+                'canonical' => $canonical,
                 'robots' => 'index,follow',
                 'type' => 'website',
+                'image' => asset('assets/demand-intelligence.png'),
+                'image_alt' => 'FinACourt court booking software showing nearby player demand for a sports venue',
+                'image_width' => 1892,
+                'image_height' => 855,
             ],
-            'structuredData' => [$this->webPageSchema(
-                'FinACourt for court owners',
-                'Help nearby players discover your venue, book open court times, return for another game, and understand what generated confirmed bookings.',
-                route('marketplace.for-owners'),
-            )],
+            'structuredData' => [
+                $this->webPageSchema(
+                    'Court booking software for sports venue owners',
+                    $description,
+                    $canonical,
+                ),
+                $this->softwareApplicationSchema($description, $canonical),
+                $this->breadcrumbSchema($canonical),
+                $this->faqSchema($faq),
+            ],
         ]);
     }
 
@@ -109,6 +124,110 @@ class OwnerAcquisitionController extends Controller
             'name' => $name,
             'description' => $description,
             'url' => $url,
+        ];
+    }
+
+    /** @return array<int, array{question: string, answer: string}> */
+    private function ownerFaq(): array
+    {
+        return [
+            [
+                'question' => 'What is court booking software?',
+                'answer' => 'Court booking software gives sports venues one place to publish court availability, receive reservations, manage schedules and prices, and keep booking records. FinACourt adds marketplace discovery and owner growth tools to those day-to-day features.',
+            ],
+            [
+                'question' => 'Can players book courts directly online?',
+                'answer' => 'Yes. Once a venue is approved, published, and has bookable courts, players can view live availability and reserve an open time. The payment choices shown depend on the payment methods currently available on FinACourt.',
+            ],
+            [
+                'question' => 'Can I manage court schedules and pricing?',
+                'answer' => 'Yes. Owners control their courts, opening hours, normal rates, availability, booking records, and published promotions from the owner workspace.',
+            ],
+            [
+                'question' => 'Can FinACourt help my venue get more players?',
+                'answer' => 'FinACourt can make a published venue discoverable in its marketplace, show grouped local search demand, help promote open court times, and help eligible past players return. It does not guarantee bookings or search rankings.',
+            ],
+            [
+                'question' => 'Can I use FinACourt with another booking system?',
+                'answer' => 'You can try FinACourt as an additional discovery and booking channel. FinACourt does not currently synchronize another provider’s calendar automatically, so you must keep availability aligned to avoid double bookings.',
+            ],
+            [
+                'question' => 'Does FinACourt charge owners a monthly subscription?',
+                'answer' => 'FinACourt does not currently charge a monthly owner subscription. Any active player service fee is shown separately before a player confirms an eligible booking.',
+            ],
+            [
+                'question' => 'Can FinACourt help with Google visibility?',
+                'answer' => 'FinACourt provides a public venue and booking page plus a Google-readiness checklist. Where supported, an owner can connect an account to match an existing Google Business Profile. FinACourt does not promise rankings or create, verify, edit, or publish the Google profile.',
+            ],
+            [
+                'question' => 'Which court sports does FinACourt support?',
+                'answer' => 'The current catalog supports badminton, basketball, futsal, pickleball, tennis, and volleyball venues.',
+            ],
+            [
+                'question' => 'How do I get started?',
+                'answer' => 'Create a court-owner account to add a venue, or use the public venue guide to find and claim a pre-created listing. FinACourt reviews venues before they become publicly bookable.',
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function softwareApplicationSchema(string $description, string $url): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'SoftwareApplication',
+            'name' => 'FinACourt',
+            'applicationCategory' => 'BusinessApplication',
+            'operatingSystem' => 'Web',
+            'description' => $description,
+            'url' => $url,
+            'audience' => [
+                '@type' => 'Audience',
+                'audienceType' => 'Sports venue owners in the Philippines',
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function breadcrumbSchema(string $url): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'BreadcrumbList',
+            'itemListElement' => [
+                [
+                    '@type' => 'ListItem',
+                    'position' => 1,
+                    'name' => 'Home',
+                    'item' => route('marketplace.home'),
+                ],
+                [
+                    '@type' => 'ListItem',
+                    'position' => 2,
+                    'name' => 'For court owners',
+                    'item' => $url,
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<int, array{question: string, answer: string}>  $faq
+     * @return array<string, mixed>
+     */
+    private function faqSchema(array $faq): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'FAQPage',
+            'mainEntity' => collect($faq)->map(fn (array $item) => [
+                '@type' => 'Question',
+                'name' => $item['question'],
+                'acceptedAnswer' => [
+                    '@type' => 'Answer',
+                    'text' => $item['answer'],
+                ],
+            ])->all(),
         ];
     }
 }

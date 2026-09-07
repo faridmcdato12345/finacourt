@@ -151,7 +151,7 @@
 
             @if ($canCancel)
                 <details class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <summary class="cursor-pointer list-none font-semibold text-slate-700">Can’t make this game? <span class="float-right text-slate-400">＋</span></summary>
+                    <summary class="cursor-pointer list-none font-semibold text-slate-700">Can’t make this game? <span data-details-icon class="float-right text-slate-400">＋</span></summary>
                     <form action="{{ route('player.bookings.cancel', $booking->reference) }}" method="post" data-requires-online class="mt-4 border-t border-slate-100 pt-4">@csrf @method('PATCH')<label class="block"><span class="text-sm font-semibold text-red-900">Cancel reservation</span><textarea name="cancellation_reason" rows="2" maxlength="500" placeholder="Reason (optional)" class="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"></textarea></label><button data-loading-label="Cancelling…" class="mt-3 min-h-11 w-full rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700">Cancel this booking</button></form>
                 </details>
             @endif
