@@ -264,6 +264,16 @@ class SavePromotionRequest extends FormRequest
                         requireFuture: false,
                     );
                     $availability->ensureBookable($slotResource, $window);
+
+                    if ($availability->hasAvailabilityBlockConflict(
+                        $slotResource->getKey(),
+                        $window->utcStart,
+                        $window->utcEnd,
+                    )) {
+                        throw ValidationException::withMessages([
+                            'start_time' => 'This court time is blocked and cannot be added to a deal.',
+                        ]);
+                    }
                 } catch (ValidationException $exception) {
                     $validator->errors()->add(
                         "slots.{$index}.starts_at_time",

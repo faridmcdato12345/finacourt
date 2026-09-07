@@ -20,7 +20,9 @@ use App\Models\ReactivationCampaign;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
+use App\Notifications\ReactivationNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -97,6 +99,46 @@ class CustomerReactivationTest extends TestCase
             'reactivation_campaign_id' => $campaign->getKey(),
             'user_id' => $unrelated->getKey(),
         ]);
+        $this->actingAs($owner)->get(route('owner.reactivation.show', $campaign))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('campaign.suppression_reasons.marketing_opt_out', 1)
+                ->where('campaign.suppression_reasons.frequency_cooldown', 0)
+                ->where('campaign.suppression_reasons.other', 0));
+    }
+
+    public function test_owner_sees_that_player_permission_prevents_email_before_sending(): void
+    {
+        [$organization, $venue, $resource, $owner, $sport] = $this->inventory('permission-preview');
+        $player = User::factory()->create(['email' => 'no-marketing-permission@example.com']);
+        $this->completedBooking($organization, $venue, $resource, $player, now()->subDays(45));
+        $campaign = $this->campaign($organization, $venue, $owner, $sport);
+
+        $this->actingAs($owner)->get(route('owner.reactivation.show', $campaign))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Reactivation/Show')
+                ->where('eligibility.audience', 1)
+                ->where('eligibility.eligible', 0)
+                ->where('eligibility.email', 0)
+                ->where('eligibility.in_app', 0)
+                ->where('eligibility.suppressed', 1)
+                ->where('eligibility.suppression_reasons.marketing_opt_out', 1)
+                ->where('eligibility.suppression_reasons.frequency_cooldown', 0));
+
+        $this->actingAs($owner)->post(route('owner.reactivation.send', $campaign))
+            ->assertRedirect(route('owner.reactivation.show', $campaign))
+            ->assertSessionHas(
+                'status',
+                'No messages were sent. The matching past player has not enabled comeback messages in their FinACourt notification preferences.',
+            );
+
+        $this->assertDatabaseHas('reactivation_campaign_recipients', [
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'user_id' => $player->getKey(),
+            'suppression_reason' => 'marketing_opt_out',
+            'sent_at' => null,
+        ]);
     }
 
     public function test_frequency_cooldown_suppresses_repeat_contact(): void
@@ -118,6 +160,59 @@ class CustomerReactivationTest extends TestCase
             'user_id' => $customer->getKey(),
             'suppression_reason' => 'frequency_cooldown',
         ]);
+    }
+
+    public function test_reactivation_uses_only_each_players_enabled_marketing_channels(): void
+    {
+        Notification::fake();
+        [$organization, $venue, $resource, $owner, $sport] = $this->inventory('channels');
+        $emailOnly = User::factory()->create(['email' => 'email-only@example.com']);
+        $inAppOnly = User::factory()->create(['email' => 'in-app-only@example.com']);
+        $this->completedBooking($organization, $venue, $resource, $emailOnly, now()->subDays(45));
+        $this->completedBooking($organization, $venue, $resource, $inAppOnly, now()->subDays(45));
+        MarketingPreference::factory()->for($emailOnly)->create([
+            'marketing_opt_in' => true,
+            'in_app_marketing_enabled' => false,
+            'email_marketing_enabled' => true,
+            'opted_in_at' => now(),
+        ]);
+        MarketingPreference::factory()->for($inAppOnly)->create([
+            'marketing_opt_in' => true,
+            'in_app_marketing_enabled' => true,
+            'email_marketing_enabled' => false,
+            'opted_in_at' => now(),
+        ]);
+        $campaign = $this->campaign($organization, $venue, $owner, $sport);
+
+        $this->actingAs($owner)->get(route('owner.reactivation.show', $campaign))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('eligibility.audience', 2)
+                ->where('eligibility.eligible', 2)
+                ->where('eligibility.email', 1)
+                ->where('eligibility.in_app', 1)
+                ->where('eligibility.suppressed', 0));
+
+        $this->actingAs($owner)->post(route('owner.reactivation.send', $campaign))->assertRedirect();
+
+        Notification::assertSentTo($emailOnly, function (ReactivationNotification $notification, array $channels) use ($emailOnly, $venue): bool {
+            $mail = $notification->toMail($emailOnly);
+            $html = view($mail->view['html'], $mail->viewData)->render();
+
+            return $channels === ['mail']
+                && $mail->subject === "Come back and play at {$venue->name} 🎉"
+                && $mail->actionText === 'Find my next game'
+                && str_contains($mail->actionUrl, '/reactivation/')
+                && str_contains($html, 'YOUR NEXT GAME AWAITS')
+                && str_contains($html, 'Find my next game')
+                && str_contains($html, 'Manage message preferences');
+        });
+        Notification::assertSentTo(
+            $inAppOnly,
+            fn (ReactivationNotification $notification, array $channels): bool => $channels === ['database'],
+        );
+        $this->assertSame(2, $campaign->refresh()->sent_count);
+        $this->assertSame(0, $campaign->suppressed_count);
     }
 
     public function test_owner_cannot_view_or_send_another_tenants_campaign(): void
@@ -217,12 +312,16 @@ class CustomerReactivationTest extends TestCase
         $this->actingAs($player)->put(route('player.preferences.update'), [
             'marketing_opt_in' => '1',
             'in_app_marketing_enabled' => '1',
+            'email_marketing_enabled' => '1',
         ])->assertRedirect();
-        $this->assertTrue($player->marketingPreference()->firstOrFail()->canReceiveInAppMarketing());
+        $preference = $player->marketingPreference()->firstOrFail();
+        $this->assertTrue($preference->canReceiveInAppMarketing());
+        $this->assertTrue($preference->canReceiveEmailMarketing());
 
         $this->actingAs($player)->put(route('player.preferences.update'), [])->assertRedirect();
         $preference = $player->marketingPreference()->firstOrFail();
         $this->assertFalse($preference->marketing_opt_in);
+        $this->assertFalse($preference->email_marketing_enabled);
         $this->assertNotNull($preference->unsubscribed_at);
     }
 

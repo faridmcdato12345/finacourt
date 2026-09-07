@@ -3,6 +3,7 @@
 namespace App\Bookings;
 
 use App\Models\Booking;
+use App\Models\CourtAvailabilityBlock;
 use App\Models\CourtResource;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -97,11 +98,33 @@ class AvailabilityService
         CarbonInterface $endAt,
         ?CarbonInterface $at = null,
     ): bool {
+        return $this->hasBookingConflict($resourceId, $startAt, $endAt, $at)
+            || $this->hasAvailabilityBlockConflict($resourceId, $startAt, $endAt);
+    }
+
+    public function hasBookingConflict(
+        int $resourceId,
+        CarbonInterface $startAt,
+        CarbonInterface $endAt,
+        ?CarbonInterface $at = null,
+    ): bool {
         return Booking::query()
             ->where('resource_id', $resourceId)
             ->blocking($at)
             ->where('start_at', '<', $endAt)
             ->where('end_at', '>', $startAt)
+            ->exists();
+    }
+
+    public function hasAvailabilityBlockConflict(
+        int $resourceId,
+        CarbonInterface $startAt,
+        CarbonInterface $endAt,
+    ): bool {
+        return CourtAvailabilityBlock::query()
+            ->where('resource_id', $resourceId)
+            ->active()
+            ->overlapping($startAt, $endAt)
             ->exists();
     }
 
@@ -135,6 +158,11 @@ class AvailabilityService
             ->where('start_at', '<', $close->utc())
             ->where('end_at', '>', $open->utc())
             ->get(['start_at', 'end_at']);
+        $courtBlocks = CourtAvailabilityBlock::query()
+            ->where('resource_id', $resource->getKey())
+            ->active()
+            ->overlapping($open->utc(), $close->utc())
+            ->get(['starts_at', 'ends_at']);
 
         $slots = collect();
         $cursor = $open;
@@ -145,6 +173,9 @@ class AvailabilityService
             $available = $cursor->isFuture() && ! $blockers->contains(
                 fn (Booking $booking) => $booking->start_at->lessThan($end->utc())
                     && $booking->end_at->greaterThan($cursor->utc()),
+            ) && ! $courtBlocks->contains(
+                fn (CourtAvailabilityBlock $block) => $block->starts_at->lessThan($end->utc())
+                    && $block->ends_at->greaterThan($cursor->utc()),
             );
 
             $slots->push([

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Marketplace;
 use App\Analytics\AnalyticsRecorder;
 use App\Enums\ResourceSetting;
 use App\Http\Controllers\Controller;
+use App\Marketplace\LocationLandingSummary;
 use App\Marketplace\MarketplaceQuery;
 use App\Marketplace\StructuredData;
 use App\Models\Sport;
@@ -43,6 +44,8 @@ class DiscoveryController extends Controller
             'breadcrumbs' => [],
             'lockedCity' => false,
             'lockedSport' => false,
+            'locationSummary' => null,
+            'relatedCities' => collect(),
             'seo' => [
                 'title' => 'Discover sports courts and venues',
                 'description' => 'Browse sports courts by city, sport, setting, price, date, and time.',
@@ -58,6 +61,7 @@ class DiscoveryController extends Controller
         Request $request,
         string $citySlug,
         MarketplaceQuery $marketplace,
+        LocationLandingSummary $locationLandingSummary,
         StructuredData $structuredData,
         PromotionTracker $tracker,
         AnalyticsRecorder $analytics,
@@ -72,35 +76,53 @@ class DiscoveryController extends Controller
         $location = $venues->first();
         $cityName = $location->publicCitySeoName();
         $canonical = route('marketplace.courts.city', $citySlug);
+        $cities = $marketplace->cities();
+        $summary = $locationLandingSummary->fromVenues(
+            $venues,
+            $cityName,
+            $location->province,
+        );
+        $relatedCities = $cities
+            ->filter(fn (Venue $city) => $city->city_slug !== $citySlug
+                && filled($location->province)
+                && $city->province === $location->province)
+            ->unique('city_slug')
+            ->take(6)
+            ->values();
 
         return view('marketplace.discovery', [
             'venues' => $venues,
-            'cities' => $marketplace->cities(),
+            'cities' => $cities,
             'sports' => $marketplace->sports(),
             'filters' => ['city' => $citySlug, 'duration_minutes' => 60],
             'settings' => ResourceSetting::cases(),
             'eyebrow' => $location->province,
             'heading' => "Sports Courts in {$cityName}",
-            'introduction' => "Find sports courts in {$cityName}. Compare nearby venues, court types, hourly rates, and availability for pickleball, badminton, basketball, and more.",
+            'introduction' => $summary['introduction'],
             'breadcrumbs' => [
                 ['name' => 'Courts', 'url' => route('marketplace.courts.index')],
                 ['name' => $cityName, 'url' => $canonical],
             ],
             'lockedCity' => true,
             'lockedSport' => false,
+            'locationSummary' => $summary,
+            'relatedCities' => $relatedCities,
             'seo' => [
                 'title' => "Sports Courts in {$cityName}",
                 'document_title' => "Sports Courts in {$cityName} | Find & Book Courts | FinACourt",
-                'description' => "Find sports courts in {$cityName}. Compare venues, prices, court settings, and availability, then book online with FinACourt.",
+                'description' => $summary['meta_description'],
                 'canonical' => $canonical,
                 'robots' => 'index,follow',
                 'type' => 'website',
             ],
-            'structuredData' => [$structuredData->breadcrumbs([
-                ['name' => 'Home', 'url' => route('marketplace.home')],
-                ['name' => 'Courts', 'url' => route('marketplace.courts.index')],
-                ['name' => $cityName, 'url' => $canonical],
-            ])],
+            'structuredData' => [
+                $structuredData->breadcrumbs([
+                    ['name' => 'Home', 'url' => route('marketplace.home')],
+                    ['name' => 'Courts', 'url' => route('marketplace.courts.index')],
+                    ['name' => $cityName, 'url' => $canonical],
+                ]),
+                $structuredData->venueList($venues, "Sports courts in {$cityName}"),
+            ],
         ]);
     }
 
@@ -147,6 +169,8 @@ class DiscoveryController extends Controller
             ],
             'lockedCity' => true,
             'lockedSport' => true,
+            'locationSummary' => null,
+            'relatedCities' => collect(),
             'seo' => [
                 'title' => "{$sportName} Courts in {$cityName}",
                 'document_title' => "{$sportName} Courts in {$cityName} | Find & Book | FinACourt",

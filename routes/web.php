@@ -25,6 +25,7 @@ use App\Http\Controllers\Marketplace\VisibilityQrController;
 use App\Http\Controllers\Owner\AnalyticsController as OwnerAnalyticsController;
 use App\Http\Controllers\Owner\BookingAvailabilityController;
 use App\Http\Controllers\Owner\BookingController;
+use App\Http\Controllers\Owner\CourtAvailabilityBlockController;
 use App\Http\Controllers\Owner\CourtResourceController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
 use App\Http\Controllers\Owner\GoogleBusinessProfileController;
@@ -304,6 +305,13 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
         ->name('location-options.cities');
     Route::get('/bookings/availability', BookingAvailabilityController::class)
         ->name('bookings.availability');
+    Route::get('/bookings/blocks/create', [CourtAvailabilityBlockController::class, 'create'])
+        ->name('booking-blocks.create');
+    Route::post('/bookings/blocks', [CourtAvailabilityBlockController::class, 'store'])
+        ->name('booking-blocks.store');
+    Route::delete('/bookings/blocks/{block}', [CourtAvailabilityBlockController::class, 'destroy'])
+        ->whereNumber('block')
+        ->name('booking-blocks.destroy');
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
     Route::get('/bookings/create', [BookingController::class, 'create'])->name('bookings.create');
     Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store');

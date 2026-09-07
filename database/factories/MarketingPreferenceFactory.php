@@ -15,6 +15,7 @@ class MarketingPreferenceFactory extends Factory
             'user_id' => User::factory(),
             'marketing_opt_in' => false,
             'in_app_marketing_enabled' => false,
+            'email_marketing_enabled' => false,
         ];
     }
 
@@ -23,6 +24,7 @@ class MarketingPreferenceFactory extends Factory
         return $this->state(fn () => [
             'marketing_opt_in' => true,
             'in_app_marketing_enabled' => true,
+            'email_marketing_enabled' => true,
             'opted_in_at' => now(),
             'opted_out_at' => null,
             'unsubscribed_at' => null,
@@ -34,6 +36,7 @@ class MarketingPreferenceFactory extends Factory
         return $this->state(fn () => [
             'marketing_opt_in' => false,
             'in_app_marketing_enabled' => false,
+            'email_marketing_enabled' => false,
             'opted_out_at' => now(),
             'unsubscribed_at' => now(),
         ]);

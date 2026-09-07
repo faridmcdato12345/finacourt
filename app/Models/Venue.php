@@ -105,6 +105,12 @@ class Venue extends Model
         return $this->hasMany(Booking::class);
     }
 
+    /** @return HasMany<CourtAvailabilityBlock, $this> */
+    public function availabilityBlocks(): HasMany
+    {
+        return $this->hasMany(CourtAvailabilityBlock::class);
+    }
+
     /** @return HasMany<Promotion, $this> */
     public function promotions(): HasMany
     {

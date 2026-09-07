@@ -54,7 +54,7 @@ class CreateBooking
 
             if ($this->availability->hasConflict($resource->getKey(), $window->utcStart, $window->utcEnd)) {
                 throw ValidationException::withMessages([
-                    'start_time' => 'This time overlaps an active reservation or hold.',
+                    'start_time' => 'This time overlaps an active reservation, hold, or court block.',
                 ]);
             }
 

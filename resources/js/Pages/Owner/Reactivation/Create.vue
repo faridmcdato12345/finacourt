@@ -34,7 +34,22 @@ function submit() { form.post('/owner/reactivation'); }
                     <h3 class="text-lg font-semibold">Message</h3>
                     <label class="mt-5 block"><span class="text-sm font-medium">Title</span><input v-model="form.title" maxlength="120" class="mt-2 min-h-12 w-full rounded-xl border border-slate-300 px-4 outline-none focus:border-court-500 focus:ring-4 focus:ring-court-100" placeholder="Ready for another game?" /><FormError :message="form.errors.title" /></label>
                     <label class="mt-5 block"><span class="text-sm font-medium">Message</span><textarea v-model="form.message" maxlength="500" rows="5" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-court-500 focus:ring-4 focus:ring-court-100" placeholder="Your next court is waiting. Check current times at our venue." /><FormError :message="form.errors.message" /></label>
-                    <p class="mt-2 text-xs text-slate-400">In-app only for now. FinACourt will not send email, SMS, or push notifications unless those are set up later.</p>
+                    <p class="mt-2 text-xs text-slate-400">FinACourt uses each player’s enabled comeback-message channels: in-app, email, or both. SMS and push notifications are not configured.</p>
+
+                    <div class="mt-6 overflow-hidden rounded-3xl border border-emerald-200 bg-emerald-950 shadow-xl shadow-emerald-950/10" aria-label="Comeback email preview">
+                        <div class="flex items-center justify-between border-b border-white/10 px-5 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">
+                            <span>Live email preview</span>
+                            <span aria-hidden="true">🎉</span>
+                        </div>
+                        <div class="relative p-6 sm:p-8">
+                            <div aria-hidden="true" class="absolute -right-8 -top-8 size-28 rounded-full border-[18px] border-amber-300/20"></div>
+                            <p class="text-xs font-bold uppercase tracking-[0.2em] text-amber-300">Your next game awaits</p>
+                            <h4 class="relative mt-3 max-w-xl text-2xl font-semibold leading-tight text-white">{{ form.title || 'Ready for another game?' }}</h4>
+                            <p class="relative mt-3 max-w-xl whitespace-pre-line text-sm leading-6 text-emerald-100">{{ form.message || 'Your next court is waiting. Check current times and make your comeback.' }}</p>
+                            <div class="relative mt-6 inline-flex rounded-xl bg-amber-300 px-5 py-3 text-sm font-bold text-emerald-950 shadow-lg shadow-black/10">Find my next game →</div>
+                        </div>
+                        <div class="bg-white px-5 py-4 text-xs leading-5 text-slate-500">Players will also see the venue name, any suggested court time, and a link to manage their message preferences.</div>
+                    </div>
                 </section>
                 <div class="flex justify-end"><button :disabled="form.processing" class="rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white disabled:opacity-60">{{ form.processing ? 'Saving…' : 'Save draft' }}</button></div>
             </form>

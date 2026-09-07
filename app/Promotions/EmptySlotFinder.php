@@ -5,6 +5,7 @@ namespace App\Promotions;
 use App\Bookings\BookingPrice;
 use App\Enums\PromotionStatus;
 use App\Models\Booking;
+use App\Models\CourtAvailabilityBlock;
 use App\Models\CourtResource;
 use App\Models\Organization;
 use App\Models\PromotionSlot;
@@ -53,6 +54,10 @@ class EmptySlotFinder
                     ->where('start_at', '<', $utcEnd)
                     ->where('end_at', '>', $now->utc())
                     ->getQuery(),
+                'availabilityBlocks' => fn ($query) => $query
+                    ->active()
+                    ->where('starts_at', '<', $utcEnd)
+                    ->where('ends_at', '>', $now->utc()),
                 'promotionSlots' => fn ($query) => $query
                     ->whereBetween('slot_date', [$now->toDateString(), $lastDay->toDateString()])
                     ->whereHas('promotion', fn ($query) => $query
@@ -96,7 +101,7 @@ class EmptySlotFinder
                     $end = $cursor->addMinutes($increment);
 
                     if ($cursor->greaterThan($now)
-                        && ! $this->blocked($resource->bookings, $cursor, $end)
+                        && ! $this->blocked($resource->bookings, $resource->availabilityBlocks, $cursor, $end)
                         && ! $this->alreadyPromoted($resource->promotionSlots, $cursor, $end)) {
                         $leadHours = max(0, (int) floor($now->diffInHours($cursor)));
                         $lastMinute = $leadHours <= 24;
@@ -138,11 +143,20 @@ class EmptySlotFinder
             ->values();
     }
 
-    /** @param Collection<int, Booking> $bookings */
-    private function blocked(Collection $bookings, CarbonInterface $start, CarbonInterface $end): bool
-    {
+    /**
+     * @param  Collection<int, Booking>  $bookings
+     * @param  Collection<int, CourtAvailabilityBlock>  $courtBlocks
+     */
+    private function blocked(
+        Collection $bookings,
+        Collection $courtBlocks,
+        CarbonInterface $start,
+        CarbonInterface $end,
+    ): bool {
         return $bookings->contains(fn (Booking $booking) => $booking->start_at->lessThan($end->utc())
-            && $booking->end_at->greaterThan($start->utc()));
+            && $booking->end_at->greaterThan($start->utc()))
+            || $courtBlocks->contains(fn (CourtAvailabilityBlock $block) => $block->starts_at->lessThan($end->utc())
+                && $block->ends_at->greaterThan($start->utc()));
     }
 
     /** @param Collection<int, PromotionSlot> $slots */

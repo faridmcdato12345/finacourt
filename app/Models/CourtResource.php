@@ -55,6 +55,12 @@ class CourtResource extends Model
         return $this->hasMany(Booking::class, 'resource_id');
     }
 
+    /** @return HasMany<CourtAvailabilityBlock, $this> */
+    public function availabilityBlocks(): HasMany
+    {
+        return $this->hasMany(CourtAvailabilityBlock::class, 'resource_id');
+    }
+
     /** @return HasMany<Promotion, $this> */
     public function promotions(): HasMany
     {

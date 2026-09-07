@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import AppSelect from './AppSelect.vue';
+import SearchableSelect from './SearchableSelect.vue';
 import DraggableVenueMap from './DraggableVenueMap.vue';
 import FormError from './FormError.vue';
 import { detectCurrentCoordinates, locationErrorMessage } from '../lib/geolocation';
@@ -168,12 +169,12 @@ function updateCoordinatesFromMap(coordinates) {
                 </div>
                 <div>
                     <label for="psgc_parent_code" class="mb-2 block text-sm font-medium text-slate-800">Province / region</label>
-                    <AppSelect id="psgc_parent_code" v-model="form.psgc_parent_code" :options="locationParents" option-value="code" option-label="label" placeholder="Select a province or region" required autocomplete="address-level1" aria-label="Province or region" />
+                    <SearchableSelect id="psgc_parent_code" v-model="form.psgc_parent_code" :options="locationParents" option-value="code" option-label="label" placeholder="Search for a province or region" search-label="Province or region" empty-label="No matching province or region found." required autocomplete="address-level1" aria-label="Search for a province or region" />
                     <FormError :message="form.errors.psgc_parent_code" />
                 </div>
                 <div>
                     <label for="psgc_city_municipality_code" class="mb-2 block text-sm font-medium text-slate-800">City / municipality</label>
-                    <AppSelect id="psgc_city_municipality_code" v-model="form.psgc_city_municipality_code" :options="cityMunicipalities" option-value="code" option-label="name" :placeholder="locationOptionsLoading ? 'Loading locations…' : form.psgc_parent_code ? 'Select a city or municipality' : 'Select a province or region first'" required autocomplete="address-level2" :disabled="!form.psgc_parent_code || locationOptionsLoading" aria-label="City or municipality" />
+                    <SearchableSelect id="psgc_city_municipality_code" v-model="form.psgc_city_municipality_code" :options="cityMunicipalities" option-value="code" option-label="name" :placeholder="locationOptionsLoading ? 'Loading locations…' : form.psgc_parent_code ? 'Search for a city or municipality' : 'Select a province or region first'" search-label="City or municipality" empty-label="No matching city or municipality found." required autocomplete="address-level2" :disabled="!form.psgc_parent_code || locationOptionsLoading" aria-label="Search for a city or municipality" />
                     <FormError :message="form.errors.psgc_city_municipality_code" />
                     <p v-if="locationOptionsError" class="mt-2 text-sm text-red-600" role="alert">{{ locationOptionsError }}</p>
                 </div>
