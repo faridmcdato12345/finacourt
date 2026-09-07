@@ -22,34 +22,49 @@ class OwnerAcquisitionLandingTest extends TestCase
         $ownerPage->assertOk()
             ->assertHeader('X-PWA-Cache', 'public-short')
             ->assertSee('<h1', false)
-            ->assertSee('<title>Get more players and court bookings with FinACourt · FinACourt</title>', false)
-            ->assertSee('Get discovered. Fill more court hours.')
-            ->assertSee('Keep players coming back.')
+            ->assertSee('<title>Court Booking Software for Sports Venue Owners Philippines | FinACourt</title>', false)
+            ->assertSee('Court Booking Software That Helps You')
+            ->assertSee('Get More Players')
+            ->assertSee('FinACourt is a sports court booking, marketplace, and growth platform built for venue owners in the Philippines.')
             ->assertSee(route('marketplace.for-owners'), false)
             ->assertSee(route('marketplace.pricing'), false)
+            ->assertSee(route('marketplace.courts.index'), false)
+            ->assertSee(route('marketplace.directory.index'), false)
             ->assertSee(route('register'), false)
             ->assertSee('href="#how-it-works"', false)
             ->assertSee('index,follow')
+            ->assertSee('More than a booking calendar')
+            ->assertSee('Most court software helps manage bookings. FinACourt also helps create more of them.')
             ->assertSee('Get discovered by players looking for a court')
             ->assertSee('See what players are looking for')
             ->assertSee('Turn open hours into bookable deals')
             ->assertSee('Know where confirmed bookings came from')
             ->assertSee('Bring past players back')
-            ->assertSee('Turn Google interest into a booking opportunity')
+            ->assertSee('Turn Google searches into booking opportunities')
+            ->assertSee('Everything you need to manage court bookings')
+            ->assertSee('Built for sports venues in the Philippines')
+            ->assertSee('Add another way for players to find you')
             ->assertSee('You do not have to set up everything alone')
             ->assertSee('Your venue. Your prices. Your decisions.')
+            ->assertSee('Frequently asked questions')
+            ->assertSee('What is court booking software?')
             ->assertSee('FinACourt does not create, edit, verify, publish, or rank your Google listing.')
+            ->assertSee('FinACourt does not currently synchronize another provider’s calendar automatically.')
             ->assertSee('Product preview — your account shows real venue activity, not sample results.')
             ->assertSee('Shown with a demo owner account.')
             ->assertSeeInOrder([
+                'More than a booking calendar',
                 'Get discovered by players looking for a court',
                 'Understand player demand',
                 'See demand. Fill open hours. Bring players back.',
                 'Fill court hours that would otherwise stay empty',
                 'Turn a past visit into another game',
                 'See which paths led to confirmed bookings',
-                'Turn Google interest into a booking opportunity',
-                'Handle the booking after you win it',
+                'Turn Google searches into booking opportunities',
+                'Everything you need to manage court bookings',
+                'Built for sports venues in the Philippines',
+                'Add another way for players to find you',
+                'Frequently asked questions',
             ])
             ->assertDontSee('47 searches')
             ->assertDontSee('27 bookings')
@@ -60,6 +75,9 @@ class OwnerAcquisitionLandingTest extends TestCase
             ->assertDontSee('acquisition attribution')
             ->assertDontSee('conversion')
             ->assertDontSee('cohort')
+            ->assertDontSee('guaranteed more bookings')
+            ->assertDontSee('guaranteed Google rankings')
+            ->assertDontSee('best court booking software')
             ->assertSee('application/ld+json', false);
 
         $this->get(route('marketplace.pricing'))
@@ -78,6 +96,76 @@ class OwnerAcquisitionLandingTest extends TestCase
             ->assertSee('No active service fee')
             ->assertSee('See how pricing works')
             ->assertDontSee('Founding venue pilot');
+    }
+
+    public function test_owner_page_has_complete_search_and_social_metadata_with_valid_visible_schema(): void
+    {
+        $response = $this->get(route('marketplace.for-owners'))->assertOk();
+        $content = $response->getContent();
+        $description = 'FinACourt is court booking software for Philippine sports venues. Manage reservations, get discovered, fill empty court hours, and track booking sources.';
+        $image = asset('assets/demand-intelligence.png');
+
+        $response
+            ->assertSee('<meta name="description" content="'.$description.'">', false)
+            ->assertSee('<link rel="canonical" href="'.route('marketplace.for-owners').'">', false)
+            ->assertSee('<meta name="robots" content="index,follow">', false)
+            ->assertSee('<meta property="og:title" content="Court Booking Software for Sports Venue Owners | FinACourt">', false)
+            ->assertSee('<meta property="og:description" content="'.$description.'">', false)
+            ->assertSee('<meta property="og:image" content="'.$image.'">', false)
+            ->assertSee('<meta name="twitter:card" content="summary_large_image">', false)
+            ->assertSee('<meta name="twitter:title" content="Court Booking Software for Sports Venue Owners | FinACourt">', false)
+            ->assertSee('<meta name="twitter:description" content="'.$description.'">', false)
+            ->assertSee('<meta name="twitter:image" content="'.$image.'">', false);
+
+        $this->assertSame(1, substr_count($content, '<h1'));
+        $this->assertSame(9, substr_count($content, '<details class="p-5'));
+        $this->assertSame(9, substr_count($content, 'data-details-question'));
+        $this->assertSame(9, substr_count($content, 'data-details-icon'));
+        $this->assertDoesNotMatchRegularExpression('/<meta[^>]+noindex/i', $content);
+
+        $styles = file_get_contents(resource_path('css/app.css'));
+        $this->assertStringContainsString('summary [data-details-icon]', $styles);
+        $this->assertStringNotContainsString('details[open] summary span {', $styles);
+
+        preg_match_all(
+            '/<script[^>]+type="application\/ld\+json"[^>]*>(.*?)<\/script>/s',
+            $content,
+            $matches,
+        );
+
+        $schemas = collect($matches[1])->map(function (string $json): array {
+            $schema = json_decode($json, true, flags: JSON_THROW_ON_ERROR);
+            $this->assertIsArray($schema);
+
+            return $schema;
+        });
+
+        $this->assertEqualsCanonicalizing(
+            ['WebPage', 'SoftwareApplication', 'BreadcrumbList', 'FAQPage'],
+            $schemas->pluck('@type')->all(),
+        );
+
+        $software = $schemas->firstWhere('@type', 'SoftwareApplication');
+        $this->assertSame('BusinessApplication', $software['applicationCategory']);
+        $this->assertSame('Web', $software['operatingSystem']);
+        $this->assertArrayNotHasKey('aggregateRating', $software);
+        $this->assertArrayNotHasKey('offers', $software);
+
+        $faq = $schemas->firstWhere('@type', 'FAQPage');
+        $this->assertCount(9, $faq['mainEntity']);
+        $this->assertSame('What is court booking software?', $faq['mainEntity'][0]['name']);
+        $this->assertStringContainsString(
+            'FinACourt adds marketplace discovery',
+            $faq['mainEntity'][0]['acceptedAnswer']['text'],
+        );
+    }
+
+    public function test_owner_landing_destinations_remain_available(): void
+    {
+        $this->get(route('register'))->assertOk();
+        $this->get(route('marketplace.directory.index'))->assertOk();
+        $this->get(route('marketplace.courts.index'))->assertOk();
+        $this->get(route('marketplace.pricing'))->assertOk();
     }
 
     public function test_owner_page_uses_selected_product_screenshots_as_accessible_supporting_evidence(): void

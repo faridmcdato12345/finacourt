@@ -18,7 +18,19 @@
         <meta property="og:description" content="{{ $seo['description'] }}">
         <meta property="og:url" content="{{ $seo['canonical'] }}">
         <meta property="og:type" content="{{ $seo['type'] ?? 'website' }}">
-        <meta name="twitter:card" content="summary">
+        @if (filled($seo['image'] ?? null))
+            <meta property="og:image" content="{{ $seo['image'] }}">
+            @if (filled($seo['image_alt'] ?? null))<meta property="og:image:alt" content="{{ $seo['image_alt'] }}">@endif
+            @if (filled($seo['image_width'] ?? null))<meta property="og:image:width" content="{{ $seo['image_width'] }}">@endif
+            @if (filled($seo['image_height'] ?? null))<meta property="og:image:height" content="{{ $seo['image_height'] }}">@endif
+        @endif
+        <meta name="twitter:card" content="{{ filled($seo['image'] ?? null) ? 'summary_large_image' : 'summary' }}">
+        <meta name="twitter:title" content="{{ $seo['title'] }}">
+        <meta name="twitter:description" content="{{ $seo['description'] }}">
+        @if (filled($seo['image'] ?? null))
+            <meta name="twitter:image" content="{{ $seo['image'] }}">
+            @if (filled($seo['image_alt'] ?? null))<meta name="twitter:image:alt" content="{{ $seo['image_alt'] }}">@endif
+        @endif
         <link rel="manifest" href="/manifest.webmanifest">
         <link rel="icon" type="image/png" href="/icons/finacourt-logo-192.png">
         <link rel="apple-touch-icon" href="/icons/finacourt-logo-192.png">

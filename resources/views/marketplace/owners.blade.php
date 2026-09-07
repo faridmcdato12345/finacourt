@@ -4,14 +4,17 @@
     <section class="overflow-hidden border-b border-court-900 bg-court-950 text-white">
         <div class="page-shell grid gap-12 py-16 sm:py-20 lg:grid-cols-[1.08fr_0.92fr] lg:items-center lg:py-24">
             <div class="max-w-3xl">
-                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-court-300">For court owners</p>
-                <h1 class="mt-5 text-4xl font-bold tracking-[-0.04em] sm:text-5xl lg:text-6xl">Get discovered. Fill more court hours. <span class="text-court-300">Keep players coming back.</span></h1>
-                <p class="mt-6 max-w-2xl text-base leading-7 text-court-100/80 sm:text-lg">FinACourt helps nearby players find your venue, shows you what they are looking for, helps turn slow hours into bookable deals, and tells you which pages and links led to confirmed bookings.</p>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-court-300">Court booking software for Philippine sports venues</p>
+                <h1 class="mt-5 text-4xl font-bold tracking-[-0.04em] sm:text-5xl lg:text-6xl">Court Booking Software That Helps You <span class="text-court-300">Get More Players</span></h1>
+                <p class="mt-6 max-w-2xl text-base leading-7 text-court-100/80 sm:text-lg">Manage reservations, get discovered by players, fill empty court hours, bring customers back, and understand what actually generates bookings.</p>
+                <p class="mt-4 max-w-2xl text-sm leading-6 text-court-100/65">FinACourt is a sports court booking, marketplace, and growth platform built for venue owners in the Philippines.</p>
                 <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-                    <a href="{{ route('register') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3.5 text-sm font-semibold text-court-900 shadow-lg shadow-black/10 hover:bg-court-50">List your venue @include('marketplace.partials.icon', ['name' => 'arrow-right', 'class' => 'size-4'])</a>
+                    <a href="{{ route('register') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3.5 text-sm font-semibold text-court-900 shadow-lg shadow-black/10 hover:bg-court-50">List your courts @include('marketplace.partials.icon', ['name' => 'arrow-right', 'class' => 'size-4'])</a>
                     <a href="#how-it-works" class="inline-flex items-center justify-center rounded-xl border border-white/25 bg-white/5 px-5 py-3.5 text-sm font-semibold text-white hover:bg-white/10">See how it works</a>
                 </div>
-                <a href="{{ route('marketplace.pricing') }}" class="mt-4 inline-flex text-sm font-semibold text-court-200 underline decoration-court-300/50 underline-offset-4 hover:text-white">See how pricing works</a>
+                <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-court-200">
+                    <a href="{{ route('marketplace.pricing') }}" class="underline decoration-court-300/50 underline-offset-4 hover:text-white">See how pricing works</a>
+                </div>
                 <div class="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-court-100/80">
                     <span class="inline-flex items-center gap-2">@include('marketplace.partials.icon', ['name' => 'check-circle', 'class' => 'size-4 text-court-300']) Start without a card</span>
                     <span class="inline-flex items-center gap-2">@include('marketplace.partials.icon', ['name' => 'check-circle', 'class' => 'size-4 text-court-300']) Every deal needs your approval</span>
@@ -51,12 +54,42 @@
         </div>
     </section>
 
+    <section id="how-it-works" class="scroll-mt-24 border-b border-slate-200 bg-slate-50 py-16 sm:py-20">
+        <div class="page-shell">
+            <div class="max-w-3xl">
+                <p class="eyebrow">More than a booking calendar</p>
+                <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em] sm:text-4xl">Most court software helps manage bookings. FinACourt also helps create more of them.</h2>
+                <p class="mt-4 leading-7 text-slate-600">Use one court reservation system for the day-to-day work, then use real marketplace activity to decide how to reach players, recover open hours, and encourage repeat bookings.</p>
+            </div>
+            <div class="mt-10 grid gap-5 lg:grid-cols-2">
+                <article class="rounded-3xl border border-slate-200 bg-white p-6 sm:p-8">
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Manage the venue</p>
+                    <h3 class="mt-3 text-xl font-semibold">Court booking essentials</h3>
+                    <ul class="mt-5 grid gap-3 text-sm leading-6 text-slate-600 sm:grid-cols-2">
+                        @foreach (['Court schedules and availability', 'Online reservations', 'Rates and promotions', 'Payment and booking status'] as $item)
+                            <li class="flex gap-2"><span class="text-court-600">✓</span><span>{{ $item }}</span></li>
+                        @endforeach
+                    </ul>
+                </article>
+                <article class="rounded-3xl border border-court-200 bg-court-950 p-6 text-white sm:p-8">
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-court-300">Grow demand</p>
+                    <h3 class="mt-3 text-xl font-semibold">Tools that help create booking opportunities</h3>
+                    <ul class="mt-5 grid gap-3 text-sm leading-6 text-court-100/75 sm:grid-cols-2">
+                        @foreach (['Marketplace discovery', 'Grouped player demand signals', 'Empty-hour promotions', 'Reactivation and booking sources'] as $item)
+                            <li class="flex gap-2"><span class="text-court-300">✓</span><span>{{ $item }}</span></li>
+                        @endforeach
+                    </ul>
+                </article>
+            </div>
+        </div>
+    </section>
+
     <section id="get-discovered" class="border-b border-slate-200 bg-white py-16 sm:py-20">
         <div class="page-shell grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
             <div class="max-w-2xl">
                 <p class="eyebrow">Get new players</p>
                 <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em] sm:text-4xl">Get discovered by players looking for a court</h2>
-                <p class="mt-4 leading-7 text-slate-600">Publish a useful venue page and put your open courts in FinACourt search. Players can find you by sport, place, date, and time, then check what they can actually reserve.</p>
+                <p class="mt-4 leading-7 text-slate-600">Publish a useful venue page and put your open courts in the <a href="{{ route('marketplace.courts.index') }}" class="font-semibold text-court-700 underline decoration-court-200 underline-offset-4">FinACourt court booking marketplace</a>. Players can find you by sport, place, date, and time, then check what they can actually reserve.</p>
                 <p class="mt-5 text-sm leading-6 text-slate-500">FinACourt helps you become easier to discover; it does not promise search rankings or guaranteed bookings.</p>
             </div>
             <div class="grid gap-4 sm:grid-cols-3">
@@ -126,7 +159,7 @@
         </div>
     </section>
 
-    <section id="how-it-works" class="scroll-mt-24 bg-white py-16 sm:py-20">
+    <section id="fill-empty-hours" class="scroll-mt-24 bg-white py-16 sm:py-20">
         <div class="page-shell grid gap-10 lg:grid-cols-[0.72fr_1.28fr] lg:items-center">
             <div>
                 <p class="eyebrow">Turn demand into action</p>
@@ -206,8 +239,8 @@
         <div class="page-shell grid gap-10 lg:grid-cols-[0.7fr_1.3fr] lg:items-center">
             <div class="max-w-2xl">
                 <p class="eyebrow">Google visibility</p>
-                <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em] sm:text-4xl">Turn Google interest into a booking opportunity</h2>
-                <p class="mt-4 leading-7 text-slate-600">Use your FinACourt venue or booking link on a Google Business Profile you manage. Players can move from finding your venue to checking real court times and booking.</p>
+                <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em] sm:text-4xl">Turn Google searches into booking opportunities</h2>
+                <p class="mt-4 leading-7 text-slate-600">Help players who find your venue through Google Search or Maps reach a public FinACourt page where they can view court information, availability, and booking options. Use the venue-readiness checklist before adding your booking link to a Google Business Profile you manage.</p>
                 <p class="mt-5 rounded-2xl bg-slate-50 px-5 py-4 text-sm font-semibold leading-6 text-slate-700">Google Search or Maps <span class="text-court-600">→</span> your FinACourt venue page <span class="text-court-600">→</span> open court times <span class="text-court-600">→</span> booking</p>
                 <div class="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950">
                     <p class="font-semibold">Clear Google boundary</p>
@@ -228,15 +261,48 @@
     <section class="page-shell py-16 sm:py-20">
         <div class="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
             <div>
-                <p class="eyebrow">Run the day-to-day work</p>
-                <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em]">Handle the booking after you win it</h2>
-                <p class="mt-4 leading-7 text-slate-600">Growth brings players in. The owner workspace helps you handle what follows without losing sight of open hours and repeat customers.</p>
+                <p class="eyebrow">Court and venue management</p>
+                <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em]">Everything you need to manage court bookings</h2>
+                <p class="mt-4 leading-7 text-slate-600">Growth brings players in. The owner workspace helps you manage reservations, court schedules, availability, pricing, payments, customers, and venue earnings in one place.</p>
             </div>
             <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach (['Courts and venue details', 'Opening hours', 'Regular prices', 'Bookings and payments', 'Customer list', 'Court earnings'] as $item)
+                @foreach (['Venue and court management', 'Live court availability', 'Opening hours and blocks', 'Court rates and promotions', 'Reservations and payment status', 'Customers and court earnings'] as $item)
                     <li class="app-card flex items-center gap-3 p-4 text-sm font-semibold text-slate-800">@include('marketplace.partials.icon', ['name' => 'check-circle', 'class' => 'size-5 shrink-0 text-court-600']) {{ $item }}</li>
                 @endforeach
             </ul>
+        </div>
+    </section>
+
+    <section class="border-y border-slate-200 bg-court-50/40 py-16 sm:py-20">
+        <div class="page-shell grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+            <div class="max-w-2xl">
+                <p class="eyebrow">Made for local court businesses</p>
+                <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em] sm:text-4xl">Built for sports venues in the Philippines</h2>
+                <p class="mt-4 leading-7 text-slate-600">FinACourt supports local discovery across Philippine cities and municipalities, PHP court pricing, public venue pages, and a mobile-friendly booking experience for players.</p>
+                <a href="{{ route('marketplace.courts.index') }}" class="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-court-800">Explore the public court marketplace @include('marketplace.partials.icon', ['name' => 'arrow-right', 'class' => 'size-4'])</a>
+            </div>
+            <div>
+                <p class="text-sm font-semibold text-slate-900">Current sports catalog</p>
+                <div class="mt-4 flex flex-wrap gap-3" aria-label="Sports currently supported by FinACourt">
+                    @foreach (['Pickleball', 'Badminton', 'Basketball', 'Futsal', 'Tennis', 'Volleyball'] as $sport)
+                        <span class="rounded-full border border-court-200 bg-white px-4 py-2 text-sm font-semibold text-court-800 shadow-sm">{{ $sport }}</span>
+                    @endforeach
+                </div>
+                <p class="mt-5 text-sm leading-6 text-slate-500">Venue availability depends on which owners have completed setup and publication in each location.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="border-b border-slate-200 bg-white py-16 sm:py-20">
+        <div class="page-shell grid gap-8 lg:grid-cols-[0.75fr_1.25fr] lg:items-center">
+            <div>
+                <p class="eyebrow">Already have a booking system?</p>
+                <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em]">Add another way for players to find you</h2>
+            </div>
+            <div class="rounded-3xl border border-slate-200 bg-slate-50 p-6 sm:p-8">
+                <p class="leading-7 text-slate-600">You do not have to replace your current court management software to try FinACourt. Use it as an additional discovery and booking channel while you evaluate what works for your venue.</p>
+                <p class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm leading-6 text-amber-950"><strong>Keep schedules aligned:</strong> FinACourt does not currently synchronize another provider’s calendar automatically. Update availability in both systems to avoid double bookings.</p>
+            </div>
         </div>
     </section>
 
@@ -277,24 +343,50 @@
     </section>
 
     <section class="page-shell py-16 sm:py-20">
-        <div class="overflow-hidden rounded-3xl border border-court-200 bg-court-50">
-            <div class="grid lg:grid-cols-[1fr_0.85fr]">
-                <div class="p-7 sm:p-10 lg:p-12">
-                    <p class="eyebrow">Transaction-based pricing</p>
-                    <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em]">No monthly owner subscription right now</h2>
-                    <p class="mt-4 max-w-xl leading-7 text-slate-600">You set your court price. For eligible player bookings, FinACourt can add a separately shown service fee to the player’s total instead of charging you a monthly subscription.</p>
-                    <a href="{{ route('marketplace.pricing') }}" class="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-court-800">Review pricing details @include('marketplace.partials.icon', ['name' => 'arrow-right', 'class' => 'size-4'])</a>
+        <div class="grid gap-10 lg:grid-cols-[0.7fr_1.3fr]">
+            <div class="max-w-xl">
+                <p class="eyebrow">Court owner questions</p>
+                <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em] sm:text-4xl">Frequently asked questions</h2>
+                <p class="mt-4 leading-7 text-slate-600">Straight answers about FinACourt’s court booking software, marketplace, pricing, and owner controls.</p>
+                <div class="mt-6 flex flex-wrap gap-3">
+                    <a href="{{ route('marketplace.pricing') }}" class="text-sm font-semibold text-court-800 underline decoration-court-200 underline-offset-4">Review owner pricing</a>
                 </div>
-                <div class="border-t border-court-200 bg-white p-7 sm:p-10 lg:border-l lg:border-t-0">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Current FinACourt player fee</p>
-                    @if ($pricing['service_fee_active'])
-                        <p class="mt-3 text-3xl font-bold tracking-tight text-slate-950">{{ $pricing['service_fee_summary'] }}</p>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">Added to eligible new player bookings and shown separately before confirmation.</p>
-                    @else
-                        <p class="mt-3 text-2xl font-bold tracking-tight text-slate-950">No active service fee</p>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">Players currently pay the court price. Any future fee must be shown before they confirm.</p>
-                    @endif
-                    <a href="{{ route('register') }}" class="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-court-700 px-5 py-3.5 text-sm font-semibold text-white hover:bg-court-800">Start listing your courts</a>
+            </div>
+            <div class="divide-y divide-slate-200 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                @foreach ($faq as $item)
+                    <details class="p-5 sm:p-6">
+                        <summary class="flex cursor-pointer list-none items-start justify-between gap-5 font-semibold text-slate-950">
+                            <span data-details-question>{{ $item['question'] }}</span>
+                            <span data-details-icon class="text-xl leading-none text-court-600 transition" aria-hidden="true">+</span>
+                        </summary>
+                        <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">{{ $item['answer'] }}</p>
+                    </details>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
+    <section class="border-t border-slate-200 bg-white py-16 sm:py-20">
+        <div class="page-shell">
+            <div class="overflow-hidden rounded-3xl border border-court-200 bg-court-50">
+                <div class="grid lg:grid-cols-[1fr_0.85fr]">
+                    <div class="p-7 sm:p-10 lg:p-12">
+                        <p class="eyebrow">Transaction-based pricing</p>
+                        <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em]">No monthly owner subscription right now</h2>
+                        <p class="mt-4 max-w-xl leading-7 text-slate-600">You set your court price. For eligible player bookings, FinACourt can add a separately shown service fee to the player’s total instead of charging you a monthly subscription.</p>
+                        <a href="{{ route('marketplace.pricing') }}" class="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-court-800">Review pricing details @include('marketplace.partials.icon', ['name' => 'arrow-right', 'class' => 'size-4'])</a>
+                    </div>
+                    <div class="border-t border-court-200 bg-white p-7 sm:p-10 lg:border-l lg:border-t-0">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Current FinACourt player fee</p>
+                        @if ($pricing['service_fee_active'])
+                            <p class="mt-3 text-3xl font-bold tracking-tight text-slate-950">{{ $pricing['service_fee_summary'] }}</p>
+                            <p class="mt-3 text-sm leading-6 text-slate-600">Added to eligible new player bookings and shown separately before confirmation.</p>
+                        @else
+                            <p class="mt-3 text-2xl font-bold tracking-tight text-slate-950">No active service fee</p>
+                            <p class="mt-3 text-sm leading-6 text-slate-600">Players currently pay the court price. Any future fee must be shown before they confirm.</p>
+                        @endif
+                        <a href="{{ route('register') }}" class="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-court-700 px-5 py-3.5 text-sm font-semibold text-white hover:bg-court-800">Start listing your courts</a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -302,8 +394,9 @@
 
     <section class="bg-court-800 text-white">
         <div class="page-shell flex flex-col gap-6 py-14 sm:flex-row sm:items-center sm:justify-between">
-            <div><h2 class="text-2xl font-bold tracking-tight sm:text-3xl">Start turning player interest into court bookings</h2><p class="mt-2 text-sm text-court-100/80">List your venue, publish real court times, and use FinACourt to discover what can help you grow.</p></div>
-            <div class="flex shrink-0 flex-col gap-3 sm:flex-row"><a href="mailto:{{ $pricing['sales_email'] }}" class="rounded-xl border border-white/25 px-5 py-3 text-center text-sm font-semibold hover:bg-white/10">Ask for setup help</a><a href="{{ route('register') }}" class="rounded-xl bg-white px-5 py-3 text-center text-sm font-semibold text-court-900 hover:bg-court-50">List your venue</a></div>
+            <div><h2 class="text-2xl font-bold tracking-tight sm:text-3xl">Start turning player interest into court bookings</h2><p class="mt-2 text-sm text-court-100/80">Add a venue, publish real court times, and use FinACourt to discover what can help you grow.</p></div>
+            <div class="flex shrink-0 flex-col gap-3 sm:flex-row">
+                <a href="{{ route('register') }}" class="rounded-xl bg-white px-5 py-3 text-center text-sm font-semibold text-court-900 hover:bg-court-50">List your courts</a></div>
         </div>
     </section>
 @endsection
