@@ -5,7 +5,7 @@
         <div class="page-shell py-14 text-center sm:py-20">
             <p class="eyebrow">Owner pricing</p>
             <h1 class="mx-auto mt-4 max-w-4xl text-4xl font-bold tracking-[-0.04em] sm:text-5xl">Simple pricing built around player bookings</h1>
-            <p class="mx-auto mt-5 max-w-3xl text-base leading-7 text-slate-600">There is no monthly owner subscription right now. You set your court price, and FinACourt can add a separately shown service fee to eligible player bookings.</p>
+            <p class="mx-auto mt-5 max-w-3xl text-base leading-7 text-slate-600">There is no monthly owner subscription right now. You set your court price, and FinACourt can add a separately shown service fee to eligible online player bookings. Pay-at-venue bookings have no transaction or processing fee.</p>
         </div>
     </section>
 
@@ -57,7 +57,7 @@
                     <p class="eyebrow">Current player service fee</p>
                     @if ($pricing['service_fee_active'])
                         <h2 class="mt-3 text-3xl font-bold tracking-tight">{{ $pricing['service_fee_summary'] }}</h2>
-                        <p class="mt-4 text-sm leading-6 text-slate-600">This fee applies to eligible new player bookings while it remains active. The exact peso amount is shown with the court price before confirmation.</p>
+                        <p class="mt-4 text-sm leading-6 text-slate-600">This fee applies to eligible new online player bookings while it remains active. The exact peso amount is shown with the court price before confirmation.</p>
                         @if ($pricing['service_fee_minimum'] || $pricing['service_fee_maximum'])
                             <dl class="mt-5 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                                 @if ($pricing['service_fee_minimum'])
@@ -70,7 +70,7 @@
                         @endif
                     @else
                         <h2 class="mt-3 text-2xl font-bold tracking-tight">No active FinACourt service fee</h2>
-                        <p class="mt-3 text-sm leading-6 text-slate-600">Players currently pay the court price for new bookings. If a service fee is turned on later, it must be shown separately before confirmation.</p>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">Players currently pay the court price for new bookings. If an online service fee is turned on later, it must be shown separately before confirmation.</p>
                     @endif
                 </div>
 
@@ -82,7 +82,7 @@
 
                 <div class="rounded-2xl border border-amber-200 bg-amber-50 p-6">
                     <h2 class="font-semibold text-amber-950">Court earnings and payouts</h2>
-                    <p class="mt-2 text-sm leading-6 text-amber-900/80">For verified online payments, FinACourt records the court price separately as venue earnings. Refunds, reversals, disputes, payment-provider charges, and approved adjustments may affect the final payout. Pay-at-venue payments are collected by the venue and are not placed in FinACourt’s online payout balance.</p>
+                    <p class="mt-2 text-sm leading-6 text-amber-900/80">For verified online payments, FinACourt records the court price separately as venue earnings. Refunds, reversals, disputes, payment-provider charges, and approved adjustments may affect the final payout. Pay-at-venue payments contain only the court price, are collected by the venue, and are not placed in FinACourt’s online payout balance.</p>
                 </div>
             </aside>
         </div>
@@ -94,7 +94,7 @@
             <div class="mx-auto mt-9 grid max-w-5xl gap-4 md:grid-cols-2">
                 @foreach ([
                     ['Will I be charged when I register?', 'No. The current application has no owner registration charge or monthly owner-subscription billing flow.'],
-                    ['Who pays the FinACourt service fee?', 'When an active rule applies, the fee is added to the player total and shown separately from your court price before confirmation.'],
+                    ['Who pays the FinACourt service fee?', 'When an active rule applies to an online booking, the fee is added to the player total and shown separately from your court price before confirmation. Pay-at-venue bookings have no transaction or processing fee.'],
                     ['How does online payment work?', 'When enabled, players complete PayMongo hosted checkout. FinACourt confirms payment only after a verified provider notification, not merely because the browser returned.'],
                     ['What happens when prices or fees change?', 'New bookings use the effective rule at booking time. Existing bookings keep their saved court price, service fee, discount, and player total.'],
                 ] as [$question, $answer])

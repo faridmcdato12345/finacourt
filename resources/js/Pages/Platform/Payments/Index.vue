@@ -66,7 +66,7 @@ function recordRefund(payment) {
                         Booking fee settings
                     </h1>
                     <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-                        Set the small FinACourt fee players pay on new marketplace bookings. Court prices stay separate, so owners still see their own venue revenue clearly.
+                        Set the small FinACourt fee players pay on new online marketplace bookings. Pay-at-venue reservations have no transaction or processing fee.
                     </p>
                 </div>
                 <div class="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
@@ -88,17 +88,17 @@ function recordRefund(payment) {
                 <div class="metric-card">
                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Fee collected/qualified</p>
                     <p class="mt-4 text-3xl font-semibold text-slate-950">{{ money(metrics.service_fee_total) }}</p>
-                    <p class="mt-2 text-xs leading-5 text-slate-500">From confirmed marketplace bookings only.</p>
+                    <p class="mt-2 text-xs leading-5 text-slate-500">From confirmed online marketplace bookings only.</p>
                 </div>
                 <div class="metric-card">
                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Pending fee</p>
                     <p class="mt-4 text-3xl font-semibold text-slate-950">{{ money(metrics.pending_service_fee_total) }}</p>
-                    <p class="mt-2 text-xs leading-5 text-slate-500">Held or confirmed bookings still waiting for payment.</p>
+                    <p class="mt-2 text-xs leading-5 text-slate-500">Online bookings still waiting for verified payment.</p>
                 </div>
                 <div class="metric-card">
                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Bookings with fee</p>
                     <p class="mt-4 text-3xl font-semibold text-slate-950">{{ number(metrics.bookings_with_fee) }}</p>
-                    <p class="mt-2 text-xs leading-5 text-slate-500">{{ number(metrics.qualified_bookings) }} qualified marketplace bookings.</p>
+                    <p class="mt-2 text-xs leading-5 text-slate-500">{{ number(metrics.qualified_bookings) }} qualified online bookings.</p>
                 </div>
                 <div class="metric-card">
                     <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Average fee</p>
@@ -127,12 +127,12 @@ function recordRefund(payment) {
                         <div v-else class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-5">
                             <h3 class="font-semibold text-slate-900">No booking fee is active</h3>
                             <p class="mt-2 text-sm leading-6 text-slate-500">
-                                Players currently pay only the court price. Save an active rule to start adding a FinACourt service fee to new marketplace bookings.
+                                Players currently pay only the court price. Save an active rule to start adding a FinACourt service fee to new online marketplace bookings.
                             </p>
                         </div>
 
                         <div class="mt-5 rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                            Existing bookings do not change when this rule changes. Each new booking keeps the exact fee that was shown and calculated by the server.
+                            Pay-at-venue bookings have no transaction or processing fee. Existing bookings do not change when this rule changes; each booking keeps its saved price snapshot.
                         </div>
                     </div>
                 </div>
@@ -142,7 +142,7 @@ function recordRefund(payment) {
                         <p class="eyebrow">New fee rule</p>
                         <h2 class="mt-1 text-xl font-semibold">Set a booking fee</h2>
                         <p class="mt-2 text-sm leading-6 text-slate-500">
-                            If you turn this on, older active rules are paused and this rule is used for new player bookings.
+                            If you turn this on, older active rules are paused and this rule is used for new online player bookings.
                         </p>
                     </div>
 
@@ -216,7 +216,7 @@ function recordRefund(payment) {
 
                     <label class="mt-5 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
                         <input v-model="form.is_active" type="checkbox" class="mt-1 rounded border-slate-300 text-court-700 focus:ring-court-600" />
-                        <span><strong class="text-slate-900">Turn this fee on after saving.</strong><br>When active, it applies to new player bookings and is shown before checkout.</span>
+                        <span><strong class="text-slate-900">Turn this fee on after saving.</strong><br>When active, it applies to new online player bookings and is shown before checkout.</span>
                     </label>
 
                     <button :disabled="form.processing" class="mt-6 min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800 disabled:cursor-wait disabled:opacity-60">

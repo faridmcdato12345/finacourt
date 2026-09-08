@@ -59,10 +59,6 @@ class BookingController extends Controller
         $availabilityError = null;
         $promotion = null;
         $price = $prices->quote($resource, $duration);
-        $price = [
-            ...$price,
-            ...$serviceFees->quote($price['total_amount'], $price['currency']),
-        ];
 
         try {
             $window = $availability->window(
@@ -81,10 +77,6 @@ class BookingController extends Controller
                     $window,
                 );
             $price = $prices->quote($resource, $duration, $promotion);
-            $price = [
-                ...$price,
-                ...$serviceFees->quote($price['total_amount'], $price['currency']),
-            ];
 
             if ($promotion !== null) {
                 $promotionTracker->recordClick($request, $promotion);
@@ -114,6 +106,8 @@ class BookingController extends Controller
             'endTime' => $endTime,
             'duration' => $duration,
             'price' => $price,
+            'onlinePrice' => $serviceFees->quote($price['total_amount'], $price['currency']),
+            'payAtVenuePrice' => $serviceFees->emptyQuoteFromAmount($price['total_amount']),
             'promotion' => $promotion,
             'campaign' => $promotion?->campaign_token,
             'availabilityError' => $availabilityError,

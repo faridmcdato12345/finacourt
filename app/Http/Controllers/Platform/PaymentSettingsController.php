@@ -96,7 +96,7 @@ class PaymentSettingsController extends Controller
         });
 
         return back()->with('status', $isActive
-            ? 'Booking service fee saved and turned on for new player bookings.'
+            ? 'Booking service fee saved and turned on for new online player bookings.'
             : 'Booking service fee rule saved as inactive.');
     }
 
@@ -118,7 +118,7 @@ class PaymentSettingsController extends Controller
         });
 
         return back()->with('status', $isActive
-            ? 'This booking service fee is now active for new player bookings.'
+            ? 'This booking service fee is now active for new online player bookings.'
             : 'This booking service fee is paused.');
     }
 
@@ -134,6 +134,7 @@ class PaymentSettingsController extends Controller
             ->count();
         $pendingFees = Booking::query()
             ->where('source', BookingSource::Marketplace)
+            ->where('payment_mode', PaymentMode::HostedCheckout)
             ->where('platform_service_fee_amount', '>', 0)
             ->whereIn('status', [BookingStatus::Hold, BookingStatus::Confirmed])
             ->where('payment_status', PaymentStatus::Pending)
@@ -154,6 +155,7 @@ class PaymentSettingsController extends Controller
                     'booking:id,reference,venue_id,total_amount,platform_service_fee_amount,player_total_amount',
                     'booking.venue:id,name',
                 ])
+                ->where('mode', PaymentMode::HostedCheckout)
                 ->where('platform_service_fee_amount', '>', 0)
                 ->latest('id')
                 ->limit(8)
@@ -180,6 +182,7 @@ class PaymentSettingsController extends Controller
     {
         return Booking::query()
             ->where('source', BookingSource::Marketplace)
+            ->where('payment_mode', PaymentMode::HostedCheckout)
             ->where('status', BookingStatus::Confirmed)
             ->where(function (Builder $query): void {
                 $query->whereNull('payment_status')

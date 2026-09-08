@@ -4,6 +4,7 @@ namespace App\Bookings;
 
 use App\Analytics\SnapshotBookingAttribution;
 use App\Enums\BookingStatus;
+use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
 use App\Models\Booking;
 use App\Models\CourtResource;
@@ -72,9 +73,9 @@ class CreateBooking
             $paymentMode = ($data['create_payment'] ?? false)
                 ? $this->createPayment->mode($paymentProvider)
                 : null;
-            $serviceFee = $paymentMode === null
-                ? $this->serviceFees->emptyQuoteFromAmount($price['total_amount'])
-                : $this->serviceFees->quote($price['total_amount'], $price['currency']);
+            $serviceFee = $paymentMode === PaymentMode::HostedCheckout
+                ? $this->serviceFees->quote($price['total_amount'], $price['currency'])
+                : $this->serviceFees->emptyQuoteFromAmount($price['total_amount']);
             $holdMinutes = (int) ($data['hold_minutes'] ?? config('booking.hold_minutes'));
             $holdExpiresAt = now()->addMinutes($holdMinutes);
 

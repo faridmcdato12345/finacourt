@@ -4,7 +4,9 @@ namespace Tests\Feature;
 
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
+use App\Enums\PaymentMode;
 use App\Enums\PlatformServiceFeeType;
+use App\Enums\PlayerPaymentOption;
 use App\Models\Booking;
 use App\Models\CourtResource;
 use App\Models\Membership;
@@ -70,8 +72,9 @@ class PlatformServiceFeeTest extends TestCase
             ])->assertForbidden();
     }
 
-    public function test_player_booking_snapshots_service_fee_and_ignores_tampered_amounts(): void
+    public function test_online_player_booking_snapshots_service_fee_and_ignores_tampered_amounts(): void
     {
+        $this->enablePayMongo();
         $rule = PlatformServiceFeeRule::factory()->create([
             'name' => 'Five percent player fee',
             'fee_type' => PlatformServiceFeeType::Percentage,
@@ -85,6 +88,7 @@ class PlatformServiceFeeTest extends TestCase
             'platform_service_fee_amount' => '0.00',
             'player_total_amount' => '1.00',
             'amount' => '1.00',
+            'payment_option' => PlayerPaymentOption::Online->value,
         ])->assertRedirect();
 
         $booking = Booking::query()->with('payment')->sole();
@@ -98,10 +102,65 @@ class PlatformServiceFeeTest extends TestCase
         $this->assertSame('682.50', $booking->payment->amount);
         $this->assertSame('650.00', $booking->payment->venue_amount);
         $this->assertSame('32.50', $booking->payment->platform_service_fee_amount);
+        $this->assertSame(PaymentMode::HostedCheckout, $booking->payment_mode);
+    }
+
+    public function test_pay_at_venue_booking_excludes_service_and_processing_fees(): void
+    {
+        $this->enablePayMongo();
+        PlatformServiceFeeRule::factory()->fixed('25.00')->create();
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+
+        $this->actingAs($player)->post(route('player.bookings.store', $venue->slug), [
+            ...$this->holdData($resource),
+            'payment_option' => PlayerPaymentOption::PayAtVenue->value,
+            'platform_service_fee_amount' => '999.00',
+            'player_total_amount' => '1.00',
+        ])->assertRedirect();
+
+        $booking = Booking::query()->with('payment')->sole();
+
+        $this->assertSame(PaymentMode::PayAtVenue, $booking->payment_mode);
+        $this->assertNull($booking->platform_service_fee_rule_id);
+        $this->assertNull($booking->platform_service_fee_name);
+        $this->assertSame('0.00', $booking->platform_service_fee_amount);
+        $this->assertSame('650.00', $booking->player_total_amount);
+        $this->assertSame('manual', $booking->payment->provider);
+        $this->assertSame('650.00', $booking->payment->amount);
+        $this->assertSame('650.00', $booking->payment->venue_amount);
+        $this->assertSame('0.00', $booking->payment->platform_service_fee_amount);
+    }
+
+    public function test_reservation_page_exposes_separate_online_and_pay_at_venue_totals(): void
+    {
+        $this->enablePayMongo();
+        PlatformServiceFeeRule::factory()->fixed('25.00')->create();
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+
+        $this->actingAs($player)->get(route('player.bookings.create', [
+            'venueSlug' => $venue->slug,
+            'resource' => $resource->getKey(),
+            'date' => now('Asia/Manila')->addDays(7)->toDateString(),
+            'start' => '09:00',
+            'duration' => 60,
+        ]))
+            ->assertOk()
+            ->assertSee('data-booking-payment-pricing', false)
+            ->assertSee('data-online-total="₱675.00"', false)
+            ->assertSee('data-pay-at-venue-total="₱650.00"', false)
+            ->assertSee('data-online-service-fee', false)
+            ->assertSee('No transaction or processing fee.');
+
+        $enhancements = file_get_contents(resource_path('js/public-selects.js'));
+        $this->assertStringContainsString('input[name="payment_option"]:checked', $enhancements);
+        $this->assertStringContainsString('element.dataset.payAtVenueTotal', $enhancements);
     }
 
     public function test_service_fee_snapshot_does_not_change_when_rule_changes(): void
     {
+        $this->enablePayMongo();
         PlatformServiceFeeRule::factory()->fixed('25.00')->create(['name' => 'Launch fee']);
         [, $venue, $resource] = $this->setupInventory();
         $player = User::factory()->create();

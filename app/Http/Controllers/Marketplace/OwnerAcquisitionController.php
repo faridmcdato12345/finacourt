@@ -53,7 +53,7 @@ class OwnerAcquisitionController extends Controller
             'pricing' => $this->ownerPricing($serviceFees),
             'seo' => [
                 'title' => 'Pricing for court owners',
-                'description' => 'See how FinACourt separates the owner-set court price, player service fee, player total, and online court earnings without a monthly owner subscription.',
+                'description' => 'See how FinACourt separates the owner-set court price, online player service fee, player total, and online court earnings without a monthly owner subscription.',
                 'canonical' => route('marketplace.pricing'),
                 'robots' => 'index,follow',
                 'type' => 'website',
@@ -153,7 +153,7 @@ class OwnerAcquisitionController extends Controller
             ],
             [
                 'question' => 'Does FinACourt charge owners a monthly subscription?',
-                'answer' => 'FinACourt does not currently charge a monthly owner subscription. Any active player service fee is shown separately before a player confirms an eligible booking.',
+                'answer' => 'FinACourt does not currently charge a monthly owner subscription. Any active player service fee is shown separately before a player confirms an eligible online booking. Pay-at-venue bookings have no transaction or processing fee.',
             ],
             [
                 'question' => 'Can FinACourt help with Google visibility?',
