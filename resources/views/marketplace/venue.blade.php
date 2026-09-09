@@ -2,7 +2,8 @@
 
 @section('content')
     @php
-        $rates = $venue->resources->map(fn ($resource) => (float) $resource->base_hourly_rate);
+        $rates = $venue->resources->flatMap(fn ($resource) => collect([(float) $resource->base_hourly_rate])
+            ->merge($resource->pricingRules->map(fn ($rule) => (float) $rule->hourly_rate)));
         $minimumRate = $rates->min();
         $maximumRate = $rates->max();
         $settings = $venue->resources->pluck('setting')->map->label()->unique()->values();

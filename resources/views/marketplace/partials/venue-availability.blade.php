@@ -46,11 +46,14 @@
                                 data-start="{{ $slot['start_time'] }}"
                                 data-end="{{ $slot['end_time'] }}"
                                 data-campaign="{{ $slot['campaign'] ?? '' }}"
+                                data-price="{{ $slot['total_amount'] }}"
                                 aria-pressed="false"
                                 class="rounded-xl border border-court-200 bg-court-50 px-2 py-3 text-center text-xs font-semibold text-court-800 hover:border-court-500"
                                 aria-label="Select {{ $slot['start_time'] }} to {{ $slot['end_time'] }}"
                             >
                                 {{ $slot['start_time'] }}–{{ $slot['end_time'] }}
+                                <span class="mt-1 block text-[10px] text-slate-500">₱{{ number_format((float) $slot['total_amount'], 2) }}</span>
+                                @if (($slot['has_time_based_price'] ?? false) && ! ($slot['campaign'] ?? null))<span class="mt-0.5 block text-[10px] text-court-700">Scheduled price</span>@endif
                                 @if ($slot['campaign'] ?? null)<span class="mt-1 block text-[10px] text-amber-700">{{ $slot['promotion_offer'] ?: 'Deal applies' }}</span>@endif
                             </a>
                         @else

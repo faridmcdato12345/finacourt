@@ -304,7 +304,13 @@ function bindConsecutiveSlotPickers() {
             }
 
             summaryTime.textContent = `${first.dataset.start}–${last.dataset.end}`;
-            summaryDetail.textContent = `${selected.length} ${selected.length === 1 ? 'slot' : 'consecutive slots'} · ${duration} minutes`;
+            const hasOnePriceContext = campaigns.length === 0
+                || (campaigns.length === 1 && selected.every((slot) => slot.dataset.campaign === campaigns[0]));
+            const selectedPrice = selected.reduce((total, slot) => total + Number(slot.dataset.price || 0), 0);
+            const priceLabel = hasOnePriceContext
+                ? ` · ${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(selectedPrice)}`
+                : ' · final price shown next';
+            summaryDetail.textContent = `${selected.length} ${selected.length === 1 ? 'slot' : 'consecutive slots'} · ${duration} minutes${priceLabel}`;
             continueLink.href = url.toString();
             continueLink.setAttribute('aria-disabled', 'false');
         };

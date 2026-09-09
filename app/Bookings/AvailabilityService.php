@@ -13,6 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 class AvailabilityService
 {
+    public function __construct(private readonly BookingPrice $prices) {}
+
     public function window(
         CourtResource $resource,
         string $date,
@@ -128,7 +130,7 @@ class AvailabilityService
             ->exists();
     }
 
-    /** @return array{date: string, timezone: string, is_open: bool, opens_at: ?string, closes_at: ?string, duration_minutes: int, slots: Collection<int, array{start_time: string, end_time: string, available: bool}>} */
+    /** @return array{date: string, timezone: string, is_open: bool, opens_at: ?string, closes_at: ?string, duration_minutes: int, slots: Collection<int, array{start_time: string, end_time: string, available: bool, unit_price: string, total_amount: string, has_time_based_price: bool}>} */
     public function slots(CourtResource $resource, string $date, int $durationMinutes): array
     {
         $resource->loadMissing('venue.organization');
@@ -170,6 +172,14 @@ class AvailabilityService
 
         while ($cursor->addMinutes($durationMinutes)->lessThanOrEqualTo($close)) {
             $end = $cursor->addMinutes($durationMinutes);
+            $window = new BookingWindow(
+                localStart: $cursor,
+                localEnd: $end,
+                utcStart: $cursor->utc(),
+                utcEnd: $end->utc(),
+                durationMinutes: $durationMinutes,
+            );
+            $price = $this->prices->quote($resource, $durationMinutes, window: $window);
             $available = $cursor->isFuture() && ! $blockers->contains(
                 fn (Booking $booking) => $booking->start_at->lessThan($end->utc())
                     && $booking->end_at->greaterThan($cursor->utc()),
@@ -182,6 +192,9 @@ class AvailabilityService
                 'start_time' => $cursor->format('H:i'),
                 'end_time' => $end->format('H:i'),
                 'available' => $available && $cursor->greaterThan($now),
+                'unit_price' => $price['unit_price'],
+                'total_amount' => $price['total_amount'],
+                'has_time_based_price' => $price['pricing_rule_snapshot'] !== null,
             ]);
             $cursor = $cursor->addMinutes($increment);
         }

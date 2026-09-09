@@ -55,6 +55,13 @@ class CourtResource extends Model
         return $this->hasMany(Booking::class, 'resource_id');
     }
 
+    /** @return HasMany<CourtPricingRule, $this> */
+    public function pricingRules(): HasMany
+    {
+        return $this->hasMany(CourtPricingRule::class, 'resource_id')
+            ->orderBy('starts_at_time');
+    }
+
     /** @return HasMany<CourtAvailabilityBlock, $this> */
     public function availabilityBlocks(): HasMany
     {

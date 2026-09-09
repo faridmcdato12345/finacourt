@@ -135,7 +135,7 @@
             <div class="mt-5 bg-court-950 p-5 text-white">
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between gap-4 text-court-100/75">
-                        <span>Court price</span>
+                        <span>{{ $price['pricing_rule_snapshot'] ? 'Scheduled court price' : 'Court price' }}</span>
                         <span>@if ((float) $price['discount_amount'] > 0)<span class="mr-2 text-court-100/45 line-through">₱{{ number_format((float) $price['original_total_amount'], 2) }}</span>@endif ₱{{ number_format((float) $price['total_amount'], 2) }}</span>
                     </div>
                     @if ((float) $onlinePrice['platform_service_fee_amount'] > 0)
@@ -149,8 +149,18 @@
                         <strong data-player-total class="text-3xl">₱{{ number_format((float) $selectedPrice['player_total_amount'], 2) }}</strong>
                     </div>
                 </div>
+                @if ($price['pricing_rule_snapshot'])
+                    <div class="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-court-200">Price schedule applied</p>
+                        <div class="mt-2 space-y-1.5 text-xs text-court-100/75">
+                            @foreach ($price['pricing_rule_snapshot'] as $segment)
+                                <div class="flex justify-between gap-3"><span>{{ $segment['starts_at'] }}–{{ $segment['ends_at'] }} · {{ $segment['name'] }}</span><span>₱{{ number_format((float) $segment['hourly_rate'], 2) }}/hr</span></div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
                 <p class="mt-3 text-xs leading-5 text-court-100/60">
-                    Calculated by the server from ₱{{ number_format((float) $price['unit_price'], 2) }}/hour.
+                    @if ($price['pricing_rule_snapshot']) Calculated from the court’s prices for your selected date and time. @else Calculated by the server from ₱{{ number_format((float) $price['unit_price'], 2) }}/hour. @endif
                     @if ((float) $price['discount_amount'] > 0) You save ₱{{ number_format((float) $price['discount_amount'], 2) }}.@endif
                     @if ((float) $onlinePrice['platform_service_fee_amount'] > 0)
                         <span data-online-fee-note @if ($selectedPaymentOption !== 'online') hidden @endif>The FinACourt fee applies only to online payment and stays separate from the venue’s court price.</span>
