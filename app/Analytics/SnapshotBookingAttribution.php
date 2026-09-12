@@ -42,8 +42,12 @@ class SnapshotBookingAttribution
             $last = [
                 ...$last,
                 'source' => AcquisitionSource::MarketplacePromotion,
+                'evidence' => 'server_promotion',
                 'medium' => 'promotion',
                 'campaign' => $promotion->campaign_token,
+                'content' => null,
+                'term' => null,
+                'click_id_hash' => null,
                 'referral_code' => null,
                 'partner_code' => null,
                 'seen_at' => now('UTC'),
@@ -75,8 +79,12 @@ class SnapshotBookingAttribution
     {
         return [
             'source' => AcquisitionSource::Direct,
+            'evidence' => 'fallback',
             'medium' => null,
             'campaign' => null,
+            'content' => null,
+            'term' => null,
+            'click_id_hash' => null,
             'referral_code' => null,
             'partner_code' => null,
             'landing_path' => null,
@@ -108,8 +116,12 @@ class SnapshotBookingAttribution
 
         return [
             'source' => $source,
+            'evidence' => $touch['evidence'] ?? 'unknown',
             'medium' => $touch['medium'] ?? null,
             'campaign' => $touch['campaign'] ?? null,
+            'content' => $touch['content'] ?? null,
+            'term' => $touch['term'] ?? null,
+            'click_id_hash' => $touch['click_id_hash'] ?? null,
             'referral_code' => $touch['referral_code'] ?? null,
             'partner_code' => $touch['partner_code'] ?? null,
             'landing_path' => $touch['landing_path'] ?? null,
@@ -128,8 +140,12 @@ class SnapshotBookingAttribution
             : AcquisitionSource::Unknown->value;
         $attributes = [
             "{$prefix}_source" => $source,
+            "{$prefix}_evidence" => $touch['evidence'],
             "{$prefix}_medium" => $touch['medium'],
             "{$prefix}_campaign" => $touch['campaign'],
+            "{$prefix}_content" => $touch['content'],
+            "{$prefix}_term" => $touch['term'],
+            "{$prefix}_click_id_hash" => $touch['click_id_hash'],
             "{$prefix}_referral_code" => $touch['referral_code'],
             "{$prefix}_partner_code" => $touch['partner_code'],
             "{$prefix}_landing_path" => $touch['landing_path'],

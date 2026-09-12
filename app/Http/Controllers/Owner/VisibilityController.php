@@ -72,7 +72,9 @@ class VisibilityController extends Controller
                     'links' => $venue->visibilityLinks->map(fn ($link) => [
                         'id' => $link->getKey(),
                         'destination' => $link->destination->value,
-                        'label' => $link->destination->label(),
+                        'source' => $link->acquisition_source->value,
+                        'source_label' => $link->acquisition_source->label(),
+                        'label' => $link->acquisition_source->label().' · '.$link->destination->label(),
                         'promotion' => $link->promotion?->title,
                         'url' => route('visibility-links.visit', $link->token),
                         'qr_url' => route('visibility-links.qr', $link->token),

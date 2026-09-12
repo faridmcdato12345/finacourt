@@ -20,7 +20,7 @@ class BookingAttributionFactory extends Factory
             'last_seen_at' => now(),
             'attributed_source' => AcquisitionSource::Direct,
             'attributed_at' => now(),
-            'rule_version' => 'last_touch_with_promotion_override_v1',
+            'rule_version' => 'last_touch_with_promotion_override_v2',
         ];
     }
 

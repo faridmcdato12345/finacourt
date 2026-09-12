@@ -107,6 +107,29 @@ class VisibilityCenterTest extends TestCase
         $this->get(route('visibility-links.visit', $link->token))->assertNotFound();
     }
 
+    public function test_owner_can_create_a_channel_specific_link_that_records_trusted_source(): void
+    {
+        [$owner, $venue] = $this->inventory('facebook-visibility', complete: true);
+
+        $this->actingAs($owner)->post(route('owner.venues.visibility-links.store', $venue), [
+            'destination' => VisibilityLinkDestination::Booking->value,
+            'source' => AcquisitionSource::Facebook->value,
+        ])->assertRedirect();
+
+        $link = $venue->visibilityLinks()->sole();
+        $this->assertSame(AcquisitionSource::Facebook, $link->acquisition_source);
+
+        $this->get(route('visibility-links.visit', $link->token))
+            ->assertRedirect(route('marketplace.venues.show', $venue->slug).'#availability')
+            ->assertSessionHas(
+                'analytics.acquisition_context.last_touch.source',
+                AcquisitionSource::Facebook->value,
+            )
+            ->assertSessionHas('analytics.acquisition_context.last_touch.evidence', 'trusted_link');
+
+        $this->assertSame(1, $link->fresh()->visits_count);
+    }
+
     public function test_directions_prefers_a_verified_place_id_then_verified_coordinates_then_address(): void
     {
         [, $venue] = $this->inventory('directions-visibility', complete: true);

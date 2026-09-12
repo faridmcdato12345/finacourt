@@ -24,7 +24,7 @@
                 <button
                     type="button"
                     data-share-page
-                    data-share-url="{{ route('marketplace.venues.show', $venue->slug) }}"
+                    data-share-url="{{ Illuminate\Support\Facades\URL::signedRoute('marketplace.venues.share', $venue->slug) }}"
                     data-share-title="{{ $venue->name }}"
                     class="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-court-300 hover:text-court-800 sm:px-4 sm:text-sm"
                 >

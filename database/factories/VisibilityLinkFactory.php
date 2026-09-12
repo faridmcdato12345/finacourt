@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\AcquisitionSource;
 use App\Enums\VisibilityLinkDestination;
 use App\Models\Venue;
 use App\Models\VisibilityLink;
@@ -17,6 +18,7 @@ class VisibilityLinkFactory extends Factory
             'venue_id' => Venue::factory(),
             'organization_id' => fn (array $attributes) => Venue::query()->findOrFail($attributes['venue_id'])->organization_id,
             'destination' => VisibilityLinkDestination::Venue,
+            'acquisition_source' => AcquisitionSource::QrCode,
             'link_key' => hash('sha256', fake()->uuid()),
             'token' => (string) Str::ulid(),
             'is_active' => true,

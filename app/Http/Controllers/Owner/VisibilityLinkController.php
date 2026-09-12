@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Owner;
 
+use App\Enums\AcquisitionSource;
 use App\Enums\VisibilityLinkDestination;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreVisibilityLinkRequest;
@@ -21,8 +22,11 @@ class VisibilityLinkController extends Controller
         $promotion = isset($data['promotion_id'])
             ? $venue->promotions()->whereKey($data['promotion_id'])->firstOrFail()
             : null;
-        $links->create($venue, $destination, $promotion, $request->user());
+        $source = AcquisitionSource::tryFrom($data['source'] ?? '') ?? AcquisitionSource::QrCode;
+        $links->create($venue, $destination, $promotion, $request->user(), $source);
 
-        return back()->with('status', 'QR code link created.');
+        return back()->with('status', $source === AcquisitionSource::QrCode
+            ? 'QR code link created.'
+            : $source->label().' tracking link created.');
     }
 }

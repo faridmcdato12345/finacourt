@@ -2,6 +2,7 @@
 
 namespace App\Visibility;
 
+use App\Enums\AcquisitionSource;
 use App\Enums\VisibilityLinkDestination;
 use App\Models\Promotion;
 use App\Models\User;
@@ -17,6 +18,7 @@ class VisibilityLinkManager
         VisibilityLinkDestination $destination,
         ?Promotion $promotion,
         User $creator,
+        AcquisitionSource $source = AcquisitionSource::QrCode,
     ): VisibilityLink {
         if (! Venue::query()->marketplace()->whereKey($venue->getKey())->exists()) {
             throw ValidationException::withMessages([
@@ -45,12 +47,25 @@ class VisibilityLinkManager
             ]);
         }
 
-        $linkKey = hash('sha256', implode(':', [
+        if (! $source->canUseTrackedVenueLink()) {
+            throw ValidationException::withMessages([
+                'source' => 'Choose a supported channel for this tracked venue link.',
+            ]);
+        }
+
+        $keyParts = [
             'venue',
             $venue->getKey(),
             $destination->value,
             $promotion?->getKey() ?? 0,
-        ]));
+        ];
+
+        // Preserve the original deterministic key for existing QR links.
+        if ($source !== AcquisitionSource::QrCode) {
+            $keyParts[] = $source->value;
+        }
+
+        $linkKey = hash('sha256', implode(':', $keyParts));
 
         return VisibilityLink::query()->firstOrCreate(
             ['link_key' => $linkKey],
@@ -60,6 +75,7 @@ class VisibilityLinkManager
                 'promotion_id' => $promotion?->getKey(),
                 'created_by_user_id' => $creator->getKey(),
                 'destination' => $destination,
+                'acquisition_source' => $source,
                 'token' => (string) Str::ulid(),
                 'is_active' => true,
             ],

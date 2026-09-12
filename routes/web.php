@@ -20,6 +20,8 @@ use App\Http\Controllers\Marketplace\SitemapController;
 use App\Http\Controllers\Marketplace\VenueController as MarketplaceVenueController;
 use App\Http\Controllers\Marketplace\VenueDirectoryController as MarketplaceVenueDirectoryController;
 use App\Http\Controllers\Marketplace\VenueDirectoryReportController;
+use App\Http\Controllers\Marketplace\VenueDiscoveryClickController;
+use App\Http\Controllers\Marketplace\VenueShareLinkController;
 use App\Http\Controllers\Marketplace\VisibilityLinkController as MarketplaceVisibilityLinkController;
 use App\Http\Controllers\Marketplace\VisibilityQrController;
 use App\Http\Controllers\Owner\AnalyticsController as OwnerAnalyticsController;
@@ -98,6 +100,12 @@ Route::middleware('throttle:marketplace')->group(function () {
         ->name('marketplace.directory.show');
     Route::get('/courts/{citySlug}', [DiscoveryController::class, 'city'])
         ->name('marketplace.courts.city');
+    Route::get('/discover/venues/{venueSlug}', VenueDiscoveryClickController::class)
+        ->middleware('signed')
+        ->name('marketplace.venues.discover');
+    Route::get('/share/venues/{venueSlug}', VenueShareLinkController::class)
+        ->middleware('signed')
+        ->name('marketplace.venues.share');
     Route::get('/venues/{venueSlug}', MarketplaceVenueController::class)
         ->name('marketplace.venues.show');
 });

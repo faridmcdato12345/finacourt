@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\AcquisitionSource;
 use App\Enums\VisibilityLinkDestination;
 use App\Models\Venue;
 use Illuminate\Foundation\Http\FormRequest;
@@ -22,6 +23,13 @@ class StoreVisibilityLinkRequest extends FormRequest
         return [
             'destination' => ['required', Rule::enum(VisibilityLinkDestination::class)],
             'promotion_id' => ['nullable', 'integer'],
+            'source' => [
+                'nullable',
+                Rule::in(collect(AcquisitionSource::cases())
+                    ->filter->canUseTrackedVenueLink()
+                    ->map->value
+                    ->all()),
+            ],
         ];
     }
 }

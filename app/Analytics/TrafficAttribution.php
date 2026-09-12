@@ -10,6 +10,7 @@ use App\Models\SalesPartnerProfile;
 use App\Models\VisibilityLink;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Str;
 
 class TrafficAttribution
@@ -32,7 +33,7 @@ class TrafficAttribution
         $stored = $request->session()->get(self::SESSION_KEY);
 
         if (! is_array($stored)) {
-            $stored = $this->legacyContext($request, $now);
+            $stored = $this->cookieContext($request) ?? $this->legacyContext($request, $now);
         }
 
         if (! is_array($stored) || $this->expired($stored, $now)) {
@@ -42,7 +43,7 @@ class TrafficAttribution
         $signal = $this->signal($request, $promotion, $now);
 
         if ($stored === null) {
-            $signal ??= $this->touch($request, AcquisitionSource::Direct, $now);
+            $signal ??= $this->touch($request, AcquisitionSource::Direct, $now, evidence: 'fallback');
             $stored = ['first_touch' => $signal, 'last_touch' => $signal];
         } elseif ($signal !== null) {
             $stored['last_touch'] = $signal;
@@ -51,6 +52,7 @@ class TrafficAttribution
         $stored = $this->normalizeContext($stored, $request, $now);
         $request->session()->put(self::SESSION_KEY, $stored);
         $request->session()->forget('analytics.attribution');
+        $this->queueContinuityCookie($stored);
         $first = $this->hydrateTouch($stored['first_touch']);
         $last = $this->hydrateTouch($stored['last_touch']);
 
@@ -74,6 +76,10 @@ class TrafficAttribution
         $now = CarbonImmutable::now('UTC');
         $stored = $request->session()->get(self::SESSION_KEY);
 
+        if (! is_array($stored)) {
+            $stored = $this->cookieContext($request);
+        }
+
         if (! is_array($stored) || $this->expired($stored, $now)) {
             $stored = null;
         }
@@ -84,6 +90,7 @@ class TrafficAttribution
             $now,
             medium: 'in_app',
             campaign: $campaign->campaign_token,
+            evidence: 'trusted_link',
         );
         $stored = [
             'first_touch' => $stored['first_touch'] ?? $touch,
@@ -93,6 +100,7 @@ class TrafficAttribution
         $stored = $this->normalizeContext($stored, $request, $now);
         $request->session()->put(self::SESSION_KEY, $stored);
         $request->session()->forget('analytics.attribution');
+        $this->queueContinuityCookie($stored);
         $first = $this->hydrateTouch($stored['first_touch']);
         $last = $this->hydrateTouch($stored['last_touch']);
 
@@ -116,16 +124,21 @@ class TrafficAttribution
         $now = CarbonImmutable::now('UTC');
         $stored = $request->session()->get(self::SESSION_KEY);
 
+        if (! is_array($stored)) {
+            $stored = $this->cookieContext($request);
+        }
+
         if (! is_array($stored) || $this->expired($stored, $now)) {
             $stored = null;
         }
 
         $touch = $this->touch(
             $request,
-            AcquisitionSource::QrCode,
+            $link->acquisition_source ?? AcquisitionSource::QrCode,
             $now,
-            medium: 'qr',
+            medium: $this->trustedLinkMedium($link->acquisition_source ?? AcquisitionSource::QrCode),
             campaign: $link->token,
+            evidence: 'trusted_link',
         );
         $stored = [
             'first_touch' => $stored['first_touch'] ?? $touch,
@@ -135,6 +148,7 @@ class TrafficAttribution
         $stored = $this->normalizeContext($stored, $request, $now);
         $request->session()->put(self::SESSION_KEY, $stored);
         $request->session()->forget('analytics.attribution');
+        $this->queueContinuityCookie($stored);
         $first = $this->hydrateTouch($stored['first_touch']);
         $last = $this->hydrateTouch($stored['last_touch']);
 
@@ -145,6 +159,28 @@ class TrafficAttribution
             'first_touch' => $first,
             'last_touch' => $last,
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function marketplaceDiscovery(Request $request, string $context): array
+    {
+        return $this->trustedTouch(
+            $request,
+            AcquisitionSource::MarketplaceOrganic,
+            'marketplace',
+            $this->token($context, 120),
+        );
+    }
+
+    /** @return array<string, mixed> */
+    public function sharedVenueLink(Request $request, string $venueSlug): array
+    {
+        return $this->trustedTouch(
+            $request,
+            AcquisitionSource::SharedLink,
+            'player_share',
+            $this->token($venueSlug, 120),
+        );
     }
 
     /**
@@ -159,6 +195,10 @@ class TrafficAttribution
         $now = CarbonImmutable::now('UTC');
         $stored = $request->session()->get(self::SESSION_KEY);
 
+        if (! is_array($stored)) {
+            $stored = $this->cookieContext($request);
+        }
+
         if (! is_array($stored) || $this->expired($stored, $now)) {
             $stored = null;
         }
@@ -170,6 +210,7 @@ class TrafficAttribution
             medium: 'referral',
             campaign: $partner->public_id,
             partnerCode: $partner->referral_code,
+            evidence: 'trusted_link',
         );
         $stored = [
             'first_touch' => $stored['first_touch'] ?? $touch,
@@ -221,13 +262,14 @@ class TrafficAttribution
                 $now,
                 medium: 'promotion',
                 campaign: $promotion->campaign_token,
+                evidence: 'server_promotion',
             );
         }
 
         $qr = $this->token($request->query('qr') ?? $request->query('qr_code'), 80);
 
         if ($qr !== null) {
-            return $this->touch($request, AcquisitionSource::QrCode, $now, medium: 'qr', campaign: $qr);
+            return $this->touch($request, AcquisitionSource::QrCode, $now, medium: 'qr', campaign: $qr, evidence: 'browser_marker');
         }
 
         $partner = $this->token($request->query('partner') ?? $request->query('partner_code'), 80);
@@ -239,6 +281,7 @@ class TrafficAttribution
                 $now,
                 medium: 'referral',
                 partnerCode: $partner,
+                evidence: 'browser_marker',
             );
         }
 
@@ -251,6 +294,7 @@ class TrafficAttribution
                 $now,
                 medium: 'referral',
                 referralCode: $referral,
+                evidence: 'browser_marker',
             );
         }
 
@@ -275,6 +319,10 @@ class TrafficAttribution
                 $now,
                 medium: $this->token($request->query('utm_medium'), 64),
                 campaign: $this->text($request->query('utm_campaign'), 120),
+                content: $this->text($request->query('utm_content'), 120),
+                term: $this->text($request->query('utm_term'), 120),
+                clickIdHash: $this->clickIdHash($request),
+                evidence: 'browser_marker',
             );
         }
 
@@ -289,6 +337,23 @@ class TrafficAttribution
                 $now,
                 medium: $medium,
                 campaign: $this->text($request->query('utm_campaign'), 120),
+                content: $this->text($request->query('utm_content'), 120),
+                term: $this->text($request->query('utm_term'), 120),
+                clickIdHash: $this->clickIdHash($request),
+                evidence: 'utm',
+            );
+        }
+
+        $clickSource = $this->clickSource($request);
+
+        if ($clickSource !== null) {
+            return $this->touch(
+                $request,
+                $clickSource,
+                $now,
+                medium: $clickSource === AcquisitionSource::GoogleAds ? 'cpc' : 'social',
+                clickIdHash: $this->clickIdHash($request),
+                evidence: 'click_id',
             );
         }
 
@@ -313,6 +378,7 @@ class TrafficAttribution
             $now,
             medium: 'referral',
             referrerHost: $this->text($referrerHost, 160),
+            evidence: 'referrer',
         );
     }
 
@@ -325,7 +391,8 @@ class TrafficAttribution
             in_array($source, ['marketplace', 'court', 'court_marketplace'], true) => AcquisitionSource::MarketplaceOrganic,
             in_array($source, ['google_maps', 'googlemaps', 'maps'], true),
             $source === 'google' && in_array($medium, ['maps', 'local', 'business-profile'], true) => AcquisitionSource::GoogleMaps,
-            $source === 'google' && ! in_array($medium, ['cpc', 'ppc', 'paid', 'display'], true) => AcquisitionSource::GoogleOrganic,
+            $source === 'google' && in_array($medium, ['cpc', 'ppc', 'paid', 'paid-search', 'display'], true) => AcquisitionSource::GoogleAds,
+            $source === 'google' => AcquisitionSource::GoogleOrganic,
             in_array($source, ['facebook', 'fb'], true) => AcquisitionSource::Facebook,
             in_array($source, ['instagram', 'ig'], true) => AcquisitionSource::Instagram,
             $source === 'tiktok' => AcquisitionSource::TikTok,
@@ -365,6 +432,7 @@ class TrafficAttribution
                 ? ($parts[1] ?? $detail)
                 : null,
             referrerHost: $legacySource === 'referral' ? $detail : null,
+            evidence: 'legacy',
         );
 
         return ['first_touch' => $touch, 'last_touch' => $touch];
@@ -392,11 +460,19 @@ class TrafficAttribution
         ?string $referralCode = null,
         ?string $partnerCode = null,
         ?string $referrerHost = null,
+        ?string $content = null,
+        ?string $term = null,
+        ?string $clickIdHash = null,
+        string $evidence = 'unknown',
     ): array {
         return [
             'source' => $source->value,
+            'evidence' => $evidence,
             'medium' => $medium,
             'campaign' => $campaign,
+            'content' => $content,
+            'term' => $term,
+            'click_id_hash' => $clickIdHash,
             'referral_code' => $referralCode,
             'partner_code' => $partnerCode,
             'landing_path' => $this->text($request->getPathInfo(), 255),
@@ -429,7 +505,7 @@ class TrafficAttribution
      */
     private function normalizeContext(array $context, Request $request, CarbonImmutable $now): array
     {
-        $fallback = $this->touch($request, AcquisitionSource::Direct, $now);
+        $fallback = $this->touch($request, AcquisitionSource::Direct, $now, evidence: 'fallback');
 
         return [
             'first_touch' => $this->normalizeTouch($context['first_touch'] ?? null, $fallback),
@@ -452,8 +528,12 @@ class TrafficAttribution
 
         return [
             'source' => $source->value,
+            'evidence' => $this->evidence($touch['evidence'] ?? null),
             'medium' => $this->token($touch['medium'] ?? null, 64),
             'campaign' => $this->text($touch['campaign'] ?? null, 120),
+            'content' => $this->text($touch['content'] ?? null, 120),
+            'term' => $this->text($touch['term'] ?? null, 120),
+            'click_id_hash' => $this->hashToken($touch['click_id_hash'] ?? null),
             'referral_code' => $this->token($touch['referral_code'] ?? null, 80),
             'partner_code' => $this->token($touch['partner_code'] ?? null, 80),
             'landing_path' => $this->text($touch['landing_path'] ?? null, 255),
@@ -480,6 +560,165 @@ class TrafficAttribution
             ?? $touch['referral_code']
             ?? $touch['partner_code']
             ?? $touch['referrer_host'];
+    }
+
+    /** @return array<string, mixed> */
+    private function trustedTouch(
+        Request $request,
+        AcquisitionSource $source,
+        string $medium,
+        ?string $campaign,
+    ): array {
+        $now = CarbonImmutable::now('UTC');
+        $stored = $request->session()->get(self::SESSION_KEY);
+
+        if (! is_array($stored)) {
+            $stored = $this->cookieContext($request);
+        }
+
+        if (! is_array($stored) || $this->expired($stored, $now)) {
+            $stored = null;
+        }
+
+        $touch = $this->touch(
+            $request,
+            $source,
+            $now,
+            medium: $medium,
+            campaign: $campaign,
+            evidence: 'trusted_link',
+        );
+        $stored = [
+            'first_touch' => $stored['first_touch'] ?? $touch,
+            'last_touch' => $touch,
+            'reactivation_campaign_token' => null,
+        ];
+        $stored = $this->normalizeContext($stored, $request, $now);
+        $request->session()->put(self::SESSION_KEY, $stored);
+        $request->session()->forget('analytics.attribution');
+        $this->queueContinuityCookie($stored);
+        $first = $this->hydrateTouch($stored['first_touch']);
+        $last = $this->hydrateTouch($stored['last_touch']);
+
+        return [
+            ...$last,
+            'detail' => $this->detail($last),
+            'reactivation_campaign_token' => null,
+            'first_touch' => $first,
+            'last_touch' => $last,
+        ];
+    }
+
+    private function trustedLinkMedium(AcquisitionSource $source): string
+    {
+        return match ($source) {
+            AcquisitionSource::QrCode => 'qr',
+            AcquisitionSource::SharedLink => 'shared_link',
+            AcquisitionSource::GoogleMaps => 'business-profile',
+            AcquisitionSource::GoogleAds => 'cpc',
+            AcquisitionSource::Facebook,
+            AcquisitionSource::Instagram,
+            AcquisitionSource::TikTok => 'social',
+            default => 'tracked_link',
+        };
+    }
+
+    private function clickSource(Request $request): ?AcquisitionSource
+    {
+        foreach ([
+            'gclid' => AcquisitionSource::GoogleAds,
+            'fbclid' => AcquisitionSource::Facebook,
+            'ttclid' => AcquisitionSource::TikTok,
+        ] as $key => $source) {
+            $value = $request->query($key);
+
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return $source;
+            }
+        }
+
+        return null;
+    }
+
+    private function clickIdHash(Request $request): ?string
+    {
+        foreach (['gclid', 'fbclid', 'ttclid'] as $key) {
+            $value = $request->query($key);
+
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                $value = Str::limit((string) $value, 512, '');
+
+                return hash_hmac('sha256', $key.':'.$value, (string) config('app.key'));
+            }
+        }
+
+        return null;
+    }
+
+    private function hashToken(mixed $value): ?string
+    {
+        return is_string($value) && preg_match('/^[a-f0-9]{64}$/', $value) === 1
+            ? $value
+            : null;
+    }
+
+    private function evidence(mixed $value): string
+    {
+        return in_array($value, [
+            'trusted_link',
+            'server_promotion',
+            'utm',
+            'click_id',
+            'referrer',
+            'browser_marker',
+            'legacy',
+            'fallback',
+            'unknown',
+        ], true) ? $value : 'unknown';
+    }
+
+    /** @return array<string, mixed>|null */
+    private function cookieContext(Request $request): ?array
+    {
+        $value = $request->cookie((string) config('attribution.cookie_name'));
+
+        if (! is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            $context = json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return is_array($context) ? $context : null;
+    }
+
+    /** @param array<string, mixed> $context */
+    private function queueContinuityCookie(array $context): void
+    {
+        try {
+            $value = json_encode(
+                $context,
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+            );
+        } catch (\Throwable) {
+            // Attribution must never prevent a player from viewing or booking.
+            return;
+        }
+
+        Cookie::queue(cookie(
+            (string) config('attribution.cookie_name'),
+            $value,
+            (int) config('attribution.lookback_days', 30) * 24 * 60,
+            '/',
+            config('session.domain'),
+            (bool) config('session.secure'),
+            true,
+            false,
+            (string) config('session.same_site', 'lax'),
+        ));
     }
 
     private function token(mixed $value, int $limit): ?string
