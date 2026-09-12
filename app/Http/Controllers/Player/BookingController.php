@@ -76,7 +76,7 @@ class BookingController extends Controller
                     $resource,
                     $window,
                 );
-            $price = $prices->quote($resource, $duration, $promotion);
+            $price = $prices->quote($resource, $duration, $promotion, $window);
 
             if ($promotion !== null) {
                 $promotionTracker->recordClick($request, $promotion);

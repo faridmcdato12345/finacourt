@@ -24,8 +24,7 @@ function submit() {
     <OwnerLayout>
         <div class="mx-auto max-w-4xl">
             <Link :href="`/owner/venues/${venue.id}`" class="text-sm font-semibold text-court-700">← Back to {{ venue.name }}</Link>
-            <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-950">Edit {{ resource.name }}</h2>
-            <p class="mt-2 text-slate-600">Update whether this court can be booked, how long bookings can be, and the hourly price.</p>
+            <div class="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><h2 class="text-3xl font-semibold tracking-tight text-slate-950">Edit {{ resource.name }}</h2><p class="mt-2 text-slate-600">Update whether this court can be booked, how long bookings can be, and the regular hourly price.</p></div><Link :href="`/owner/venues/${venue.id}/resources/${resource.id}/pricing`" class="rounded-xl border border-court-300 bg-court-50 px-4 py-2.5 text-center text-sm font-semibold text-court-800">Manage time-based prices</Link></div>
             <div class="mt-8"><ResourceForm :form="form" :sports="sports" :resource-types="resourceTypes" :settings="settings" :increments="increments" submit-label="Save court" @submit="submit" /></div>
         </div>
     </OwnerLayout>

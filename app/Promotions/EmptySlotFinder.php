@@ -3,6 +3,7 @@
 namespace App\Promotions;
 
 use App\Bookings\BookingPrice;
+use App\Bookings\BookingWindow;
 use App\Enums\PromotionStatus;
 use App\Models\Booking;
 use App\Models\CourtAvailabilityBlock;
@@ -76,7 +77,6 @@ class EmptySlotFinder
         foreach ($resources as $resource) {
             $resource->venue->setRelation('organization', $organization);
             $increment = $resource->booking_increment_minutes;
-            $price = $this->prices->quote($resource, $increment);
 
             for ($offset = 0; $offset < $horizonDays; $offset++) {
                 $date = $now->startOfDay()->addDays($offset);
@@ -103,6 +103,17 @@ class EmptySlotFinder
                     if ($cursor->greaterThan($now)
                         && ! $this->blocked($resource->bookings, $resource->availabilityBlocks, $cursor, $end)
                         && ! $this->alreadyPromoted($resource->promotionSlots, $cursor, $end)) {
+                        $price = $this->prices->quote(
+                            $resource,
+                            $increment,
+                            window: new BookingWindow(
+                                localStart: $cursor,
+                                localEnd: $end,
+                                utcStart: $cursor->utc(),
+                                utcEnd: $end->utc(),
+                                durationMinutes: $increment,
+                            ),
+                        );
                         $leadHours = max(0, (int) floor($now->diffInHours($cursor)));
                         $lastMinute = $leadHours <= 24;
                         $opportunities->push([

@@ -127,7 +127,7 @@ class MarketplaceQuery
                     ->orderBy('ends_on'),
                 'resources' => function ($query) use ($resourceConstraint, $filters): void {
                     $resourceConstraint($query);
-                    $query->with(['sport:id,name,slug']);
+                    $query->with(['sport:id,name,slug', 'pricingRules']);
 
                     if ($this->usesAvailabilityFilter($filters)) {
                         $day = CarbonImmutable::createFromFormat('!Y-m-d', $filters['date'], 'UTC');
@@ -205,7 +205,7 @@ class MarketplaceQuery
                     ->latest('published_at')
                     ->limit(12),
                 'resources' => fn ($query) => $query->marketplace()
-                    ->with('sport:id,name,slug')
+                    ->with(['sport:id,name,slug', 'pricingRules'])
                     ->orderBy('name'),
             ])
             ->firstOrFail();
@@ -259,7 +259,7 @@ class MarketplaceQuery
             'photos:id,venue_id,storage_path,alt_text,sort_order,is_primary',
             'sports' => fn ($query) => $query->where('is_active', true)->orderBy('name'),
             'resources' => fn ($query) => $query->marketplace()
-                ->with('sport:id,name,slug')
+                ->with(['sport:id,name,slug', 'pricingRules'])
                 ->orderBy('base_hourly_rate'),
             'promotions' => fn ($query) => $query->publicInventory()
                 ->with([
@@ -358,8 +358,11 @@ class MarketplaceQuery
         array $filters,
     ): array {
         $bestPromotion = null;
-        $bestQuote = $this->prices->quote($resource, 60);
         $window = $this->promotionWindow($resource, $filters);
+        $quoteDuration = $window?->durationMinutes ?? 60;
+        $bestQuote = $window === null
+            ? $this->prices->minimumHourlyQuote($resource)
+            : $this->prices->quote($resource, $quoteDuration, window: $window);
         $requiresExactApplicability = $this->usesAvailabilityFilter($filters);
 
         foreach ($promotions as $promotion) {
@@ -376,7 +379,9 @@ class MarketplaceQuery
                 continue;
             }
 
-            $quote = $this->prices->quote($resource, 60, $promotion);
+            $quote = $window === null
+                ? $this->prices->minimumHourlyQuote($resource, $promotion)
+                : $this->prices->quote($resource, $quoteDuration, $promotion, $window);
 
             if ((float) $quote['unit_price'] < (float) $bestQuote['unit_price']
                 || ($bestPromotion === null && $quote['unit_price'] === $bestQuote['unit_price'])) {

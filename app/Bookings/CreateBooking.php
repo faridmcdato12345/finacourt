@@ -66,7 +66,7 @@ class CreateBooking
                 $data['campaign'] ?? null,
                 lockForUpdate: true,
             );
-            $price = $this->prices->quote($resource, $window->durationMinutes, $promotion);
+            $price = $this->prices->quote($resource, $window->durationMinutes, $promotion, $window);
             $paymentProvider = ($data['create_payment'] ?? false)
                 ? ($data['payment_provider'] ?? null)
                 : null;

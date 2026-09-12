@@ -52,6 +52,7 @@ function destroyResource(resource) {
                                     <p class="mt-2 text-sm font-semibold text-slate-900">{{ money.format(resource.base_hourly_rate) }} / hour</p>
                                 </div>
                                 <div class="flex gap-2">
+                                    <Link :href="`/owner/venues/${venue.id}/resources/${resource.id}/pricing`" class="rounded-lg border border-court-200 bg-court-50 px-3 py-2 text-sm font-semibold text-court-800 hover:bg-court-100">Pricing</Link>
                                     <Link :href="`/owner/venues/${venue.id}/resources/${resource.id}/edit`" class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Edit</Link>
                                     <button type="button" class="rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50" @click="destroyResource(resource)">Delete</button>
                                 </div>
