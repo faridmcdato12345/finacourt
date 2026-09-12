@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Marketplace;
 
+use App\Enums\VisibilityLinkDestination;
 use App\Http\Controllers\Controller;
 use App\Models\VisibilityLink;
 use Endroid\QrCode\Color\Color;
@@ -17,6 +18,12 @@ class VisibilityQrController extends Controller
     public function __invoke(VisibilityLink $visibilityLink): Response
     {
         abort_unless($visibilityLink->is_active, 404);
+
+        if ($visibilityLink->destination === VisibilityLinkDestination::ExternalBooking) {
+            $destination = $visibilityLink->externalBookingDestination;
+            abort_unless($destination?->is_active, 404);
+        }
+
         $destination = route('visibility-links.visit', $visibilityLink->token);
         $result = (new SvgWriter)->write(new QrCode(
             data: $destination,

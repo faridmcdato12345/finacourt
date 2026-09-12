@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'resource_id',
     'promotion_id',
     'booking_id',
+    'visibility_link_id',
     'event_type',
     'demand_city_slug',
     'demand_sport_slug',
@@ -77,6 +78,12 @@ class AnalyticsEvent extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    /** @return BelongsTo<VisibilityLink, $this> */
+    public function visibilityLink(): BelongsTo
+    {
+        return $this->belongsTo(VisibilityLink::class)->withTrashed();
     }
 
     protected function casts(): array

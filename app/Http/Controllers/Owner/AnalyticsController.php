@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Owner;
 use App\Analytics\AnalyticsPeriod;
 use App\Analytics\AnalyticsReport;
 use App\Analytics\DemandReport;
+use App\Analytics\ExternalBookingTrafficReport;
 use App\Http\Controllers\Controller;
 use App\Tenancy\TenantContext;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class AnalyticsController extends Controller
         TenantContext $context,
         AnalyticsReport $report,
         DemandReport $demandReport,
+        ExternalBookingTrafficReport $externalTraffic,
     ): Response {
         $validated = $request->validate([
             'from' => ['nullable', 'date_format:Y-m-d'],
@@ -35,6 +37,7 @@ class AnalyticsController extends Controller
         return Inertia::render('Owner/Analytics/Index', [
             'report' => $report->generate($period, $organization, $venue),
             'demand' => $demandReport->owner($period, $organization, $venue),
+            'externalTraffic' => $externalTraffic->generate($period, $organization, $venue),
             'filters' => [
                 'from' => $period->from,
                 'to' => $period->to,

@@ -7,6 +7,7 @@ use App\Enums\AnalyticsEventType;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
 use App\Enums\DirectoryListingStatus;
+use App\Enums\VisibilityLinkDestination;
 use App\Marketplace\MarketplaceSearchResult;
 use App\Models\AnalyticsEvent;
 use App\Models\Booking;
@@ -14,6 +15,7 @@ use App\Models\CourtResource;
 use App\Models\Promotion;
 use App\Models\Venue;
 use App\Models\VenueDirectoryListing;
+use App\Models\VisibilityLink;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -217,6 +219,57 @@ class AnalyticsRecorder
         );
     }
 
+    public function recordExternalBookingLinkClick(Request $request, VisibilityLink $link): bool
+    {
+        $link->loadMissing(['venue', 'externalBookingDestination']);
+        $destination = $link->externalBookingDestination;
+
+        if ($link->destination !== VisibilityLinkDestination::ExternalBooking
+            || $destination === null
+            || $link->organization_id !== $link->venue->organization_id
+            || $destination->organization_id !== $link->organization_id
+            || $destination->venue_id !== $link->venue_id) {
+            throw new LogicException('External booking analytics associations must belong to the same organization and venue.');
+        }
+
+        if ($this->isObviousBot($request)) {
+            return false;
+        }
+
+        $visitorHash = $this->visitorHash($request);
+        $occurredAt = now('UTC');
+        $referrerHost = parse_url((string) $request->headers->get('referer'), PHP_URL_HOST);
+
+        AnalyticsEvent::query()->create([
+            'organization_id' => $link->organization_id,
+            'venue_id' => $link->venue_id,
+            'visibility_link_id' => $link->getKey(),
+            'event_type' => AnalyticsEventType::ExternalBookingLinkClick,
+            'visitor_hash' => $visitorHash,
+            'traffic_source' => $link->acquisition_source->value,
+            'source_detail' => $link->campaign ?: $link->label,
+            'dedupe_key' => hash('sha256', implode('|', [
+                $visitorHash,
+                AnalyticsEventType::ExternalBookingLinkClick->value,
+                $link->getKey(),
+                $occurredAt->format('Y-m-d H:i:s.u'),
+                Str::random(24),
+            ])),
+            'metadata' => [
+                'schema_version' => 1,
+                'campaign' => $link->campaign,
+                'label' => $link->label,
+                'referrer_host' => is_string($referrerHost)
+                    ? Str::lower(Str::limit($referrerHost, 160, ''))
+                    : null,
+                'traffic_kind' => 'external_booking',
+            ],
+            'occurred_at' => $occurredAt,
+        ]);
+
+        return true;
+    }
+
     /** @return array<string, string> */
     private function promotionMetadata(Request $request, Promotion $promotion): array
     {
@@ -335,5 +388,13 @@ class AnalyticsRecorder
         }
 
         return hash_hmac('sha256', $token, (string) config('app.key'));
+    }
+
+    private function isObviousBot(Request $request): bool
+    {
+        $userAgent = $request->userAgent();
+
+        return is_string($userAgent)
+            && preg_match('/bot|crawler|spider|slurp|preview|headless|uptime|monitor/i', $userAgent) === 1;
     }
 }
