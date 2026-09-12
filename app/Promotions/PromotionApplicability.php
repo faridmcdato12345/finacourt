@@ -62,7 +62,7 @@ class PromotionApplicability
             ))
             ->map(fn (Promotion $candidate) => [
                 'promotion' => $candidate,
-                'price' => $this->prices->quote($resource, $window->durationMinutes, $candidate),
+                'price' => $this->prices->quote($resource, $window->durationMinutes, $candidate, $window),
             ])
             ->filter(fn (array $candidate) => (float) $candidate['price']['discount_amount'] > 0)
             ->sort(function (array $left, array $right): int {

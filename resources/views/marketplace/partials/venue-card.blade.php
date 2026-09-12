@@ -14,10 +14,21 @@
     $coverPhotoUrl = $coverPhoto
         ? Illuminate\Support\Facades\Storage::disk('public')->url($coverPhoto->storage_path)
         : null;
-    $venueUrl = route('marketplace.venues.show', [
-        'venueSlug' => $venue->slug,
-        ...($promotion?->marketplaceParameters() ?? []),
-    ]);
+    $discoveryContext = match (true) {
+        request()->routeIs('marketplace.home') => 'marketplace_home',
+        request()->routeIs('marketplace.courts.city') => 'city_landing',
+        request()->routeIs('marketplace.courts.sport-city') => 'sport_landing',
+        default => 'court_search',
+    };
+    $venueUrl = $promotion
+        ? route('marketplace.venues.show', [
+            'venueSlug' => $venue->slug,
+            ...$promotion->marketplaceParameters(),
+        ])
+        : Illuminate\Support\Facades\URL::signedRoute('marketplace.venues.discover', [
+            'venueSlug' => $venue->slug,
+            'context' => $discoveryContext,
+        ]);
 @endphp
 <article class="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:border-court-200 hover:shadow-xl hover:shadow-slate-900/8">
     <a href="{{ $venueUrl }}" class="block" aria-label="View {{ $venue->name }}">

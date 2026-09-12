@@ -102,6 +102,27 @@ class PromotionEngineV2Test extends TestCase
         );
     }
 
+    public function test_specific_promotion_slot_can_end_at_midnight(): void
+    {
+        [, $venue, $resource, $owner] = $this->setupInventory();
+        $date = $this->futureDate();
+        OperatingHour::query()
+            ->where('venue_id', $venue->getKey())
+            ->where('day_of_week', CarbonImmutable::parse($date, 'Asia/Manila')->dayOfWeek)
+            ->update(['closes_at' => '00:00']);
+
+        $this->actingAs($owner)->post(route('owner.promotions.store'), $this->campaignData($venue, [
+            'slots' => [$this->slotData($resource, $date, '23:00', '00:00')],
+        ]))->assertRedirect();
+
+        $slot = PromotionSlot::query()->firstOrFail();
+        $this->assertSame(
+            CarbonImmutable::parse($date, 'Asia/Manila')->addDay()->toDateString().' 00:00',
+            $slot->endsAt('Asia/Manila')->format('Y-m-d H:i'),
+        );
+        $this->assertNotNull($slot->promotion->load('venue.organization', 'slots')->nextSlot());
+    }
+
     public function test_non_exact_strategy_cannot_retain_hidden_exact_slots(): void
     {
         [, $venue, $resource, $owner] = $this->setupInventory();

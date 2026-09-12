@@ -373,14 +373,14 @@
                     <div class="p-7 sm:p-10 lg:p-12">
                         <p class="eyebrow">Transaction-based pricing</p>
                         <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em]">No monthly owner subscription right now</h2>
-                        <p class="mt-4 max-w-xl leading-7 text-slate-600">You set your court price. For eligible player bookings, FinACourt can add a separately shown service fee to the player’s total instead of charging you a monthly subscription.</p>
+                        <p class="mt-4 max-w-xl leading-7 text-slate-600">You set your court price. For eligible online player bookings, FinACourt can add a separately shown service fee to the player’s total instead of charging you a monthly subscription. Pay-at-venue bookings have no transaction or processing fee.</p>
                         <a href="{{ route('marketplace.pricing') }}" class="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-court-800">Review pricing details @include('marketplace.partials.icon', ['name' => 'arrow-right', 'class' => 'size-4'])</a>
                     </div>
                     <div class="border-t border-court-200 bg-white p-7 sm:p-10 lg:border-l lg:border-t-0">
                         <p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Current FinACourt player fee</p>
                         @if ($pricing['service_fee_active'])
                             <p class="mt-3 text-3xl font-bold tracking-tight text-slate-950">{{ $pricing['service_fee_summary'] }}</p>
-                            <p class="mt-3 text-sm leading-6 text-slate-600">Added to eligible new player bookings and shown separately before confirmation.</p>
+                            <p class="mt-3 text-sm leading-6 text-slate-600">Added to eligible new online player bookings and shown separately before confirmation.</p>
                         @else
                             <p class="mt-3 text-2xl font-bold tracking-tight text-slate-950">No active service fee</p>
                             <p class="mt-3 text-sm leading-6 text-slate-600">Players currently pay the court price. Any future fee must be shown before they confirm.</p>

@@ -53,6 +53,7 @@ class LegalPagesTest extends TestCase
             ->assertSee('legal@finacourt.test')
             ->assertSee('Pay at venue')
             ->assertSee('platform service fee')
+            ->assertSee('does not add a transaction, processing, or platform service fee')
             ->assertSee('verified provider notification')
             ->assertSee('href="/privacy">Privacy Policy', false)
             ->assertSee('application/ld+json', false)

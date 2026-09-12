@@ -3,6 +3,7 @@
 namespace App\Promotions;
 
 use App\Bookings\BookingPrice;
+use App\Bookings\BookingWindow;
 use App\Enums\PromotionStatus;
 use App\Models\Booking;
 use App\Models\CourtAvailabilityBlock;
@@ -38,7 +39,7 @@ class EmptySlotFinder
             ? CarbonImmutable::instance($at)->setTimezone($timezone)
             : CarbonImmutable::now($timezone);
         $lastDay = $now->startOfDay()->addDays($horizonDays - 1);
-        $utcEnd = $lastDay->endOfDay()->utc();
+        $utcEnd = $lastDay->addDay()->endOfDay()->utc();
 
         $resources = CourtResource::query()
             ->where('is_active', true)
@@ -76,7 +77,6 @@ class EmptySlotFinder
         foreach ($resources as $resource) {
             $resource->venue->setRelation('organization', $organization);
             $increment = $resource->booking_increment_minutes;
-            $price = $this->prices->quote($resource, $increment);
 
             for ($offset = 0; $offset < $horizonDays; $offset++) {
                 $date = $now->startOfDay()->addDays($offset);
@@ -97,12 +97,31 @@ class EmptySlotFinder
                     $timezone,
                 );
 
+                if ($close->lessThanOrEqualTo($cursor)) {
+                    $close = $close->addDay();
+                }
+
                 while ($cursor->addMinutes($increment)->lessThanOrEqualTo($close)) {
                     $end = $cursor->addMinutes($increment);
 
+                    if ($cursor->greaterThan($lastDay->endOfDay())) {
+                        break;
+                    }
+
                     if ($cursor->greaterThan($now)
                         && ! $this->blocked($resource->bookings, $resource->availabilityBlocks, $cursor, $end)
-                        && ! $this->alreadyPromoted($resource->promotionSlots, $cursor, $end)) {
+                        && ! $this->alreadyPromoted($resource, $resource->promotionSlots, $cursor, $end)) {
+                        $price = $this->prices->quote(
+                            $resource,
+                            $increment,
+                            window: new BookingWindow(
+                                localStart: $cursor,
+                                localEnd: $end,
+                                utcStart: $cursor->utc(),
+                                utcEnd: $end->utc(),
+                                durationMinutes: $increment,
+                            ),
+                        );
                         $leadHours = max(0, (int) floor($now->diffInHours($cursor)));
                         $lastMinute = $leadHours <= 24;
                         $opportunities->push([
@@ -112,7 +131,7 @@ class EmptySlotFinder
                             'resource_name' => $resource->name,
                             'sport_id' => $resource->sport_id,
                             'sport_name' => $resource->sport->name,
-                            'slot_date' => $date->toDateString(),
+                            'slot_date' => $cursor->toDateString(),
                             'starts_at_time' => $cursor->format('H:i'),
                             'ends_at_time' => $end->format('H:i'),
                             'lead_hours' => $leadHours,
@@ -160,10 +179,18 @@ class EmptySlotFinder
     }
 
     /** @param Collection<int, PromotionSlot> $slots */
-    private function alreadyPromoted(Collection $slots, CarbonInterface $start, CarbonInterface $end): bool
-    {
-        return $slots->contains(fn (PromotionSlot $slot) => $slot->slot_date->toDateString() === $start->toDateString()
-            && $slot->starts_at_time < $end->format('H:i:s')
-            && $slot->ends_at_time > $start->format('H:i:s'));
+    private function alreadyPromoted(
+        CourtResource $resource,
+        Collection $slots,
+        CarbonInterface $start,
+        CarbonInterface $end,
+    ): bool {
+        return $slots->contains(function (PromotionSlot $slot) use ($end, $resource, $start): bool {
+            $timezone = $start->getTimezone()->getName();
+
+            return $slot->resource_id === $resource->getKey()
+                && $slot->startsAt($timezone)->lessThan($end)
+                && $slot->endsAt($timezone)->greaterThan($start);
+        });
     }
 }

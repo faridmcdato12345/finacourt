@@ -68,7 +68,7 @@ class StructuredData
                     '@type' => 'OpeningHoursSpecification',
                     'dayOfWeek' => 'https://schema.org/'.$hours->day_of_week->label(),
                     'opens' => substr($hours->opens_at, 0, 5),
-                    'closes' => substr($hours->closes_at, 0, 5),
+                    'closes' => $hours->isOpen24Hours() ? '23:59' : substr($hours->closes_at, 0, 5),
                 ])->values()->all(),
             'amenityFeature' => $venue->amenities->map(fn ($amenity) => [
                 '@type' => 'LocationFeatureSpecification',

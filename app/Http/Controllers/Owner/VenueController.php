@@ -248,6 +248,7 @@ class VenueController extends Controller
                 'operating_hours' => $venue->operatingHours->map(fn ($hour) => [
                     'day' => $hour->day_of_week->label(),
                     'is_closed' => $hour->is_closed,
+                    'display_hours' => $hour->displayHours(),
                     'opens_at' => $hour->opens_at ? substr($hour->opens_at, 0, 5) : null,
                     'closes_at' => $hour->closes_at ? substr($hour->closes_at, 0, 5) : null,
                 ]),

@@ -22,6 +22,7 @@ class UpdateOperatingHoursRequest extends FormRequest
             'hours' => ['required', 'array', 'size:7'],
             'hours.*.day_of_week' => ['required', 'integer', 'between:0,6', 'distinct'],
             'hours.*.is_closed' => ['required', 'boolean'],
+            'hours.*.is_24_hours' => ['sometimes', 'boolean'],
             'hours.*.opens_at' => ['nullable', 'date_format:H:i'],
             'hours.*.closes_at' => ['nullable', 'date_format:H:i'],
         ];
@@ -42,7 +43,17 @@ class UpdateOperatingHoursRequest extends FormRequest
             }
 
             foreach ($hours as $index => $hour) {
-                if ((bool) ($hour['is_closed'] ?? false)) {
+                $isClosed = (bool) ($hour['is_closed'] ?? false);
+                $isOpen24Hours = (bool) ($hour['is_24_hours'] ?? false);
+
+                if ($isClosed && $isOpen24Hours) {
+                    $validator->errors()->add(
+                        "hours.$index.is_24_hours",
+                        'A closed day cannot also be open 24 hours.',
+                    );
+                }
+
+                if ($isClosed || $isOpen24Hours) {
                     continue;
                 }
 
@@ -57,10 +68,10 @@ class UpdateOperatingHoursRequest extends FormRequest
                     $validator->errors()->add("hours.$index.closes_at", 'A closing time is required.');
                 }
 
-                if ($opensAt && $closesAt && $closesAt <= $opensAt) {
+                if ($opensAt && $closesAt && $closesAt === $opensAt) {
                     $validator->errors()->add(
                         "hours.$index.closes_at",
-                        'Closing time must be later than opening time.',
+                        'Choose Open 24 hours when the opening and closing times are the same.',
                     );
                 }
             }

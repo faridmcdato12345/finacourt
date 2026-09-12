@@ -29,6 +29,7 @@ class OperatingHoursController extends Controller
                     'day_of_week' => $day->value,
                     'day' => $day->label(),
                     'is_closed' => $hour?->is_closed ?? false,
+                    'is_24_hours' => $hour?->isOpen24Hours() ?? false,
                     'opens_at' => $hour?->opens_at ? substr($hour->opens_at, 0, 5) : '08:00',
                     'closes_at' => $hour?->closes_at ? substr($hour->closes_at, 0, 5) : '22:00',
                 ];
@@ -47,13 +48,14 @@ class OperatingHoursController extends Controller
 
             foreach ($request->validated('hours') as $hour) {
                 $isClosed = (bool) $hour['is_closed'];
+                $isOpen24Hours = ! $isClosed && (bool) ($hour['is_24_hours'] ?? false);
 
                 $venue->operatingHours()->updateOrCreate(
                     ['day_of_week' => $hour['day_of_week']],
                     [
                         'is_closed' => $isClosed,
-                        'opens_at' => $isClosed ? null : $hour['opens_at'],
-                        'closes_at' => $isClosed ? null : $hour['closes_at'],
+                        'opens_at' => $isClosed ? null : ($isOpen24Hours ? '00:00' : $hour['opens_at']),
+                        'closes_at' => $isClosed ? null : ($isOpen24Hours ? '00:00' : $hour['closes_at']),
                     ],
                 );
             }

@@ -40,7 +40,7 @@ class PlayerReservationFlowTest extends TestCase
             'duration' => 60,
         ]))
             ->assertOk()
-            ->assertSee('Choose any consecutive available times within today’s opening hours.')
+            ->assertSee('Choose any consecutive available times within this date’s opening hours.')
             ->assertSee('data-maximum-duration="1440"', false)
             ->assertSee('data-slot-picker', false)
             ->assertSee('data-start="09:00"', false);

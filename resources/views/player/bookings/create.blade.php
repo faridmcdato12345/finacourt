@@ -11,11 +11,18 @@
         if (! $onlinePaymentAvailable && $selectedPaymentOption === 'online') {
             $selectedPaymentOption = 'pay_at_venue';
         }
+
+        $selectedPrice = $selectedPaymentOption === 'online' ? $onlinePrice : $payAtVenuePrice;
     @endphp
 
     <section class="border-b border-slate-200 bg-white"><div class="page-shell max-w-6xl py-8 sm:py-10"><a href="{{ route('marketplace.venues.show', array_filter(['venueSlug' => $venue->slug, 'resource' => $resource->id, 'date' => $date, 'duration' => $duration, 'campaign' => $campaign])) }}#availability" class="text-sm font-semibold text-court-700">← Change time</a><div class="mt-6 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p class="eyebrow">Booking details</p><h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Review before we hold your court</h1><p class="mt-2 text-sm text-slate-500">The server will validate availability and price again when you continue.</p></div><ol class="flex items-center gap-2 text-xs font-semibold"><li class="flex items-center gap-2 text-court-700"><span class="grid size-7 place-items-center rounded-full bg-court-700 text-white">1</span>Details</li><li class="h-px w-7 bg-slate-200"></li><li class="flex items-center gap-2 text-slate-400"><span class="grid size-7 place-items-center rounded-full border border-slate-300">2</span>Confirm</li></ol></div></div></section>
 
-    <section class="page-shell grid max-w-6xl items-start gap-7 py-8 sm:py-10 lg:grid-cols-[minmax(0,1fr)_23rem]">
+    <section
+        data-booking-payment-pricing
+        data-online-total="₱{{ number_format((float) $onlinePrice['player_total_amount'], 2) }}"
+        data-pay-at-venue-total="₱{{ number_format((float) $payAtVenuePrice['player_total_amount'], 2) }}"
+        class="page-shell grid max-w-6xl items-start gap-7 py-8 sm:py-10 lg:grid-cols-[minmax(0,1fr)_23rem]"
+    >
         <div class="space-y-6">
             <section class="app-card overflow-hidden"><div class="relative h-44 overflow-hidden bg-court-950">@if ($coverPhotoUrl)<img src="{{ $coverPhotoUrl }}" alt="{{ $coverPhoto->alt_text ?: $venue->name.' venue cover photo' }}" loading="eager" decoding="async" fetchpriority="high" class="absolute inset-0 size-full object-cover"><div class="absolute inset-0 bg-gradient-to-t from-court-950/45 via-court-950/5 to-black/10"></div>@else<div class="court-visual absolute inset-0" role="img" aria-label="Venue photo placeholder for {{ $venue->name }}"></div>@endif</div><div class="grid gap-5 p-5 sm:grid-cols-2 sm:p-6"><div><p class="text-xs font-semibold uppercase tracking-wider text-court-700">Venue</p><h2 class="mt-2 text-xl font-semibold">{{ $venue->name }}</h2><p class="mt-1 text-sm text-slate-500">{{ $venue->publicCityName() }}, {{ $venue->province }}</p></div><div class="sm:border-l sm:border-slate-100 sm:pl-6"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Selected court</p><h3 class="mt-2 text-xl font-semibold">{{ $resource->name }}</h3><p class="mt-1 text-sm text-slate-500">{{ $resource->sport->name }} · {{ $resource->setting->label() }}</p></div></div></section>
 
@@ -78,8 +85,8 @@
                                             </span>
                                         </span>
                                         <strong class="mt-4 text-base text-slate-950">Pay at venue</strong>
-                                        <span class="mt-1 text-sm leading-6 text-slate-600">Reserve the court now and pay the displayed total directly when you arrive.</span>
-                                        <span class="mt-auto pt-3 text-xs font-semibold text-slate-500">No online payment will be collected.</span>
+                                        <span class="mt-1 text-sm leading-6 text-slate-600">Reserve the court now and pay only the court price directly when you arrive.</span>
+                                        <span class="mt-auto pt-3 text-xs font-semibold text-court-700">No transaction or processing fee.</span>
                                     </span>
                                     <span aria-hidden="true" class="absolute right-5 top-5 grid size-6 place-items-center rounded-full border border-slate-300 text-transparent transition peer-checked:border-court-700 peer-checked:bg-court-700 peer-checked:text-white">✓</span>
                                 </label>
@@ -113,7 +120,10 @@
                 </div>
                 <div class="flex justify-between gap-5">
                     <dt class="text-slate-400">Payment</dt>
-                    <dd class="text-right font-medium">Choose below<span class="block text-xs font-normal text-slate-400">Online or at venue</span></dd>
+                    <dd class="text-right font-medium">
+                        <span data-payment-choice-label>{{ $selectedPaymentOption === 'online' ? 'Pay online' : 'Pay at venue' }}</span>
+                        <span data-payment-choice-detail class="block text-xs font-normal text-slate-400">{{ $selectedPaymentOption === 'online' ? 'Secure checkout' : 'At the venue' }}</span>
+                    </dd>
                 </div>
             </dl>
             @if ($promotion)
@@ -125,24 +135,37 @@
             <div class="mt-5 bg-court-950 p-5 text-white">
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between gap-4 text-court-100/75">
-                        <span>Court price</span>
+                        <span>{{ $price['pricing_rule_snapshot'] ? 'Scheduled court price' : 'Court price' }}</span>
                         <span>@if ((float) $price['discount_amount'] > 0)<span class="mr-2 text-court-100/45 line-through">₱{{ number_format((float) $price['original_total_amount'], 2) }}</span>@endif ₱{{ number_format((float) $price['total_amount'], 2) }}</span>
                     </div>
-                    @if ((float) $price['platform_service_fee_amount'] > 0)
-                        <div class="flex justify-between gap-4 text-court-100/75">
-                            <span>{{ $price['platform_service_fee_name'] ?: 'FinACourt service fee' }}</span>
-                            <span>₱{{ number_format((float) $price['platform_service_fee_amount'], 2) }}</span>
+                    @if ((float) $onlinePrice['platform_service_fee_amount'] > 0)
+                        <div data-online-service-fee @if ($selectedPaymentOption !== 'online') hidden @endif class="flex justify-between gap-4 text-court-100/75">
+                            <span>{{ $onlinePrice['platform_service_fee_name'] ?: 'FinACourt service fee' }}</span>
+                            <span>₱{{ number_format((float) $onlinePrice['platform_service_fee_amount'], 2) }}</span>
                         </div>
                     @endif
                     <div class="flex items-end justify-between gap-4 border-t border-white/10 pt-4">
                         <span class="text-court-100/70">Player total</span>
-                        <strong class="text-3xl">₱{{ number_format((float) $price['player_total_amount'], 2) }}</strong>
+                        <strong data-player-total class="text-3xl">₱{{ number_format((float) $selectedPrice['player_total_amount'], 2) }}</strong>
                     </div>
                 </div>
+                @if ($price['pricing_rule_snapshot'])
+                    <div class="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-court-200">Price schedule applied</p>
+                        <div class="mt-2 space-y-1.5 text-xs text-court-100/75">
+                            @foreach ($price['pricing_rule_snapshot'] as $segment)
+                                <div class="flex justify-between gap-3"><span>{{ $segment['starts_at'] }}–{{ $segment['ends_at'] }} · {{ $segment['name'] }}</span><span>₱{{ number_format((float) $segment['hourly_rate'], 2) }}/hr</span></div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
                 <p class="mt-3 text-xs leading-5 text-court-100/60">
-                    Calculated by the server from ₱{{ number_format((float) $price['unit_price'], 2) }}/hour.
+                    @if ($price['pricing_rule_snapshot']) Calculated from the court’s prices for your selected date and time. @else Calculated by the server from ₱{{ number_format((float) $price['unit_price'], 2) }}/hour. @endif
                     @if ((float) $price['discount_amount'] > 0) You save ₱{{ number_format((float) $price['discount_amount'], 2) }}.@endif
-                    @if ((float) $price['platform_service_fee_amount'] > 0) The FinACourt fee is kept separate from the venue’s court price.@endif
+                    @if ((float) $onlinePrice['platform_service_fee_amount'] > 0)
+                        <span data-online-fee-note @if ($selectedPaymentOption !== 'online') hidden @endif>The FinACourt fee applies only to online payment and stays separate from the venue’s court price.</span>
+                    @endif
+                    <span data-pay-at-venue-fee-note @if ($selectedPaymentOption === 'online') hidden @endif>Pay at venue has no transaction or processing fee.</span>
                 </p>
             </div>
         </aside>

@@ -51,8 +51,12 @@ class DashboardController extends Controller
                     'total_amount' => $booking->total_amount,
                 ];
             });
-        $period = AnalyticsPeriod::fromFilters([], $timezone);
+        $period = AnalyticsPeriod::fromFilters([
+            'from' => $today->startOfMonth()->toDateString(),
+            'to' => $today->toDateString(),
+        ], $timezone);
         $report = $analytics->generate($period, $organization);
+        $growth = $recommendations->report($organization, limit: 3)->toArray();
         $featuredVenue = $organization->venues()
             ->whereHas('photos')
             ->with('photos:id,venue_id,storage_path,alt_text,sort_order,is_primary')
@@ -84,8 +88,13 @@ class DashboardController extends Controller
             ],
             'marketplace' => $report['metrics'],
             'period' => $report['period'],
+            'booking_sources' => [
+                ...$report['booking_source_summary'],
+                'period_label' => 'This month',
+                'value_label' => 'Booking value',
+            ],
             'promotions' => collect($report['promotions'])->take(3)->values(),
-            'growth' => $recommendations->report($organization, limit: 3)->toArray(),
+            'growth' => $growth,
         ]);
     }
 }

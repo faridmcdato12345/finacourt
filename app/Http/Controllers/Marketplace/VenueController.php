@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Marketplace;
 
 use App\Analytics\AnalyticsRecorder;
 use App\Bookings\AvailabilityService;
+use App\Bookings\BookingPrice;
 use App\Http\Controllers\Controller;
 use App\Marketplace\MarketplaceQuery;
 use App\Marketplace\StructuredData;
@@ -24,6 +25,7 @@ class VenueController extends Controller
         string $venueSlug,
         MarketplaceQuery $marketplace,
         AvailabilityService $availabilityService,
+        BookingPrice $prices,
         StructuredData $structuredData,
         PromotionMarketplace $promotionMarketplace,
         PromotionApplicability $promotionApplicability,
@@ -87,11 +89,13 @@ class VenueController extends Controller
                     $date,
                     $promotionApplicability,
                     $promotions,
+                    $prices,
                     $resource,
                 ): array {
+                    $slotDate = $slot['booking_date'] ?? $date;
                     $window = $availabilityService->window(
                         $resource,
-                        $date,
+                        $slotDate,
                         $slot['start_time'],
                         $slot['end_time'],
                         requireFuture: false,
@@ -106,6 +110,10 @@ class VenueController extends Controller
 
                     $slot['campaign'] = $promotion?->campaign_token;
                     $slot['promotion_offer'] = $promotion?->offerLabel();
+                    $price = $prices->quote($resource, $window->durationMinutes, $promotion, $window);
+                    $slot['unit_price'] = $price['unit_price'];
+                    $slot['total_amount'] = $price['total_amount'];
+                    $slot['has_time_based_price'] = $price['pricing_rule_snapshot'] !== null;
 
                     return $slot;
                 });

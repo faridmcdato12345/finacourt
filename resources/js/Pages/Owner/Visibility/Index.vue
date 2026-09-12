@@ -10,13 +10,25 @@ defineProps({
 });
 
 const copied = ref(null);
+const trackedChannels = [
+    { source: 'shared_link', label: 'Copy tracked link' },
+    { source: 'facebook', label: 'Facebook' },
+    { source: 'instagram', label: 'Instagram' },
+    { source: 'tiktok', label: 'TikTok' },
+    { source: 'google_maps', label: 'Google Business Profile' },
+    { source: 'google_ads', label: 'Google Ads' },
+];
 
-function createLink(venueId, destination, promotionId = null) {
+function createLink(venueId, destination, promotionId = null, source = 'qr_code') {
     router.post(`/owner/venues/${venueId}/visibility-links`, {
         destination,
         promotion_id: promotionId,
+        source,
     }, { preserveScroll: true });
 }
+
+const qrLinks = (venue) => venue.links.filter((link) => link.source === 'qr_code');
+const channelLinks = (venue) => venue.links.filter((link) => link.source !== 'qr_code');
 
 async function copy(value, key) {
     if (!value || !navigator.clipboard) return;
@@ -110,6 +122,22 @@ async function copy(value, key) {
                             <p v-else class="mt-3 text-sm leading-6 text-slate-500">Publish at least one court players can book to unlock public and booking links.</p>
                         </div>
 
+                        <div class="rounded-2xl border border-court-200 bg-court-50/60 p-5">
+                            <p class="eyebrow">Tracked sharing links</p>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-950">Know which posts lead to bookings</h3>
+                            <p class="mt-2 text-xs leading-5 text-slate-600">Create the link for the place where you will post it. FinACourt records that channel before sending the player to your venue.</p>
+                            <div v-if="venue.booking_url" class="mt-4 flex flex-wrap gap-2">
+                                <button v-for="channel in trackedChannels" :key="channel.source" type="button" class="rounded-xl border border-court-200 bg-white px-3 py-2.5 text-xs font-semibold text-court-800 hover:border-court-400" @click="createLink(venue.id, 'booking', null, channel.source)">{{ channel.label }}</button>
+                            </div>
+                            <p v-else class="mt-3 text-sm text-slate-500">Publish a bookable court to create tracked links.</p>
+                            <div v-if="channelLinks(venue).length" class="mt-4 space-y-3">
+                                <div v-for="link in channelLinks(venue)" :key="link.id" class="rounded-xl border border-court-100 bg-white p-3">
+                                    <div class="flex items-center justify-between gap-3"><p class="text-xs font-semibold text-slate-900">{{ link.source_label }}</p><span class="text-[11px] text-slate-400">{{ link.visits_count }} visits</span></div>
+                                    <div class="mt-2 flex gap-2"><input :value="link.url" readonly class="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600"><button type="button" class="rounded-lg bg-court-700 px-3 text-xs font-semibold text-white" @click="copy(link.url, `tracked-${link.id}`)">{{ copied === `tracked-${link.id}` ? 'Copied' : 'Copy' }}</button></div>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="rounded-2xl border border-slate-200 p-5">
                             <p class="eyebrow">QR booking links</p>
                             <h3 class="mt-1 text-lg font-semibold text-slate-950">Ready-to-share QR codes</h3>
@@ -121,8 +149,8 @@ async function copy(value, key) {
                             <div v-if="venue.promotions.length" class="mt-3 space-y-2">
                                 <button v-for="promotion in venue.promotions" :key="promotion.id" type="button" class="block w-full rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-left text-xs font-semibold text-amber-900" @click="createLink(venue.id, 'promotion', promotion.id)">Create deal QR for {{ promotion.title }}</button>
                             </div>
-                            <div v-if="venue.links.length" class="mt-5 grid gap-3 sm:grid-cols-2">
-                                <div v-for="link in venue.links" :key="link.id" class="rounded-2xl border border-slate-200 bg-white p-3">
+                            <div v-if="qrLinks(venue).length" class="mt-5 grid gap-3 sm:grid-cols-2">
+                                <div v-for="link in qrLinks(venue)" :key="link.id" class="rounded-2xl border border-slate-200 bg-white p-3">
                                     <img :src="link.qr_url" :alt="`${link.label} QR code`" class="theme-keep-light mx-auto aspect-square w-36 rounded-xl bg-white">
                                     <p class="mt-2 text-center text-xs font-semibold text-slate-900">{{ link.promotion || link.label }}</p>
                                     <p class="mt-1 text-center text-[11px] text-slate-400">{{ link.visits_count }} scans</p>

@@ -20,6 +20,8 @@ use App\Http\Controllers\Marketplace\SitemapController;
 use App\Http\Controllers\Marketplace\VenueController as MarketplaceVenueController;
 use App\Http\Controllers\Marketplace\VenueDirectoryController as MarketplaceVenueDirectoryController;
 use App\Http\Controllers\Marketplace\VenueDirectoryReportController;
+use App\Http\Controllers\Marketplace\VenueDiscoveryClickController;
+use App\Http\Controllers\Marketplace\VenueShareLinkController;
 use App\Http\Controllers\Marketplace\VisibilityLinkController as MarketplaceVisibilityLinkController;
 use App\Http\Controllers\Marketplace\VisibilityQrController;
 use App\Http\Controllers\Owner\AnalyticsController as OwnerAnalyticsController;
@@ -27,6 +29,7 @@ use App\Http\Controllers\Owner\BookingAvailabilityController;
 use App\Http\Controllers\Owner\BookingController;
 use App\Http\Controllers\Owner\CourtAvailabilityBlockController;
 use App\Http\Controllers\Owner\CourtResourceController;
+use App\Http\Controllers\Owner\CourtPricingRuleController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
 use App\Http\Controllers\Owner\GoogleBusinessProfileController;
 use App\Http\Controllers\Owner\GrowthRecommendationController as OwnerGrowthRecommendationController;
@@ -98,6 +101,12 @@ Route::middleware('throttle:marketplace')->group(function () {
         ->name('marketplace.directory.show');
     Route::get('/courts/{citySlug}', [DiscoveryController::class, 'city'])
         ->name('marketplace.courts.city');
+    Route::get('/discover/venues/{venueSlug}', VenueDiscoveryClickController::class)
+        ->middleware('signed')
+        ->name('marketplace.venues.discover');
+    Route::get('/share/venues/{venueSlug}', VenueShareLinkController::class)
+        ->middleware('signed')
+        ->name('marketplace.venues.share');
     Route::get('/venues/{venueSlug}', MarketplaceVenueController::class)
         ->name('marketplace.venues.show');
 });
@@ -374,6 +383,14 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
         ->name('venues.hours.update');
     Route::resource('venues.resources', CourtResourceController::class)
         ->only(['create', 'store', 'edit', 'update', 'destroy']);
+    Route::get('/venues/{venue}/resources/{resource}/pricing', [CourtPricingRuleController::class, 'index'])
+        ->name('venues.resources.pricing.index');
+    Route::post('/venues/{venue}/resources/{resource}/pricing', [CourtPricingRuleController::class, 'store'])
+        ->name('venues.resources.pricing.store');
+    Route::put('/venues/{venue}/resources/{resource}/pricing/{pricingRule}', [CourtPricingRuleController::class, 'update'])
+        ->name('venues.resources.pricing.update');
+    Route::delete('/venues/{venue}/resources/{resource}/pricing/{pricingRule}', [CourtPricingRuleController::class, 'destroy'])
+        ->name('venues.resources.pricing.destroy');
 });
 
 Route::post('/owner/organizations/{organization}/activate', OrganizationContextController::class)

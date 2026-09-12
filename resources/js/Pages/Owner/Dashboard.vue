@@ -1,14 +1,26 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import OwnerLayout from '../../Layouts/OwnerLayout.vue';
 
-const props = defineProps({ organization: Object, inventory: Object, today: Object, marketplace: Object, period: Object, promotions: Array, growth: Object });
+const props = defineProps({ organization: Object, inventory: Object, today: Object, marketplace: Object, period: Object, booking_sources: Object, promotions: Array, growth: Object });
 const money = (value) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(Number(value));
-const priorityLabel = (priority) => ({ high: 'Important', medium: 'Worth trying', low: 'When you have time' }[priority] || priority);
+const nextAction = computed(() => props.growth?.active?.[0] || null);
+const sourceTone = (source) => ({
+    google: 'bg-blue-50 text-blue-700',
+    social: 'bg-violet-50 text-violet-700',
+    finacourt_search: 'bg-court-50 text-court-800',
+    shared_links: 'bg-sky-50 text-sky-700',
+    qr_code: 'bg-slate-100 text-slate-700',
+    promotions: 'bg-amber-50 text-amber-800',
+    past_player_messages: 'bg-rose-50 text-rose-700',
+    referrals: 'bg-teal-50 text-teal-700',
+    direct_unknown: 'bg-slate-100 text-slate-600',
+}[source] || 'bg-slate-100 text-slate-600');
 
 const metrics = () => [
     { label: 'Venue page visits', value: props.marketplace.profile_views, detail: 'People opened your venue page', icon: 'eye' },
-    { label: 'Bookings started', value: props.marketplace.booking_starts, detail: 'Last 30 days', icon: 'calendar' },
+    { label: 'Bookings started', value: props.marketplace.booking_starts, detail: 'This month', icon: 'calendar' },
     { label: 'Confirmed bookings', value: props.marketplace.completed_bookings, detail: `${props.marketplace.conversion_rate}% of visits became bookings`, icon: 'check' },
     { label: 'Value of confirmed bookings', value: money(props.marketplace.booking_revenue), detail: 'Cancelled and refunded bookings are left out', icon: 'wallet' },
     { label: 'First-time players', value: props.marketplace.new_customers, detail: 'First confirmed booking', icon: 'users' },
@@ -24,15 +36,67 @@ const metrics = () => [
                 <div class="flex flex-wrap gap-2"><Link href="/owner/bookings/create" class="rounded-xl bg-court-700 px-4 py-2.5 text-sm font-semibold text-white">Create booking</Link><Link href="/owner/venues" class="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700">Manage courts</Link></div>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                <section v-for="metric in metrics()" :key="metric.label" class="metric-card"><div class="flex items-start justify-between gap-3"><span class="metric-icon"><svg v-if="metric.icon === 'eye'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /></svg><svg v-else-if="metric.icon === 'calendar'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3v3m12-3v3M4 9h16M5 5h14v15H5z" /></svg><svg v-else-if="metric.icon === 'check'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></svg><svg v-else-if="metric.icon === 'wallet'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h15v13H4zM4 9h16m-5 4h5v3h-5z" /></svg><svg v-else viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm11 9a7 7 0 0 0-14 0m10-9a3 3 0 1 0 0-6" /></svg></span><span class="text-[10px] font-semibold uppercase tracking-wider text-slate-300">Last 30 days</span></div><p class="mt-5 text-sm font-medium text-slate-500">{{ metric.label }}</p><p class="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{{ metric.value }}</p><p class="mt-2 text-xs text-slate-400">{{ metric.detail }}</p></section>
-            </div>
-
             <section class="app-card overflow-hidden">
-                <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><p class="eyebrow">Helpful next steps</p><h3 class="mt-1 text-xl font-semibold">Growth opportunities</h3><p class="mt-2 text-sm text-slate-500">Prioritized actions based on player searches, open court times, bookings, promotions, and past players.</p></div><Link href="/owner/growth" class="text-sm font-semibold text-court-700">View all opportunities →</Link></div>
-                <div v-if="growth.active.length" class="grid gap-px bg-slate-100 lg:grid-cols-3"><div v-for="recommendation in growth.active" :key="recommendation.key" class="bg-white p-5 sm:p-6"><div class="flex items-center gap-2"><span :class="recommendation.priority === 'high' ? 'bg-amber-50 text-amber-800' : 'bg-court-50 text-court-800'" class="rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider">{{ priorityLabel(recommendation.priority) }}</span><span class="text-xs text-slate-400">{{ recommendation.venue || recommendation.type_label }}</span></div><h4 class="mt-4 font-semibold leading-6 text-slate-900">{{ recommendation.title }}</h4><p class="mt-2 line-clamp-3 text-sm leading-6 text-slate-500">{{ recommendation.explanation }}</p><Link :href="recommendation.suggested_action.url" class="mt-4 inline-block text-sm font-semibold text-court-700">{{ recommendation.suggested_action.label }} →</Link></div></div>
-                <div v-else class="px-6 py-12 text-center"><p class="font-semibold text-slate-800">No suggestions yet</p><p class="mt-2 text-sm text-slate-500">FinACourt waits until there is enough real activity before suggesting something.</p></div>
+                <div class="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2"><p class="eyebrow">{{ booking_sources.period_label }}</p><span class="rounded-full bg-court-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-court-800">Confirmed bookings</span></div>
+                        <h2 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Where Your Bookings Come From</h2>
+                        <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">See which identifiable sources are leading to bookings so you know what is working.</p>
+                    </div>
+                    <Link :href="`/owner/analytics?from=${period.from}&to=${period.to}`" class="text-sm font-semibold text-court-700">View detailed analytics →</Link>
+                </div>
+
+                <div v-if="booking_sources.sources.length" class="p-5 sm:p-6">
+                    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                        <article v-for="source in booking_sources.sources" :key="source.key" class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <span :class="sourceTone(source.key)" class="grid size-11 shrink-0 place-items-center rounded-xl">
+                                    <svg v-if="source.key === 'qr_code'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zm4 0h2v6h-6v-2h4z" /></svg>
+                                    <svg v-else-if="source.key === 'shared_links' || source.key === 'referrals'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.2 1.2M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.2-1.2" /></svg>
+                                    <svg v-else-if="source.key === 'direct_unknown'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.4 2.4 0 1 1 3.4 2.2c-.8.4-1.2.9-1.2 1.8m0 3h.01" /></svg>
+                                    <svg v-else viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 18V8m5 10v-5m5 5V5m5 13v-8" /></svg>
+                                </span>
+                                <div class="min-w-0"><h3 class="truncate font-semibold text-slate-900">{{ source.label }}</h3><p class="mt-1 text-sm text-slate-500">{{ source.bookings }} {{ source.bookings === 1 ? 'booking' : 'bookings' }}</p></div>
+                                <div class="ml-auto shrink-0 text-right"><p class="font-semibold text-slate-950">{{ money(source.booking_value) }}</p><p class="mt-1 text-[10px] uppercase tracking-wider text-slate-400">{{ booking_sources.value_label }}</p></div>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div class="mt-5 grid gap-4 border-t border-slate-100 pt-5 lg:grid-cols-2">
+                        <div class="rounded-2xl bg-court-950 p-5 text-white">
+                            <p class="text-xs font-semibold uppercase tracking-wider text-court-300">Top source this month</p>
+                            <p class="mt-3 text-lg font-semibold">{{ booking_sources.top_source.label }}</p>
+                            <p class="mt-1 text-sm leading-6 text-court-100/70">It brought {{ booking_sources.top_source.bookings }} {{ booking_sources.top_source.bookings === 1 ? 'booking' : 'bookings' }} worth {{ money(booking_sources.top_source.booking_value) }} in court prices.</p>
+                        </div>
+                        <div class="rounded-2xl bg-amber-50 p-5">
+                            <template v-if="nextAction">
+                                <p class="text-xs font-semibold uppercase tracking-wider text-amber-800">Recommended next step</p>
+                                <p class="mt-3 font-semibold text-slate-900">{{ nextAction.title }}</p>
+                                <p class="mt-1 line-clamp-2 text-sm leading-6 text-slate-600">{{ nextAction.explanation }}</p>
+                                <Link :href="nextAction.suggested_action.url" class="mt-3 inline-block text-sm font-semibold text-court-800">{{ nextAction.suggested_action.label }} →</Link>
+                            </template>
+                            <template v-else>
+                                <p class="text-xs font-semibold uppercase tracking-wider text-amber-800">What to do next</p>
+                                <p class="mt-3 font-semibold text-slate-900">No action needed right now</p>
+                                <p class="mt-1 text-sm leading-6 text-slate-600">FinACourt will suggest a next step after there is enough real activity.</p>
+                            </template>
+                        </div>
+                    </div>
+
+                    <p class="mt-4 text-xs leading-5 text-slate-400">Booking value is the court price before any owner payout fee. The player service fee is not included. Some bookings appear as Direct / Unknown when the original source cannot be identified.</p>
+                </div>
+
+                <div v-else class="px-5 py-12 text-center sm:px-6">
+                    <div class="mx-auto grid size-14 place-items-center rounded-2xl bg-court-50 text-court-700"><svg viewBox="0 0 24 24" class="size-6" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 18V8m5 10v-5m5 5V5m5 13v-8" /></svg></div>
+                    <h3 class="mt-4 font-semibold text-slate-900">Your booking sources will appear here once players start booking</h3>
+                    <p class="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">Use a tracked booking link when you share your venue so FinACourt can show which source worked.</p>
+                    <Link href="/owner/visibility" class="mt-4 inline-block text-sm font-semibold text-court-700">Get a tracked booking link →</Link>
+                </div>
             </section>
+
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                <section v-for="metric in metrics()" :key="metric.label" class="metric-card"><div class="flex items-start justify-between gap-3"><span class="metric-icon"><svg v-if="metric.icon === 'eye'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.5" /></svg><svg v-else-if="metric.icon === 'calendar'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3v3m12-3v3M4 9h16M5 5h14v15H5z" /></svg><svg v-else-if="metric.icon === 'check'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16 9" /></svg><svg v-else-if="metric.icon === 'wallet'" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h15v13H4zM4 9h16m-5 4h5v3h-5z" /></svg><svg v-else viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm11 9a7 7 0 0 0-14 0m10-9a3 3 0 1 0 0-6" /></svg></span><span class="text-[10px] font-semibold uppercase tracking-wider text-slate-300">This month</span></div><p class="mt-5 text-sm font-medium text-slate-500">{{ metric.label }}</p><p class="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{{ metric.value }}</p><p class="mt-2 text-xs text-slate-400">{{ metric.detail }}</p></section>
+            </div>
 
             <div class="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
                 <section class="app-card overflow-hidden"><div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><p class="eyebrow">Today</p><h3 class="mt-1 text-xl font-semibold">Today’s schedule</h3></div><div class="flex gap-2"><span class="rounded-full bg-court-50 px-3 py-1.5 text-xs font-semibold text-court-800">{{ today.bookings }} bookings</span><span class="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800">{{ today.pending_payments }} pending payments</span></div></div>

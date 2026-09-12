@@ -244,10 +244,10 @@ class SavePromotionRequest extends FormRequest
                 $start = (string) ($slot['starts_at_time'] ?? '');
                 $end = (string) ($slot['ends_at_time'] ?? '');
 
-                if ($end <= $start) {
+                if ($end === $start) {
                     $validator->errors()->add(
                         "slots.{$index}.ends_at_time",
-                        'The court-time end must be later than its start.',
+                        'The court-time end must be different from its start.',
                     );
 
                     continue;
@@ -283,10 +283,11 @@ class SavePromotionRequest extends FormRequest
                     continue;
                 }
 
-                $key = $slotResource->getKey().'|'.$slotDate;
+                $key = $slotResource->getKey();
 
                 foreach ($windows[$key] ?? [] as $existing) {
-                    if ($start < $existing['end'] && $end > $existing['start']) {
+                    if ($window->localStart->lessThan($existing['end'])
+                        && $window->localEnd->greaterThan($existing['start'])) {
                         $validator->errors()->add(
                             "slots.{$index}.starts_at_time",
                             'Selected slots for the same court cannot overlap.',
@@ -294,7 +295,7 @@ class SavePromotionRequest extends FormRequest
                     }
                 }
 
-                $windows[$key][] = ['start' => $start, 'end' => $end];
+                $windows[$key][] = ['start' => $window->localStart, 'end' => $window->localEnd];
             }
         }];
     }

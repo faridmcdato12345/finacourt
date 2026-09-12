@@ -260,11 +260,6 @@ function bindPlayerExperience() {
     });
 }
 
-function minutes(time) {
-    const [hour, minute] = time.split(':').map(Number);
-    return hour * 60 + minute;
-}
-
 function bindConsecutiveSlotPickers() {
     document.querySelectorAll('[data-slot-picker]').forEach((picker) => {
         const slots = Array.from(picker.querySelectorAll('[data-slot]'));
@@ -291,10 +286,10 @@ function bindConsecutiveSlotPickers() {
 
             const first = selected[0];
             const last = selected[selected.length - 1];
-            const duration = minutes(last.dataset.end) - minutes(first.dataset.start);
+            const duration = Number(last.dataset.endOffset) - Number(first.dataset.startOffset);
             const url = new URL(picker.dataset.reviewUrl, window.location.origin);
             url.searchParams.set('resource', picker.dataset.resource);
-            url.searchParams.set('date', picker.dataset.date);
+            url.searchParams.set('date', first.dataset.date || picker.dataset.date);
             url.searchParams.set('start', first.dataset.start);
             url.searchParams.set('duration', String(duration));
 
@@ -303,8 +298,14 @@ function bindConsecutiveSlotPickers() {
                 url.searchParams.set('campaign', campaigns[0]);
             }
 
-            summaryTime.textContent = `${first.dataset.start}–${last.dataset.end}`;
-            summaryDetail.textContent = `${selected.length} ${selected.length === 1 ? 'slot' : 'consecutive slots'} · ${duration} minutes`;
+            summaryTime.textContent = `${first.dataset.startLabel}–${last.dataset.endLabel}`;
+            const hasOnePriceContext = campaigns.length === 0
+                || (campaigns.length === 1 && selected.every((slot) => slot.dataset.campaign === campaigns[0]));
+            const selectedPrice = selected.reduce((total, slot) => total + Number(slot.dataset.price || 0), 0);
+            const priceLabel = hasOnePriceContext
+                ? ` · ${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(selectedPrice)}`
+                : ' · final price shown next';
+            summaryDetail.textContent = `${selected.length} ${selected.length === 1 ? 'slot' : 'consecutive slots'} · ${duration} minutes${priceLabel}`;
             continueLink.href = url.toString();
             continueLink.setAttribute('aria-disabled', 'false');
         };
@@ -338,11 +339,12 @@ function bindConsecutiveSlotPickers() {
                 const first = selected[0];
                 const last = selected[selected.length - 1];
                 const extendsAfter = Number(slot.dataset.slotIndex) === Number(last.dataset.slotIndex) + 1
-                    && slot.dataset.start === last.dataset.end;
+                    && Number(slot.dataset.startOffset) === Number(last.dataset.endOffset);
                 const extendsBefore = Number(slot.dataset.slotIndex) === Number(first.dataset.slotIndex) - 1
-                    && slot.dataset.end === first.dataset.start;
+                    && Number(slot.dataset.endOffset) === Number(first.dataset.startOffset);
                 const candidate = extendsAfter ? [...selected, slot] : extendsBefore ? [slot, ...selected] : [slot];
-                const duration = minutes(candidate[candidate.length - 1].dataset.end) - minutes(candidate[0].dataset.start);
+                const duration = Number(candidate[candidate.length - 1].dataset.endOffset)
+                    - Number(candidate[0].dataset.startOffset);
 
                 selected = duration <= maximumDuration ? candidate : [slot];
                 update();

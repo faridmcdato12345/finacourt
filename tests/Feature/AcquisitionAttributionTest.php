@@ -20,8 +20,10 @@ use App\Models\PromotionSlot;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\URL;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -37,10 +39,12 @@ class AcquisitionAttributionTest extends TestCase
             'customer_reactivation',
             'google_organic',
             'google_maps',
+            'google_ads',
             'facebook',
             'instagram',
             'tiktok',
             'qr_code',
+            'shared_link',
             'referral',
             'sales_partner',
             'direct',
@@ -63,6 +67,23 @@ class AcquisitionAttributionTest extends TestCase
         $this->assertSame($second['last_touch']['seen_at'], $internal['last_touch']['seen_at']);
     }
 
+    public function test_google_ads_and_extended_campaign_fields_are_normalized_without_storing_raw_click_ids(): void
+    {
+        $context = $this->capture(
+            '/courts?utm_source=google&utm_medium=cpc&utm_campaign=holiday-games&utm_content=green-button&utm_term=pickleball-court&gclid=raw-sensitive-click-id',
+            app('session')->driver(),
+        );
+
+        $this->assertSame(AcquisitionSource::GoogleAds, $context['source']);
+        $this->assertSame('cpc', $context['medium']);
+        $this->assertSame('holiday-games', $context['campaign']);
+        $this->assertSame('green-button', $context['content']);
+        $this->assertSame('pickleball-court', $context['term']);
+        $this->assertSame('utm', $context['evidence']);
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $context['click_id_hash']);
+        $this->assertStringNotContainsString('raw-sensitive-click-id', json_encode($context, JSON_THROW_ON_ERROR));
+    }
+
     public function test_expired_session_context_starts_a_new_direct_attribution_window(): void
     {
         $session = app('session')->driver();
@@ -75,6 +96,25 @@ class AcquisitionAttributionTest extends TestCase
         $this->assertSame(AcquisitionSource::Direct, $expired['source']);
         $this->assertSame(AcquisitionSource::Direct, $expired['first_touch']['source']);
         $this->assertNotSame($first['seen_at'], $expired['seen_at']);
+    }
+
+    public function test_first_party_cookie_restores_an_unexpired_touch_after_session_data_is_lost(): void
+    {
+        $session = app('session')->driver();
+        $captured = $this->capture('/courts?utm_source=facebook&utm_campaign=community-post', $session);
+        $stored = $session->get('analytics.acquisition_context');
+        $session->forget('analytics.acquisition_context');
+        $request = Request::create('/venues/sample-venue', 'GET', [], [
+            (string) config('attribution.cookie_name') => json_encode($stored, JSON_THROW_ON_ERROR),
+        ]);
+        $request->setLaravelSession($session);
+
+        $restored = app(TrafficAttribution::class)->current($request);
+
+        $this->assertSame(AcquisitionSource::Facebook, $captured['source']);
+        $this->assertSame(AcquisitionSource::Facebook, $restored['source']);
+        $this->assertSame('community-post', $restored['campaign']);
+        $this->assertSame($captured['first_touch']['seen_at'], $restored['first_touch']['seen_at']);
     }
 
     public function test_qr_referral_partner_and_unknown_markers_are_parsed_without_arbitrary_sources(): void
@@ -142,7 +182,7 @@ class AcquisitionAttributionTest extends TestCase
         $this->assertSame($promotion->campaign_token, $snapshot->promotion_campaign_token);
         $this->assertSame($slot->slot_token, $snapshot->promotion_slot_token);
         $this->assertSame('Original campaign title', $snapshot->promotion_title);
-        $this->assertSame('last_touch_with_promotion_override_v1', $snapshot->rule_version);
+        $this->assertSame('last_touch_with_promotion_override_v2', $snapshot->rule_version);
 
         $promotion->update(['title' => 'Edited after booking']);
         $this->get('/courts?utm_source=instagram&utm_campaign=after-booking')->assertOk();
@@ -151,6 +191,63 @@ class AcquisitionAttributionTest extends TestCase
         $this->assertSame('Original campaign title', $snapshot->promotion_title);
         $this->assertSame(AcquisitionSource::Facebook, $snapshot->first_source);
         $this->assertSame(AcquisitionSource::MarketplacePromotion, $snapshot->attributed_source);
+    }
+
+    public function test_marketplace_discovery_survives_real_player_login_and_is_snapshotted_on_booking(): void
+    {
+        [$organization, $venue, $resource] = $this->inventory('marketplace-login-attribution');
+        $player = User::factory()->create(['email' => 'marketplace-player@example.com']);
+        $date = now($organization->timezone)->addDays(5)->toDateString();
+
+        $this->get(route('marketplace.venues.discover', [
+            'venueSlug' => $venue->slug,
+            'context' => 'court_search',
+        ]))->assertForbidden();
+
+        $this->get(URL::signedRoute('marketplace.venues.discover', [
+            'venueSlug' => $venue->slug,
+            'context' => 'court_search',
+        ]))
+            ->assertRedirect(route('marketplace.venues.show', $venue->slug))
+            ->assertSessionHas('analytics.acquisition_context.last_touch.source', AcquisitionSource::MarketplaceOrganic->value)
+            ->assertSessionHas('analytics.acquisition_context.last_touch.evidence', 'trusted_link');
+
+        $this->post(route('player.login'), [
+            'email' => $player->email,
+            'password' => 'password',
+        ])->assertRedirect(route('player.bookings.index'));
+
+        $this->post(route('player.bookings.store', $venue->slug), $this->holdData($resource, $date))
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
+
+        $booking = Booking::query()->where('player_user_id', $player->getKey())->firstOrFail();
+        $this->assertSame(AcquisitionSource::MarketplaceOrganic, $booking->attribution->first_source);
+        $this->assertSame(AcquisitionSource::MarketplaceOrganic, $booking->attribution->attributed_source);
+        $this->assertSame('trusted_link', $booking->attribution->attributed_evidence);
+        $this->assertSame('court_search', $booking->attribution->attributed_campaign);
+    }
+
+    public function test_player_shared_venue_route_records_a_distinct_trusted_booking_source(): void
+    {
+        [$organization, $venue, $resource] = $this->inventory('shared-link-attribution');
+        $player = User::factory()->create();
+        $date = now($organization->timezone)->addDays(5)->toDateString();
+
+        $this->get(URL::signedRoute('marketplace.venues.share', $venue->slug))
+            ->assertRedirect(route('marketplace.venues.show', $venue->slug))
+            ->assertSessionHas('analytics.acquisition_context.last_touch.source', AcquisitionSource::SharedLink->value)
+            ->assertSessionHas('analytics.acquisition_context.last_touch.evidence', 'trusted_link');
+
+        $this->actingAs($player)->post(
+            route('player.bookings.store', $venue->slug),
+            $this->holdData($resource, $date),
+        )->assertSessionHasNoErrors()->assertRedirect();
+
+        $booking = Booking::query()->where('player_user_id', $player->getKey())->firstOrFail();
+        $this->assertSame(AcquisitionSource::SharedLink, $booking->attribution->attributed_source);
+        $this->assertSame('player_share', $booking->attribution->attributed_medium);
+        $this->assertSame('trusted_link', $booking->attribution->attributed_evidence);
     }
 
     public function test_promotion_impressions_do_not_claim_a_touch_but_valid_campaign_clicks_do(): void
@@ -218,6 +315,8 @@ class AcquisitionAttributionTest extends TestCase
                 ->where('report.traffic_sources.0.bookings', 1)
                 ->where('report.traffic_sources.0.new_customers', 1)
                 ->where('report.traffic_sources.0.revenue', '650.00')
+                ->where('report.first_touch_sources.0.source', AcquisitionSource::GoogleOrganic->value)
+                ->where('report.first_touch_sources.0.bookings', 1)
                 ->where('report.metrics.completed_bookings', 1)
                 ->where('report.metrics.booking_revenue', '650.00')
                 ->where('report.metrics.new_customers', 1)
@@ -230,6 +329,83 @@ class AcquisitionAttributionTest extends TestCase
                 ->where('report.metrics.completed_bookings', 2));
 
         $this->assertNotNull($newCustomer);
+    }
+
+    public function test_owner_dashboard_groups_this_months_booking_sources_and_excludes_player_fees(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-10 12:00:00', 'Asia/Manila'));
+        [$organizationA, $venueA, $resourceA, $ownerA] = $this->inventory('source-summary-owner-a', true);
+        [$organizationB, $venueB, $resourceB] = $this->inventory('source-summary-owner-b');
+
+        $googleSearch = $this->attributedBooking(
+            $organizationA,
+            $venueA,
+            $resourceA,
+            AcquisitionSource::GoogleOrganic,
+            amount: '500.00',
+        );
+        $googleSearch->update([
+            'platform_service_fee_amount' => '50.00',
+            'player_total_amount' => '550.00',
+        ]);
+        $this->attributedBooking($organizationA, $venueA, $resourceA, AcquisitionSource::GoogleMaps, amount: '700.00');
+        $this->attributedBooking($organizationA, $venueA, $resourceA, AcquisitionSource::Facebook, amount: '300.00');
+        $this->attributedBooking($organizationA, $venueA, $resourceA, AcquisitionSource::MarketplaceOrganic, amount: '400.00');
+        $this->attributedBooking($organizationA, $venueA, $resourceA, AcquisitionSource::Direct, amount: '200.00');
+        $this->attributedBooking($organizationA, $venueA, $resourceA, AcquisitionSource::Unknown, amount: '100.00');
+
+        $this->attributedBooking(
+            $organizationA,
+            $venueA,
+            $resourceA,
+            AcquisitionSource::GoogleAds,
+            PaymentStatus::Refunded,
+            amount: '900.00',
+        );
+        $this->attributedBooking(
+            $organizationA,
+            $venueA,
+            $resourceA,
+            AcquisitionSource::GoogleOrganic,
+            amount: '800.00',
+            createdAt: now()->subMonthNoOverflow(),
+        );
+        $this->attributedBooking($organizationB, $venueB, $resourceB, AcquisitionSource::GoogleOrganic, amount: '9000.00');
+
+        $this->actingAs($ownerA)->get(route('owner.dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Dashboard')
+                ->where('booking_sources.period_label', 'This month')
+                ->where('booking_sources.value_label', 'Booking value')
+                ->where('booking_sources.total_bookings', 6)
+                ->where('booking_sources.total_booking_value', '2200.00')
+                ->where('booking_sources.top_source.key', 'google')
+                ->where('booking_sources.top_source.bookings', 2)
+                ->where('booking_sources.top_source.booking_value', '1200.00')
+                ->where('booking_sources.sources.0.label', 'Google')
+                ->where('booking_sources.sources.1.label', 'Direct / Unknown')
+                ->where('booking_sources.sources.1.bookings', 2)
+                ->where('booking_sources.sources.1.booking_value', '300.00')
+                ->where('booking_sources.sources.2.label', 'FinACourt Search')
+                ->where('booking_sources.sources.3.label', 'Facebook / Social'));
+    }
+
+    public function test_owner_dashboard_has_a_safe_empty_booking_source_summary(): void
+    {
+        $organization = Organization::factory()->create(['timezone' => 'Asia/Manila']);
+        $owner = User::factory()->create();
+        Membership::factory()->owner()->for($owner)->for($organization)->create();
+
+        $this->actingAs($owner)->get(route('owner.dashboard'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/Dashboard')
+                ->where('booking_sources.sources', [])
+                ->where('booking_sources.total_bookings', 0)
+                ->where('booking_sources.total_booking_value', '0.00')
+                ->where('booking_sources.top_source', null)
+                ->where('growth.active', []));
     }
 
     public function test_attribution_snapshot_endpoint_does_not_exist_and_model_hides_no_raw_referrer_query(): void
@@ -319,6 +495,8 @@ class AcquisitionAttributionTest extends TestCase
         AcquisitionSource $source,
         PaymentStatus $paymentStatus = PaymentStatus::Paid,
         BookingStatus $status = BookingStatus::Confirmed,
+        string $amount = '650.00',
+        mixed $createdAt = null,
     ): Booking {
         $player = User::factory()->create();
         $booking = Booking::factory()->for($resource, 'resource')->create([
@@ -328,7 +506,10 @@ class AcquisitionAttributionTest extends TestCase
             'source' => BookingSource::Marketplace,
             'status' => $status,
             'payment_status' => $paymentStatus,
-            'total_amount' => '650.00',
+            'total_amount' => $amount,
+            'player_total_amount' => $amount,
+            'created_at' => $createdAt ?? now(),
+            'updated_at' => $createdAt ?? now(),
         ]);
         BookingAttribution::factory()->for($booking)->create([
             'organization_id' => $organization->getKey(),

@@ -36,6 +36,7 @@ class AnalyticsReport
             $organization,
         );
         $trafficSources = $this->trafficSources(clone $qualified, $period, $organization);
+        $firstTouchSources = $this->firstTouchSources(clone $qualified);
 
         return [
             'period' => ['from' => $period->from, 'to' => $period->to],
@@ -54,6 +55,8 @@ class AnalyticsReport
                 'booking_revenue' => number_format((float) $revenue, 2, '.', ''),
             ],
             'traffic_sources' => $trafficSources,
+            'first_touch_sources' => $firstTouchSources,
+            'booking_source_summary' => $this->bookingSourceSummary($trafficSources),
             'acquisition_metrics' => $this->acquisitionMetrics($trafficSources),
             'promotions' => $this->promotionPerformance($period, $organization, $venue),
             'organizations' => $organization === null
@@ -163,6 +166,8 @@ class AnalyticsReport
         return $qualified
             ->leftJoin('booking_attributions', 'booking_attributions.booking_id', '=', 'bookings.id')
             ->selectRaw("{$source} as source_label, COUNT(*) as bookings, SUM(bookings.total_amount) as revenue")
+            ->selectRaw("SUM(CASE WHEN booking_attributions.attributed_evidence IN ('trusted_link', 'server_promotion') THEN 1 ELSE 0 END) as server_tracked_bookings")
+            ->selectRaw("SUM(CASE WHEN booking_attributions.attributed_evidence IN ('utm', 'click_id', 'referrer', 'browser_marker') THEN 1 ELSE 0 END) as identifiable_bookings")
             ->groupByRaw($source)
             ->orderByDesc('bookings')
             ->get()
@@ -174,9 +179,103 @@ class AnalyticsReport
                     'label' => $source->label(),
                     'bookings' => (int) $row->bookings,
                     'new_customers' => (int) ($newCustomers[$source->value] ?? 0),
+                    'server_tracked_bookings' => (int) $row->server_tracked_bookings,
+                    'identifiable_bookings' => (int) $row->identifiable_bookings,
                     'revenue' => number_format((float) $row->revenue, 2, '.', ''),
                 ];
             })->all();
+    }
+
+    /** @param Builder<Booking> $qualified
+     * @return array<int, array<string, mixed>>
+     */
+    private function firstTouchSources(Builder $qualified): array
+    {
+        $source = $this->firstSourceExpression();
+
+        return $qualified
+            ->leftJoin('booking_attributions', 'booking_attributions.booking_id', '=', 'bookings.id')
+            ->selectRaw("{$source} as source_label, COUNT(*) as bookings, SUM(bookings.total_amount) as revenue")
+            ->groupByRaw($source)
+            ->orderByDesc('bookings')
+            ->get()
+            ->map(function (Booking $row): array {
+                $source = AcquisitionSource::tryFrom($row->source_label) ?? AcquisitionSource::Unknown;
+
+                return [
+                    'source' => $source->value,
+                    'label' => $source->label(),
+                    'bookings' => (int) $row->bookings,
+                    'revenue' => number_format((float) $row->revenue, 2, '.', ''),
+                ];
+            })->all();
+    }
+
+    /**
+     * Turn the detailed attribution taxonomy into a short owner-facing booking
+     * summary. The underlying rows remain available in traffic_sources for the
+     * detailed analytics page.
+     *
+     * @param  array<int, array<string, mixed>>  $sources
+     * @return array<string, mixed>
+     */
+    private function bookingSourceSummary(array $sources): array
+    {
+        $groups = collect($sources)
+            ->groupBy(function (array $row): string {
+                $source = AcquisitionSource::tryFrom((string) ($row['source'] ?? ''))
+                    ?? AcquisitionSource::Unknown;
+
+                return $this->ownerSourceGroup($source)['key'];
+            })
+            ->map(function ($rows): array {
+                $source = AcquisitionSource::tryFrom((string) ($rows->first()['source'] ?? ''))
+                    ?? AcquisitionSource::Unknown;
+                $group = $this->ownerSourceGroup($source);
+
+                return [
+                    'key' => $group['key'],
+                    'label' => $group['label'],
+                    'bookings' => (int) $rows->sum('bookings'),
+                    'booking_value' => number_format((float) $rows->sum('revenue'), 2, '.', ''),
+                ];
+            })
+            ->filter(fn (array $row): bool => $row['bookings'] > 0)
+            ->sort(function (array $left, array $right): int {
+                return ($right['bookings'] <=> $left['bookings'])
+                    ?: ((float) $right['booking_value'] <=> (float) $left['booking_value'])
+                    ?: strcasecmp($left['label'], $right['label']);
+            })
+            ->values();
+
+        return [
+            'sources' => $groups->all(),
+            'total_bookings' => (int) $groups->sum('bookings'),
+            'total_booking_value' => number_format((float) $groups->sum('booking_value'), 2, '.', ''),
+            'top_source' => $groups->first(),
+        ];
+    }
+
+    /** @return array{key: string, label: string} */
+    private function ownerSourceGroup(AcquisitionSource $source): array
+    {
+        return match ($source) {
+            AcquisitionSource::GoogleOrganic,
+            AcquisitionSource::GoogleMaps,
+            AcquisitionSource::GoogleAds => ['key' => 'google', 'label' => 'Google'],
+            AcquisitionSource::Facebook,
+            AcquisitionSource::Instagram,
+            AcquisitionSource::TikTok => ['key' => 'social', 'label' => 'Facebook / Social'],
+            AcquisitionSource::MarketplaceOrganic => ['key' => 'finacourt_search', 'label' => 'FinACourt Search'],
+            AcquisitionSource::SharedLink => ['key' => 'shared_links', 'label' => 'Shared Links'],
+            AcquisitionSource::QrCode => ['key' => 'qr_code', 'label' => 'QR Code'],
+            AcquisitionSource::MarketplacePromotion => ['key' => 'promotions', 'label' => 'Promotions'],
+            AcquisitionSource::CustomerReactivation => ['key' => 'past_player_messages', 'label' => 'Messages to Past Players'],
+            AcquisitionSource::Referral,
+            AcquisitionSource::SalesPartner => ['key' => 'referrals', 'label' => 'Referrals'],
+            AcquisitionSource::Direct,
+            AcquisitionSource::Unknown => ['key' => 'direct_unknown', 'label' => 'Direct / Unknown'],
+        };
     }
 
     /** @param Builder<Booking> $qualified
@@ -249,6 +348,29 @@ class AnalyticsReport
             SQL;
     }
 
+    private function firstSourceExpression(): string
+    {
+        $recognized = collect(AcquisitionSource::cases())
+            ->map(fn (AcquisitionSource $source) => "'{$source->value}'")
+            ->implode(', ');
+        $promotion = AcquisitionSource::MarketplacePromotion->value;
+        $unknown = AcquisitionSource::Unknown->value;
+        $direct = AcquisitionSource::Direct->value;
+
+        return <<<SQL
+            COALESCE(
+                booking_attributions.first_source,
+                CASE
+                    WHEN bookings.traffic_source = 'promotion' THEN '{$promotion}'
+                    WHEN bookings.traffic_source = 'campaign' THEN '{$unknown}'
+                    WHEN bookings.traffic_source IN ({$recognized}) THEN bookings.traffic_source
+                    WHEN bookings.traffic_source IS NULL THEN '{$direct}'
+                    ELSE '{$unknown}'
+                END
+            )
+            SQL;
+    }
+
     /** @param array<int, array<string, mixed>> $sources
      * @return array<string, int|string>
      */
@@ -259,17 +381,24 @@ class AnalyticsReport
         $google = $rows->whereIn('source', [
             AcquisitionSource::GoogleOrganic->value,
             AcquisitionSource::GoogleMaps->value,
+            AcquisitionSource::GoogleAds->value,
         ]);
-        $qrReferral = $rows->whereIn('source', [
-            AcquisitionSource::QrCode->value,
-            AcquisitionSource::Referral->value,
-        ]);
+        $qr = $rows->where('source', AcquisitionSource::QrCode->value);
+        $shared = $rows->where('source', AcquisitionSource::SharedLink->value);
+        $referral = $rows->where('source', AcquisitionSource::Referral->value);
+        $qrReferral = $qr->merge($referral);
 
         return [
             'promoted_bookings' => (int) $promotion->sum('bookings'),
             'promoted_revenue' => number_format((float) $promotion->sum('revenue'), 2, '.', ''),
             'google_bookings' => (int) $google->sum('bookings'),
             'google_revenue' => number_format((float) $google->sum('revenue'), 2, '.', ''),
+            'qr_bookings' => (int) $qr->sum('bookings'),
+            'qr_revenue' => number_format((float) $qr->sum('revenue'), 2, '.', ''),
+            'shared_link_bookings' => (int) $shared->sum('bookings'),
+            'shared_link_revenue' => number_format((float) $shared->sum('revenue'), 2, '.', ''),
+            'referral_bookings' => (int) $referral->sum('bookings'),
+            'referral_revenue' => number_format((float) $referral->sum('revenue'), 2, '.', ''),
             'qr_referral_bookings' => (int) $qrReferral->sum('bookings'),
             'qr_referral_revenue' => number_format((float) $qrReferral->sum('revenue'), 2, '.', ''),
         ];

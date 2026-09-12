@@ -12,6 +12,7 @@ use App\Models\Membership;
 use App\Models\OperatingHour;
 use App\Models\Organization;
 use App\Models\Payment;
+use App\Models\PlatformServiceFeeRule;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
@@ -74,6 +75,7 @@ class PaymentFlowTest extends TestCase
     public function test_player_can_choose_pay_at_venue_even_when_paymongo_is_the_default(): void
     {
         $this->enablePayMongo();
+        PlatformServiceFeeRule::factory()->fixed('25.00')->create();
         [, $venue, $resource] = $this->setupInventory();
         $player = User::factory()->create();
 
@@ -84,8 +86,11 @@ class PaymentFlowTest extends TestCase
         ]);
 
         $this->assertSame(PaymentMode::PayAtVenue, $booking->payment_mode);
+        $this->assertSame('0.00', $booking->platform_service_fee_amount);
+        $this->assertSame($booking->total_amount, $booking->player_total_amount);
         $this->assertSame('manual', $booking->payment->provider);
         $this->assertSame(PaymentMode::PayAtVenue, $booking->payment->mode);
+        $this->assertSame('0.00', $booking->payment->platform_service_fee_amount);
     }
 
     public function test_online_choice_is_rejected_when_secure_checkout_is_not_ready(): void

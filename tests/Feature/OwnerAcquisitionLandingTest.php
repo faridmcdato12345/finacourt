@@ -87,6 +87,7 @@ class OwnerAcquisitionLandingTest extends TestCase
             ->assertSee('No active FinACourt service fee')
             ->assertSee('No monthly subscription')
             ->assertSee('PayMongo hosted checkout')
+            ->assertSee('Pay-at-venue bookings have no transaction or processing fee.')
             ->assertSee(route('register'), false)
             ->assertDontSee('Founding venue pilot')
             ->assertDontSee('success redirect');

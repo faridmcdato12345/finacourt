@@ -41,3 +41,35 @@ document.querySelectorAll('[data-public-number]').forEach((element) => {
         console.error('Unable to enhance marketplace number field.', error);
     }
 });
+
+document.querySelectorAll('[data-booking-payment-pricing]').forEach((element) => {
+    const paymentOptions = element.querySelectorAll('input[name="payment_option"]');
+
+    if (paymentOptions.length === 0) return;
+
+    const onlineFee = element.querySelector('[data-online-service-fee]');
+    const onlineFeeNote = element.querySelector('[data-online-fee-note]');
+    const payAtVenueFeeNote = element.querySelector('[data-pay-at-venue-fee-note]');
+    const playerTotal = element.querySelector('[data-player-total]');
+    const paymentLabel = element.querySelector('[data-payment-choice-label]');
+    const paymentDetail = element.querySelector('[data-payment-choice-detail]');
+
+    const updatePricing = () => {
+        const selectedOption = element.querySelector('input[name="payment_option"]:checked');
+        const isOnline = selectedOption?.value === 'online';
+
+        if (onlineFee) onlineFee.hidden = !isOnline;
+        if (onlineFeeNote) onlineFeeNote.hidden = !isOnline;
+        if (payAtVenueFeeNote) payAtVenueFeeNote.hidden = isOnline;
+        if (playerTotal) {
+            playerTotal.textContent = isOnline
+                ? element.dataset.onlineTotal
+                : element.dataset.payAtVenueTotal;
+        }
+        if (paymentLabel) paymentLabel.textContent = isOnline ? 'Pay online' : 'Pay at venue';
+        if (paymentDetail) paymentDetail.textContent = isOnline ? 'Secure checkout' : 'At the venue';
+    };
+
+    paymentOptions.forEach((option) => option.addEventListener('change', updatePricing));
+    updatePricing();
+});

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AcquisitionSource;
 use App\Enums\VisibilityLinkDestination;
 use Database\Factories\VisibilityLinkFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'promotion_id',
     'created_by_user_id',
     'destination',
+    'acquisition_source',
     'link_key',
     'token',
     'is_active',
@@ -54,6 +56,7 @@ class VisibilityLink extends Model
     {
         return [
             'destination' => VisibilityLinkDestination::class,
+            'acquisition_source' => AcquisitionSource::class,
             'is_active' => 'boolean',
             'visits_count' => 'integer',
             'last_visited_at' => 'immutable_datetime',

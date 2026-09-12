@@ -13,6 +13,8 @@ use Illuminate\Validation\ValidationException;
 
 class AvailabilityService
 {
+    public function __construct(private readonly BookingPrice $prices) {}
+
     public function window(
         CourtResource $resource,
         string $date,
@@ -25,9 +27,13 @@ class AvailabilityService
         $localStart = $this->localDateTime($date, $startTime, $timezone, 'start_time');
         $localEnd = $this->localDateTime($date, $endTime, $timezone, 'end_time');
 
-        if ($localEnd->lessThanOrEqualTo($localStart)) {
+        if ($localEnd->lessThan($localStart)) {
+            $localEnd = $localEnd->addDay();
+        }
+
+        if ($localEnd->equalTo($localStart)) {
             throw ValidationException::withMessages([
-                'end_time' => 'The end time must be later than the start time on the same day.',
+                'end_time' => 'The end time must be different from the start time.',
             ]);
         }
 
@@ -54,38 +60,27 @@ class AvailabilityService
             ]);
         }
 
-        $hours = $resource->venue->relationLoaded('operatingHours')
-            ? $resource->venue->operatingHours->first(
-                fn ($hours) => $hours->day_of_week->value === $window->localStart->dayOfWeek,
-            )
-            : $resource->venue->operatingHours()
-                ->where('day_of_week', $window->localStart->dayOfWeek)
-                ->first();
+        $operatingWindow = $this->operatingWindows(
+            $resource,
+            $window->localStart->startOfDay()->subDay(),
+            $window->localEnd->startOfDay(),
+        )->first(fn (array $hours) => $hours['start']->lessThanOrEqualTo($window->localStart)
+            && $hours['end']->greaterThanOrEqualTo($window->localEnd));
 
-        if (! $hours || $hours->is_closed || ! $hours->opens_at || ! $hours->closes_at) {
-            throw ValidationException::withMessages([
-                'booking_date' => 'The venue is closed on the selected date.',
-            ]);
-        }
-
-        $openMinute = $this->minutes($hours->opens_at);
-        $closeMinute = $this->minutes($hours->closes_at);
-        $startMinute = $window->localStart->hour * 60 + $window->localStart->minute;
-        $endMinute = $window->localEnd->hour * 60 + $window->localEnd->minute;
-
-        if ($startMinute < $openMinute || $endMinute > $closeMinute) {
+        if (! $operatingWindow) {
             throw ValidationException::withMessages([
                 'start_time' => 'The booking must be entirely within venue operating hours.',
             ]);
         }
 
         $increment = $resource->booking_increment_minutes;
+        $alignsWithOpening = collect($operatingWindow['anchors'])->contains(
+            fn (CarbonImmutable $opening) => $opening->lessThanOrEqualTo($window->localStart)
+                && (int) $opening->diffInMinutes($window->localStart) % $increment === 0
+                && (int) $opening->diffInMinutes($window->localEnd) % $increment === 0,
+        );
 
-        if (
-            ($startMinute - $openMinute) % $increment !== 0
-            || ($endMinute - $openMinute) % $increment !== 0
-            || $window->durationMinutes % $increment !== 0
-        ) {
+        if (! $alignsWithOpening || $window->durationMinutes % $increment !== 0) {
             throw ValidationException::withMessages([
                 'start_time' => "Start, end, and duration must align to {$increment}-minute slots from opening time.",
             ]);
@@ -128,7 +123,7 @@ class AvailabilityService
             ->exists();
     }
 
-    /** @return array{date: string, timezone: string, is_open: bool, opens_at: ?string, closes_at: ?string, duration_minutes: int, slots: Collection<int, array{start_time: string, end_time: string, available: bool}>} */
+    /** @return array<string, mixed> */
     public function slots(CourtResource $resource, string $date, int $durationMinutes): array
     {
         $resource->loadMissing('venue.organization');
@@ -142,56 +137,135 @@ class AvailabilityService
             ]);
         }
 
-        $hours = $resource->venue->operatingHours()
-            ->where('day_of_week', $day->dayOfWeek)
-            ->first();
-
-        if (! $resource->is_active || ! $hours || $hours->is_closed || ! $hours->opens_at || ! $hours->closes_at) {
+        if (! $resource->is_active) {
             return $this->emptySchedule($date, $timezone, $durationMinutes);
         }
 
-        $open = $this->localDateTime($date, substr($hours->opens_at, 0, 5), $timezone, 'date');
-        $close = $this->localDateTime($date, substr($hours->closes_at, 0, 5), $timezone, 'date');
+        $nextDay = $day->addDay();
+        $operatingWindows = $this->operatingWindows($resource, $day->subDay(), $day->addDay());
+        $relevantWindows = $operatingWindows
+            ->filter(fn (array $hours) => $hours['start']->lessThan($nextDay)
+                && $hours['end']->greaterThan($day))
+            ->values();
+
+        if ($relevantWindows->isEmpty()) {
+            return $this->emptySchedule($date, $timezone, $durationMinutes);
+        }
+
+        $queryEnd = $relevantWindows
+            ->sortBy(fn (array $hours) => $hours['end']->getTimestamp())
+            ->last()['end'];
         $blockers = Booking::query()
             ->where('resource_id', $resource->getKey())
             ->blocking()
-            ->where('start_at', '<', $close->utc())
-            ->where('end_at', '>', $open->utc())
+            ->where('start_at', '<', $queryEnd->utc())
+            ->where('end_at', '>', $day->utc())
             ->get(['start_at', 'end_at']);
         $courtBlocks = CourtAvailabilityBlock::query()
             ->where('resource_id', $resource->getKey())
             ->active()
-            ->overlapping($open->utc(), $close->utc())
+            ->overlapping($day->utc(), $queryEnd->utc())
             ->get(['starts_at', 'ends_at']);
 
         $slots = collect();
-        $cursor = $open;
         $now = CarbonImmutable::now($timezone);
 
-        while ($cursor->addMinutes($durationMinutes)->lessThanOrEqualTo($close)) {
-            $end = $cursor->addMinutes($durationMinutes);
-            $available = $cursor->isFuture() && ! $blockers->contains(
-                fn (Booking $booking) => $booking->start_at->lessThan($end->utc())
-                    && $booking->end_at->greaterThan($cursor->utc()),
-            ) && ! $courtBlocks->contains(
-                fn (CourtAvailabilityBlock $block) => $block->starts_at->lessThan($end->utc())
-                    && $block->ends_at->greaterThan($cursor->utc()),
-            );
+        foreach ($relevantWindows as $operatingWindow) {
+            foreach ($operatingWindow['anchors'] as $opening) {
+                $cursor = $opening;
 
-            $slots->push([
-                'start_time' => $cursor->format('H:i'),
-                'end_time' => $end->format('H:i'),
-                'available' => $available && $cursor->greaterThan($now),
-            ]);
-            $cursor = $cursor->addMinutes($increment);
+                if ($cursor->lessThan($day)) {
+                    $minutesUntilDay = (int) $cursor->diffInMinutes($day);
+                    $cursor = $cursor->addMinutes((int) ceil($minutesUntilDay / $increment) * $increment);
+                }
+
+                while ($cursor->lessThan($nextDay)
+                    && $cursor->addMinutes($durationMinutes)->lessThanOrEqualTo($operatingWindow['end'])) {
+                    $end = $cursor->addMinutes($durationMinutes);
+                    $key = (string) $cursor->getTimestamp();
+
+                    if ($slots->has($key)) {
+                        $cursor = $cursor->addMinutes($increment);
+
+                        continue;
+                    }
+
+                    $window = new BookingWindow(
+                        localStart: $cursor,
+                        localEnd: $end,
+                        utcStart: $cursor->utc(),
+                        utcEnd: $end->utc(),
+                        durationMinutes: $durationMinutes,
+                    );
+                    $price = $this->prices->quote($resource, $durationMinutes, window: $window);
+                    $available = $cursor->greaterThan($now) && ! $blockers->contains(
+                        fn (Booking $booking) => $booking->start_at->lessThan($end->utc())
+                            && $booking->end_at->greaterThan($cursor->utc()),
+                    ) && ! $courtBlocks->contains(
+                        fn (CourtAvailabilityBlock $block) => $block->starts_at->lessThan($end->utc())
+                            && $block->ends_at->greaterThan($cursor->utc()),
+                    );
+
+                    $slots->put($key, [
+                        'booking_date' => $cursor->toDateString(),
+                        'end_date' => $end->toDateString(),
+                        'start_time' => $cursor->format('H:i'),
+                        'end_time' => $end->format('H:i'),
+                        'display_time' => $cursor->format('H:i').'–'.($end->isSameDay($cursor)
+                            ? $end->format('H:i')
+                            : $end->format('D H:i')),
+                        'display_time_12_hour' => $cursor->format('g:i A').'–'.($end->isSameDay($cursor)
+                            ? $end->format('g:i A')
+                            : $end->format('D g:i A')),
+                        'start_label' => $cursor->format('M j, H:i'),
+                        'end_label' => $end->isSameDay($cursor)
+                            ? $end->format('H:i')
+                            : $end->format('M j, H:i'),
+                        'start_label_12_hour' => $cursor->format('M j, g:i A'),
+                        'end_label_12_hour' => $end->isSameDay($cursor)
+                            ? $end->format('g:i A')
+                            : $end->format('M j, g:i A'),
+                        'start_offset_minutes' => (int) $day->diffInMinutes($cursor),
+                        'end_offset_minutes' => (int) $day->diffInMinutes($end),
+                        'available' => $available,
+                        'unit_price' => $price['unit_price'],
+                        'total_amount' => $price['total_amount'],
+                        'has_time_based_price' => $price['pricing_rule_snapshot'] !== null,
+                    ]);
+                    $cursor = $cursor->addMinutes($increment);
+                }
+            }
         }
+
+        $slots = $slots->sortBy('start_offset_minutes')->values();
+        $periods = $relevantWindows->map(function (array $hours) use ($day, $nextDay): array {
+            $start = $hours['start']->greaterThan($day) ? $hours['start'] : $day;
+            $end = $hours['end']->lessThan($nextDay) ? $hours['end'] : $nextDay;
+
+            return [
+                'starts_at' => $start->format('H:i'),
+                'ends_at' => $end->equalTo($nextDay) ? '24:00' : $end->format('H:i'),
+            ];
+        })->values();
+        $isOpen24Hours = $periods->count() === 1
+            && $periods->first()['starts_at'] === '00:00'
+            && $periods->first()['ends_at'] === '24:00';
 
         return [
             'date' => $date,
             'timezone' => $timezone,
             'is_open' => true,
-            'opens_at' => $open->format('H:i'),
-            'closes_at' => $close->format('H:i'),
+            'is_24_hours' => $isOpen24Hours,
+            'opens_at' => $periods->first()['starts_at'],
+            'closes_at' => $periods->last()['ends_at'],
+            'hours_label' => $isOpen24Hours
+                ? 'Open 24 hours'
+                : $periods->map(fn (array $period) => $period['starts_at'].'–'.$period['ends_at'])->join(' · '),
+            'hours_label_12_hour' => $isOpen24Hours
+                ? 'Open 24 hours'
+                : $periods->map(fn (array $period) => $this->displayClockTime($period['starts_at'])
+                    .'–'.$this->displayClockTime($period['ends_at']))->join(' · '),
+            'periods' => $periods,
             'duration_minutes' => $durationMinutes,
             'slots' => $slots,
         ];
@@ -229,22 +303,100 @@ class AvailabilityService
         return $value;
     }
 
-    private function minutes(string $time): int
-    {
-        [$hour, $minute] = array_map('intval', explode(':', $time));
+    /**
+     * @return Collection<int, array{
+     *     start: CarbonImmutable,
+     *     end: CarbonImmutable,
+     *     anchors: array<int, CarbonImmutable>
+     * }>
+     */
+    private function operatingWindows(
+        CourtResource $resource,
+        CarbonImmutable $firstDay,
+        CarbonImmutable $lastDay,
+    ): Collection {
+        $resource->venue->loadMissing('operatingHours');
+        $hoursByDay = $resource->venue->operatingHours
+            ->keyBy(fn ($hours) => $hours->day_of_week->value);
+        $windows = collect();
+        $date = $firstDay->startOfDay();
+        $lastDate = $lastDay->startOfDay();
 
-        return $hour * 60 + $minute;
+        while ($date->lessThanOrEqualTo($lastDate)) {
+            $hours = $hoursByDay->get($date->dayOfWeek);
+
+            if ($hours && ! $hours->is_closed && $hours->opens_at && $hours->closes_at) {
+                $open = $date->addSeconds($this->seconds($hours->opens_at));
+                $close = $date->addSeconds($this->seconds($hours->closes_at));
+
+                if ($close->lessThanOrEqualTo($open)) {
+                    $close = $close->addDay();
+                }
+
+                $windows->push([
+                    'start' => $open,
+                    'end' => $close,
+                    'anchors' => [$open],
+                ]);
+            }
+
+            $date = $date->addDay();
+        }
+
+        $merged = collect();
+
+        foreach ($windows->sortBy(fn (array $hours) => $hours['start']->getTimestamp()) as $window) {
+            if ($merged->isEmpty()) {
+                $merged->push($window);
+
+                continue;
+            }
+
+            $previous = $merged->pop();
+
+            if ($window['start']->lessThanOrEqualTo($previous['end'])) {
+                $previous['end'] = $window['end']->greaterThan($previous['end'])
+                    ? $window['end']
+                    : $previous['end'];
+                $previous['anchors'] = [...$previous['anchors'], ...$window['anchors']];
+                $merged->push($previous);
+            } else {
+                $merged->push($previous, $window);
+            }
+        }
+
+        return $merged->values();
     }
 
-    /** @return array{date: string, timezone: string, is_open: false, opens_at: null, closes_at: null, duration_minutes: int, slots: Collection<int, never>} */
+    private function seconds(string $time): int
+    {
+        [$hour, $minute, $second] = array_map('intval', array_pad(explode(':', $time), 3, 0));
+
+        return $hour * 3600 + $minute * 60 + $second;
+    }
+
+    private function displayClockTime(string $time): string
+    {
+        [$hour, $minute] = array_map('intval', explode(':', $time));
+        $suffix = $hour >= 12 && $hour < 24 ? 'PM' : 'AM';
+        $displayHour = $hour % 12;
+
+        return ($displayHour === 0 ? 12 : $displayHour).':'.str_pad((string) $minute, 2, '0', STR_PAD_LEFT).' '.$suffix;
+    }
+
+    /** @return array<string, mixed> */
     private function emptySchedule(string $date, string $timezone, int $durationMinutes): array
     {
         return [
             'date' => $date,
             'timezone' => $timezone,
             'is_open' => false,
+            'is_24_hours' => false,
             'opens_at' => null,
             'closes_at' => null,
+            'hours_label' => null,
+            'hours_label_12_hour' => null,
+            'periods' => collect(),
             'duration_minutes' => $durationMinutes,
             'slots' => collect(),
         ];
