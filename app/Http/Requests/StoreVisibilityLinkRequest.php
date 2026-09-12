@@ -21,7 +21,11 @@ class StoreVisibilityLinkRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'destination' => ['required', Rule::enum(VisibilityLinkDestination::class)],
+            'destination' => ['required', Rule::in([
+                VisibilityLinkDestination::Venue->value,
+                VisibilityLinkDestination::Booking->value,
+                VisibilityLinkDestination::Promotion->value,
+            ])],
             'promotion_id' => ['nullable', 'integer'],
             'source' => [
                 'nullable',

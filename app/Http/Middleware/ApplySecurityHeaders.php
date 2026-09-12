@@ -65,6 +65,7 @@ class ApplySecurityHeaders
             'player.*',
             'bookings.*',
             'webhooks.*',
+            'visibility-links.*',
             'login',
             'register',
             'logout',

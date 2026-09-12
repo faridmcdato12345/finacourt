@@ -27,10 +27,12 @@ use App\Http\Controllers\Marketplace\VisibilityQrController;
 use App\Http\Controllers\Owner\AnalyticsController as OwnerAnalyticsController;
 use App\Http\Controllers\Owner\BookingAvailabilityController;
 use App\Http\Controllers\Owner\BookingController;
+use App\Http\Controllers\Owner\BookingLinkController as OwnerBookingLinkController;
 use App\Http\Controllers\Owner\CourtAvailabilityBlockController;
-use App\Http\Controllers\Owner\CourtResourceController;
 use App\Http\Controllers\Owner\CourtPricingRuleController;
+use App\Http\Controllers\Owner\CourtResourceController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
+use App\Http\Controllers\Owner\ExternalBookingDestinationController;
 use App\Http\Controllers\Owner\GoogleBusinessProfileController;
 use App\Http\Controllers\Owner\GrowthRecommendationController as OwnerGrowthRecommendationController;
 use App\Http\Controllers\Owner\GrowthRecommendationStateController as OwnerGrowthRecommendationStateController;
@@ -296,6 +298,12 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
         ->name('google-business-profile.callback');
     Route::get('/dashboard', OwnerDashboardController::class)->name('dashboard');
     Route::get('/analytics', OwnerAnalyticsController::class)->name('analytics');
+    Route::get('/booking-links', [OwnerBookingLinkController::class, 'index'])
+        ->name('booking-links.index');
+    Route::patch('/booking-links/{visibilityLink}', [OwnerBookingLinkController::class, 'update'])
+        ->name('booking-links.update');
+    Route::delete('/booking-links/{visibilityLink}', [OwnerBookingLinkController::class, 'destroy'])
+        ->name('booking-links.destroy');
     Route::get('/growth', OwnerGrowthRecommendationController::class)->name('growth.index');
     Route::post('/growth/{recommendationKey}/state', [OwnerGrowthRecommendationStateController::class, 'store'])
         ->where('recommendationKey', '[a-f0-9]{64}')
@@ -357,6 +365,11 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
         ->name('venues.photos.store');
     Route::post('/venues/{venue}/visibility-links', [OwnerVisibilityLinkController::class, 'store'])
         ->name('venues.visibility-links.store');
+    Route::put('/venues/{venue}/external-booking-destination', [ExternalBookingDestinationController::class, 'update'])
+        ->name('venues.external-booking-destination.update');
+    Route::post('/venues/{venue}/booking-links', [OwnerBookingLinkController::class, 'store'])
+        ->middleware('throttle:30,1')
+        ->name('venues.booking-links.store');
     Route::post('/venues/{venue}/google-place', [VenuePlaceController::class, 'store'])
         ->name('venues.google-place.store');
     Route::post('/venues/{venue}/google-business-profile/connect', [GoogleBusinessProfileController::class, 'connect'])

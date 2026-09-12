@@ -1,10 +1,10 @@
 <script setup>
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { computed, reactive } from 'vue';
 import AppSelect from '../../../Components/AppSelect.vue';
 import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
 
-const props = defineProps({ report: Object, demand: Object, filters: Object, venues: Array, timezone: String });
+const props = defineProps({ report: Object, demand: Object, externalTraffic: Object, filters: Object, venues: Array, timezone: String });
 const form = reactive({ ...props.filters });
 const money = (value) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 2 }).format(Number(value));
 const number = (value) => new Intl.NumberFormat('en-PH').format(Number(value));
@@ -84,6 +84,20 @@ function applyFilters() { router.get('/owner/analytics', form, { preserveState: 
                 <section class="app-card overflow-hidden"><div class="border-b border-slate-100 px-6 py-5"><p class="eyebrow">First discovery</p><h3 class="mt-1 text-xl font-semibold">Where players first found you</h3><p class="mt-2 text-xs leading-5 text-slate-500">The earliest identifiable source in the attribution window. It can be unavailable when cookies expire, a player changes devices, or another app hides the referrer.</p></div><div v-if="report.first_touch_sources.length" class="divide-y divide-slate-100"><div v-for="source in report.first_touch_sources" :key="source.source" class="grid grid-cols-[1fr_auto_auto] gap-4 px-6 py-4 text-sm"><span class="font-medium text-slate-800">{{ source.label }}</span><span class="text-right text-slate-500">{{ source.bookings }} bookings</span><span class="text-right font-semibold">{{ money(source.revenue) }}</span></div></div><p v-else class="px-6 py-10 text-center text-sm text-slate-500">No confirmed booking sources in this date range.</p></section>
                 <section class="app-card overflow-hidden"><div class="border-b border-slate-100 px-6 py-5"><p class="eyebrow">Booking credit</p><h3 class="mt-1 text-xl font-semibold">What most recently led to booking</h3><p class="mt-2 text-xs leading-5 text-slate-500">FinACourt uses the clearest recent source it can see. A validated deal receives booking credit while the original discovery source stays in the first-discovery report.</p></div><div v-if="report.traffic_sources.length" class="divide-y divide-slate-100"><div v-for="source in report.traffic_sources" :key="source.source" class="grid grid-cols-[1fr_auto_auto] gap-4 px-6 py-4 text-sm"><div><span class="font-medium text-slate-800">{{ source.label }}</span><p class="mt-1 text-xs text-slate-400">{{ source.new_customers }} first-time · {{ source.server_tracked_bookings }} server-tracked · {{ source.identifiable_bookings }} tagged/referrer</p></div><span class="self-center text-right text-slate-500">{{ source.bookings }} bookings</span><span class="self-center text-right font-semibold">{{ money(source.revenue) }}</span></div></div><p v-else class="px-6 py-10 text-center text-sm text-slate-500">No confirmed bookings with a source in this date range.</p></section>
             </div>
+
+            <section class="app-card overflow-hidden">
+                <div class="flex flex-col gap-4 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-end sm:justify-between sm:px-6">
+                    <div><p class="eyebrow">External booking traffic</p><h3 class="mt-1 text-xl font-semibold">Traffic sent to your current booking page</h3><p class="mt-2 max-w-3xl text-sm leading-6 text-slate-500">These are Booking Link clicks, not confirmed FinACourt bookings. External booking conversion and revenue are unavailable without evidence from that platform.</p></div>
+                    <Link :href="`/owner/booking-links${filters.venue ? `?venue=${filters.venue}` : ''}`" class="text-sm font-semibold text-court-800">Manage Booking Links →</Link>
+                </div>
+                <div class="grid gap-4 border-b border-slate-100 p-5 sm:grid-cols-3 sm:p-6">
+                    <div class="rounded-2xl bg-slate-50 p-5"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Total clicks</p><p class="mt-3 text-3xl font-semibold">{{ externalTraffic.metrics.total_clicks }}</p></div>
+                    <div class="rounded-2xl bg-slate-50 p-5"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Unique visitors</p><p class="mt-3 text-3xl font-semibold">{{ externalTraffic.metrics.unique_visitors }}</p></div>
+                    <div class="rounded-2xl bg-court-950 p-5 text-white"><p class="text-xs font-semibold uppercase tracking-wider text-court-300">External bookings</p><p class="mt-3 text-3xl font-semibold">—</p><p class="mt-1 text-xs text-court-100/65">Conversion unavailable</p></div>
+                </div>
+                <div v-if="externalTraffic.sources.length" class="divide-y divide-slate-100"><div v-for="source in externalTraffic.sources" :key="source.source" class="grid gap-2 px-5 py-4 sm:grid-cols-[1fr_auto_auto] sm:items-center sm:px-6"><div><p class="font-medium text-slate-900">{{ source.label }}</p><p class="mt-1 text-xs text-slate-400">Traffic sent externally · Bookings unavailable</p></div><p class="text-sm text-slate-500">{{ source.unique_visitors }} unique</p><p class="font-semibold text-court-800">{{ source.clicks }} clicks</p></div></div>
+                <p v-else class="px-6 py-10 text-center text-sm text-slate-500">No external Booking Link traffic in this date range.</p>
+            </section>
 
             <section class="app-card overflow-hidden"><div class="border-b border-slate-100 px-6 py-5"><p class="eyebrow">Deals</p><h3 class="mt-1 text-xl font-semibold">How your deals are doing</h3></div><div v-if="report.promotions.length" class="divide-y divide-slate-100"><div v-for="promotion in report.promotions" :key="promotion.id" class="px-6 py-4"><div class="flex items-start justify-between gap-3"><div><p class="font-medium">{{ promotion.title }}</p><p class="mt-1 text-xs text-slate-400">{{ promotion.venue }}</p></div><p class="font-semibold">{{ money(promotion.revenue) }}</p></div><div class="mt-3 flex flex-wrap gap-2 text-xs"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">{{ promotion.impressions }} times shown</span><span class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600">{{ promotion.clicks }} opened</span><span class="rounded-full bg-court-50 px-2.5 py-1 font-semibold text-court-800">{{ promotion.bookings }} bookings</span></div></div></div><p v-else class="px-6 py-10 text-center text-sm text-slate-500">No deals match this view.</p></section>
         </div>

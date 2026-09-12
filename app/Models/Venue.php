@@ -135,6 +135,12 @@ class Venue extends Model
         return $this->hasMany(VisibilityLink::class);
     }
 
+    /** @return HasOne<ExternalBookingDestination, $this> */
+    public function externalBookingDestination(): HasOne
+    {
+        return $this->hasOne(ExternalBookingDestination::class);
+    }
+
     /** @return HasOne<GoogleBusinessProfileConnection, $this> */
     public function googleBusinessProfileConnection(): HasOne
     {

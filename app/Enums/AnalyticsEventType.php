@@ -12,4 +12,5 @@ enum AnalyticsEventType: string
     case AvailabilityView = 'availability_view';
     case BookingStart = 'booking_start';
     case CompletedBooking = 'completed_booking';
+    case ExternalBookingLinkClick = 'external_booking_link_click';
 }
