@@ -13,6 +13,7 @@ use App\Models\Organization;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -178,6 +179,95 @@ class BookingEngineTest extends TestCase
             ->assertJsonFragment(['start_time' => '10:00', 'end_time' => '11:00', 'available' => true]);
     }
 
+    public function test_booking_can_end_at_midnight(): void
+    {
+        [$owner, $resource] = $this->bookingSetup();
+        $date = $this->futureDate();
+        $this->hoursForDate($resource, $date)->update(['closes_at' => '00:00']);
+
+        $this->actingAs($owner)
+            ->getJson(route('owner.bookings.availability', [
+                'resource_id' => $resource->getKey(),
+                'date' => $date,
+                'duration_minutes' => 60,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('hours_label', '08:00–24:00')
+            ->assertJsonPath('hours_label_12_hour', '8:00 AM–12:00 AM')
+            ->assertJsonFragment([
+                'booking_date' => $date,
+                'start_time' => '23:00',
+                'end_time' => '00:00',
+                'display_time_12_hour' => '11:00 PM–'.CarbonImmutable::parse($date, 'Asia/Manila')->addDay()->format('D').' 12:00 AM',
+            ]);
+
+        $this->actingAs($owner)
+            ->post(route('owner.bookings.store'), [
+                ...$this->bookingData($resource),
+                'booking_date' => $date,
+                'start_time' => '23:00',
+                'end_time' => '00:00',
+            ])->assertRedirect();
+
+        $booking = Booking::query()->firstOrFail();
+        $this->assertSame("{$date} 23:00", $booking->start_at->setTimezone('Asia/Manila')->format('Y-m-d H:i'));
+        $this->assertSame(
+            CarbonImmutable::parse($date, 'Asia/Manila')->addDay()->format('Y-m-d').' 00:00',
+            $booking->end_at->setTimezone('Asia/Manila')->format('Y-m-d H:i'),
+        );
+    }
+
+    public function test_overnight_hours_are_available_after_midnight_on_the_next_date(): void
+    {
+        [$owner, $resource] = $this->bookingSetup();
+        $openingDate = $this->futureDate();
+        $nextDate = CarbonImmutable::parse($openingDate, 'Asia/Manila')->addDay()->toDateString();
+        $this->hoursForDate($resource, $openingDate)->update([
+            'opens_at' => '18:00',
+            'closes_at' => '03:00',
+        ]);
+
+        $this->actingAs($owner)
+            ->getJson(route('owner.bookings.availability', [
+                'resource_id' => $resource->getKey(),
+                'date' => $nextDate,
+                'duration_minutes' => 60,
+            ]))
+            ->assertOk()
+            ->assertJsonFragment([
+                'booking_date' => $nextDate,
+                'start_time' => '01:00',
+                'end_time' => '02:00',
+            ]);
+
+        $this->actingAs($owner)
+            ->post(route('owner.bookings.store'), [
+                ...$this->bookingData($resource),
+                'booking_date' => $nextDate,
+                'start_time' => '01:00',
+                'end_time' => '02:00',
+            ])->assertRedirect();
+    }
+
+    public function test_continuous_24_hour_schedule_allows_a_booking_across_midnight(): void
+    {
+        [$owner, $resource] = $this->bookingSetup();
+        OperatingHour::query()->where('venue_id', $resource->venue_id)->update([
+            'opens_at' => '00:00',
+            'closes_at' => '00:00',
+        ]);
+
+        $this->actingAs($owner)
+            ->post(route('owner.bookings.store'), [
+                ...$this->bookingData($resource),
+                'start_time' => '23:00',
+                'end_time' => '01:00',
+            ])->assertRedirect();
+
+        $booking = Booking::query()->firstOrFail();
+        $this->assertSame(120, (int) $booking->start_at->diffInMinutes($booking->end_at));
+    }
+
     public function test_tenant_cannot_view_cancel_or_book_another_tenants_inventory(): void
     {
         [$ownerA] = $this->bookingSetup();
@@ -289,5 +379,15 @@ class BookingEngineTest extends TestCase
     private function futureDate(): string
     {
         return now('Asia/Manila')->addDays(7)->toDateString();
+    }
+
+    private function hoursForDate(CourtResource $resource, string $date): OperatingHour
+    {
+        $dayOfWeek = CarbonImmutable::parse($date, 'Asia/Manila')->dayOfWeek;
+
+        return OperatingHour::query()
+            ->where('venue_id', $resource->venue_id)
+            ->where('day_of_week', $dayOfWeek)
+            ->firstOrFail();
     }
 }

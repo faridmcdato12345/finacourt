@@ -38,7 +38,7 @@ class OperatingHour extends Model
             && substr($this->closes_at, 0, 5) < substr($this->opens_at, 0, 5);
     }
 
-    public function displayHours(): string
+    public function displayHours(bool $useTwelveHourClock = false): string
     {
         if ($this->is_closed || ! $this->opens_at || ! $this->closes_at) {
             return 'Closed';
@@ -48,8 +48,24 @@ class OperatingHour extends Model
             return 'Open 24 hours';
         }
 
-        return substr($this->opens_at, 0, 5).'–'.substr($this->closes_at, 0, 5)
+        $opensAt = $useTwelveHourClock
+            ? $this->displayClockTime($this->opens_at)
+            : substr($this->opens_at, 0, 5);
+        $closesAt = $useTwelveHourClock
+            ? $this->displayClockTime($this->closes_at)
+            : substr($this->closes_at, 0, 5);
+
+        return $opensAt.'–'.$closesAt
             .($this->spansMidnight() ? ' next day' : '');
+    }
+
+    private function displayClockTime(string $time): string
+    {
+        [$hour, $minute] = array_map('intval', explode(':', substr($time, 0, 5)));
+        $suffix = $hour >= 12 ? 'PM' : 'AM';
+        $displayHour = $hour % 12;
+
+        return ($displayHour === 0 ? 12 : $displayHour).':'.str_pad((string) $minute, 2, '0', STR_PAD_LEFT).' '.$suffix;
     }
 
     protected function casts(): array

@@ -91,7 +91,7 @@ function destroyResource(resource) {
                     <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <div class="flex items-center justify-between"><h3 class="font-semibold text-slate-950">Opening hours</h3><Link :href="`/owner/venues/${venue.id}/hours`" class="text-sm font-semibold text-court-700">Edit</Link></div>
                         <dl class="mt-4 space-y-3 text-sm">
-                            <div v-for="hour in venue.operating_hours" :key="hour.day" class="flex justify-between gap-4"><dt class="text-slate-500">{{ hour.day }}</dt><dd class="font-medium text-slate-800">{{ hour.is_closed ? 'Closed' : `${hour.opens_at}–${hour.closes_at}` }}</dd></div>
+                            <div v-for="hour in venue.operating_hours" :key="hour.day" class="flex justify-between gap-4"><dt class="text-slate-500">{{ hour.day }}</dt><dd class="font-medium text-slate-800">{{ hour.display_hours }}</dd></div>
                         </dl>
                     </section>
                     <section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

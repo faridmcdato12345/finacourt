@@ -627,8 +627,8 @@ class PublicMarketplaceTest extends TestCase
             'duration' => 60,
         ]))
             ->assertOk()
-            ->assertSee('08:00–09:00')
-            ->assertSee('09:00–10:00')
+            ->assertSee('8:00 AM–9:00 AM')
+            ->assertSee('9:00 AM–10:00 AM')
             ->assertSee('line-through', false)
             ->assertSee('<meta name="robots" content="noindex,follow">', false);
     }
@@ -658,8 +658,8 @@ class PublicMarketplaceTest extends TestCase
         ]))
             ->assertOk()
             ->assertSee('Select your times on '.$firstResource->name)
-            ->assertSee('aria-label="Select 17:00 to 18:00"', false)
-            ->assertSee('aria-label="Select 18:00 to 19:00"', false)
+            ->assertSee('aria-label="Select '.$date->format('M j').', 5:00 PM to 6:00 PM"', false)
+            ->assertSee('aria-label="Select '.$date->format('M j').', 6:00 PM to 7:00 PM"', false)
             ->assertDontSee('data-unavailable-slot data-start="17:00"', false)
             ->assertDontSee('data-unavailable-slot data-start="18:00"', false);
 
@@ -672,8 +672,8 @@ class PublicMarketplaceTest extends TestCase
             ->assertSee('Select your times on '.$secondResource->name)
             ->assertSee('data-unavailable-slot data-start="17:00"', false)
             ->assertSee('data-unavailable-slot data-start="18:00"', false)
-            ->assertDontSee('aria-label="Select 17:00 to 18:00"', false)
-            ->assertDontSee('aria-label="Select 18:00 to 19:00"', false);
+            ->assertDontSee('aria-label="Select '.$date->format('M j').', 5:00 PM to 6:00 PM"', false)
+            ->assertDontSee('aria-label="Select '.$date->format('M j').', 6:00 PM to 7:00 PM"', false);
     }
 
     public function test_court_blocks_are_hidden_from_public_availability_and_filtered_search(): void
@@ -700,7 +700,7 @@ class PublicMarketplaceTest extends TestCase
         ]))
             ->assertOk()
             ->assertSee('data-unavailable-slot data-start="17:00"', false)
-            ->assertDontSee('aria-label="Select 17:00 to 18:00"', false)
+            ->assertDontSee('aria-label="Select '.$date->format('M j').', 5:00 PM to 6:00 PM"', false)
             ->assertDontSee('Court maintenance');
 
         $this->get(route('marketplace.courts.index', [

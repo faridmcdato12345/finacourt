@@ -68,6 +68,7 @@ async function checkAvailability() {
 
 function chooseSlot(slot) {
     if (!slot.available) return;
+    form.booking_date = slot.booking_date;
     form.start_time = slot.start_time;
     form.end_time = slot.end_time;
 }
@@ -125,9 +126,9 @@ function submit() {
                         <button type="button" class="mt-4 w-full rounded-xl border border-court-700 px-4 py-2.5 text-sm font-semibold text-court-800" :disabled="checking" @click="checkAvailability">{{ checking ? 'Checking…' : 'Check available slots' }}</button>
                         <p v-if="availabilityError" class="mt-3 text-sm text-red-600">{{ availabilityError }}</p>
                         <div v-if="schedule" class="mt-4">
-                            <p class="text-xs font-medium text-slate-500">{{ schedule.is_open ? `Open ${schedule.opens_at}–${schedule.closes_at}` : 'Closed or court not bookable' }}</p>
+                            <p class="text-xs font-medium text-slate-500">{{ schedule.is_open ? schedule.hours_label : 'Closed or court not bookable' }}</p>
                             <div v-if="schedule.slots.length" class="mt-3 grid grid-cols-2 gap-2">
-                                <button v-for="slot in schedule.slots" :key="slot.start_time" type="button" :disabled="!slot.available" :class="['rounded-lg border px-2 py-2 text-xs font-semibold', slot.available ? 'border-court-200 text-court-800 hover:bg-court-50' : 'border-slate-100 bg-slate-50 text-slate-300', form.start_time === slot.start_time && form.end_time === slot.end_time ? 'ring-2 ring-court-500' : '']" @click="chooseSlot(slot)"><span class="block">{{ slot.start_time }}–{{ slot.end_time }}</span><span class="mt-1 block text-[10px]">{{ money.format(slot.total_amount) }}</span></button>
+                                <button v-for="slot in schedule.slots" :key="`${slot.booking_date}-${slot.start_time}`" type="button" :disabled="!slot.available" :class="['rounded-lg border px-2 py-2 text-xs font-semibold', slot.available ? 'border-court-200 text-court-800 hover:bg-court-50' : 'border-slate-100 bg-slate-50 text-slate-300', form.booking_date === slot.booking_date && form.start_time === slot.start_time && form.end_time === slot.end_time ? 'ring-2 ring-court-500' : '']" @click="chooseSlot(slot)"><span class="block">{{ slot.display_time }}</span><span class="mt-1 block text-[10px]">{{ money.format(slot.total_amount) }}</span></button>
                             </div>
                         </div>
                     </section>

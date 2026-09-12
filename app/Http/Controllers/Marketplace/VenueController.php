@@ -92,9 +92,10 @@ class VenueController extends Controller
                     $prices,
                     $resource,
                 ): array {
+                    $slotDate = $slot['booking_date'] ?? $date;
                     $window = $availabilityService->window(
                         $resource,
-                        $date,
+                        $slotDate,
                         $slot['start_time'],
                         $slot['end_time'],
                         requireFuture: false,

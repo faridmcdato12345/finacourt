@@ -78,7 +78,7 @@
                         @if ($venue->published_reviews_count > 0)<a href="#reviews" class="inline-flex items-center gap-1.5 font-semibold text-slate-700"><span class="text-amber-400">★</span> {{ number_format((float) $venue->published_reviews_avg_rating, 1) }} <span class="font-normal text-slate-400">({{ $venue->published_reviews_count }} {{ Str::plural('review', $venue->published_reviews_count) }})</span></a>@endif
                         <span class="inline-flex items-center gap-1.5">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-4 text-court-600']) {{ $venue->publicCityName() }}, {{ $venue->province }}</span>
                         @if ($todayHours && ! $todayHours->is_closed)
-                            <span class="inline-flex items-center gap-1.5 text-court-700">@include('marketplace.partials.icon', ['name' => 'clock', 'class' => 'size-4']) Open today {{ substr($todayHours->opens_at, 0, 5) }}–{{ substr($todayHours->closes_at, 0, 5) }}</span>
+                            <span class="inline-flex items-center gap-1.5 text-court-700">@include('marketplace.partials.icon', ['name' => 'clock', 'class' => 'size-4']) {{ $todayHours->isOpen24Hours() ? 'Open 24 hours today' : 'Open today '.$todayHours->displayHours(true) }}</span>
                         @else
                             <span class="inline-flex items-center gap-1.5 text-slate-500">@include('marketplace.partials.icon', ['name' => 'clock', 'class' => 'size-4']) Closed today</span>
                         @endif
@@ -111,8 +111,10 @@
                                 @php
                                     $nextSlot = $promotion->nextSlot();
                                     $isUpcoming = $promotion->isUpcoming();
+                                    $nextSlotStartsAt = $nextSlot?->startsAt($venue->organization->timezone);
+                                    $nextSlotEndsAt = $nextSlot?->endsAt($venue->organization->timezone);
                                 @endphp
-                                <a href="{{ route('marketplace.venues.show', ['venueSlug' => $venue->slug, ...$promotion->marketplaceParameters()]) }}#availability" class="rounded-xl border border-amber-200 bg-white p-4"><div class="flex items-start justify-between gap-3"><div><h3 class="font-semibold">{{ $promotion->title }}</h3><p class="mt-1 text-sm text-slate-500">{{ $nextSlot?->resource?->name ?: $promotion->resource?->name ?: 'Eligible venue courts' }}</p></div>@if ($promotion->offerLabel())<span class="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">{{ $promotion->offerLabel() }}</span>@endif</div><p class="mt-3 text-xs leading-5 text-slate-400">@if ($nextSlot){{ $nextSlot->slot_date->format('M j') }} · {{ substr($nextSlot->starts_at_time, 0, 5) }}–{{ substr($nextSlot->ends_at_time, 0, 5) }}@elseif ($isUpcoming)Available from {{ $promotion->starts_on->format('M j, Y') }}@else Eligibility is checked for the exact court and time selected.@endif</p></a>
+                                <a href="{{ route('marketplace.venues.show', ['venueSlug' => $venue->slug, ...$promotion->marketplaceParameters()]) }}#availability" class="rounded-xl border border-amber-200 bg-white p-4"><div class="flex items-start justify-between gap-3"><div><h3 class="font-semibold">{{ $promotion->title }}</h3><p class="mt-1 text-sm text-slate-500">{{ $nextSlot?->resource?->name ?: $promotion->resource?->name ?: 'Eligible venue courts' }}</p></div>@if ($promotion->offerLabel())<span class="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">{{ $promotion->offerLabel() }}</span>@endif</div><p class="mt-3 text-xs leading-5 text-slate-400">@if ($nextSlot){{ $nextSlotStartsAt->format('M j') }} · {{ $nextSlotStartsAt->format('g:i A') }}–{{ $nextSlotEndsAt->format('g:i A') }}@elseif ($isUpcoming)Available from {{ $promotion->starts_on->format('M j, Y') }}@else Eligibility is checked for the exact court and time selected.@endif</p></a>
                             @endforeach
                         </div>
                     </section>
@@ -154,7 +156,7 @@
                     <h2 class="mt-2 text-xl font-semibold">Operating hours</h2>
                     <dl class="mt-5 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
                         @foreach ($venue->operatingHours as $hours)
-                            <div class="flex justify-between gap-4 border-b border-slate-100 pb-3"><dt class="text-slate-500">{{ $hours->day_of_week->label() }}</dt><dd class="font-medium text-slate-800">{{ $hours->is_closed ? 'Closed' : substr($hours->opens_at, 0, 5).'–'.substr($hours->closes_at, 0, 5) }}</dd></div>
+                            <div class="flex justify-between gap-4 border-b border-slate-100 pb-3"><dt class="text-slate-500">{{ $hours->day_of_week->label() }}</dt><dd class="font-medium text-slate-800">{{ $hours->displayHours(true) }}</dd></div>
                         @endforeach
                     </dl>
                 </section>

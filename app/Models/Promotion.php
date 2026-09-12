@@ -192,15 +192,14 @@ class Promotion extends Model
         $at ??= $this->relationLoaded('venue') && $this->venue->relationLoaded('organization')
             ? now($this->venue->organization->timezone)
             : now();
+        $timezone = $at->getTimezone()->getName();
         $slots = $this->relationLoaded('slots')
             ? $this->slots
             : $this->slots()->with('resource')->get();
 
         return $slots
-            ->filter(fn (PromotionSlot $slot) => $slot->slot_date->toDateString() > $at->toDateString()
-                || ($slot->slot_date->toDateString() === $at->toDateString()
-                    && $slot->ends_at_time > $at->format('H:i:s')))
-            ->sortBy(fn (PromotionSlot $slot) => $slot->slot_date->format('Y-m-d').' '.$slot->starts_at_time)
+            ->filter(fn (PromotionSlot $slot) => $slot->endsAt($timezone)->greaterThan($at))
+            ->sortBy(fn (PromotionSlot $slot) => $slot->startsAt($timezone)->getTimestamp())
             ->first();
     }
 

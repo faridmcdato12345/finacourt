@@ -18,6 +18,12 @@ function allDayChanged(hour) {
     if (hour.is_24_hours) hour.is_closed = false;
 }
 
+function closeAtMidnight(hour) {
+    hour.is_closed = false;
+    hour.is_24_hours = false;
+    hour.closes_at = '00:00';
+}
+
 function spansMidnight(hour) {
     return !hour.is_closed
         && !hour.is_24_hours
@@ -53,6 +59,7 @@ function spansMidnight(hour) {
                             <label :for="`closes-${index}`" class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-slate-400">Closes</label>
                             <input :id="`closes-${index}`" v-model="hour.closes_at" type="time" :disabled="hour.is_closed || hour.is_24_hours" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 disabled:bg-slate-100 disabled:text-slate-400" />
                             <p v-if="spansMidnight(hour)" class="mt-1.5 text-xs font-medium text-court-700">Closes the next day</p>
+                            <button v-if="!hour.is_closed && !hour.is_24_hours" type="button" class="mt-1.5 text-xs font-semibold text-court-700 hover:text-court-900" @click="closeAtMidnight(hour)">Set to 12:00 midnight</button>
                             <FormError :message="form.errors[`hours.${index}.closes_at`]" />
                         </div>
                     </div>

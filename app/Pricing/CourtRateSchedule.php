@@ -19,23 +19,30 @@ class CourtRateSchedule
     public function segments(CourtResource $resource, BookingWindow $window): array
     {
         $resource->loadMissing('pricingRules');
-        $rules = $resource->pricingRules
-            ->filter(fn (CourtPricingRule $rule) => in_array(
-                $window->localStart->dayOfWeek,
-                array_map('intval', $rule->days_of_week),
-                true,
-            ))
-            ->filter(function (CourtPricingRule $rule) use ($window): bool {
-                [$start, $end] = $this->ruleWindow($rule, $window->localStart);
+        $ruleWindows = collect();
+        $date = $window->localStart->startOfDay();
 
-                return $start->lessThan($window->localEnd) && $end->greaterThan($window->localStart);
-            })
-            ->values();
+        while ($date->lessThanOrEqualTo($window->localEnd->startOfDay())) {
+            foreach ($resource->pricingRules as $rule) {
+                if (! in_array($date->dayOfWeek, array_map('intval', $rule->days_of_week), true)) {
+                    continue;
+                }
+
+                [$start, $end] = $this->ruleWindow($rule, $date);
+
+                if ($start->lessThan($window->localEnd) && $end->greaterThan($window->localStart)) {
+                    $ruleWindows->push(compact('rule', 'start', 'end'));
+                }
+            }
+
+            $date = $date->addDay();
+        }
 
         $boundaries = collect([$window->localStart, $window->localEnd]);
 
-        foreach ($rules as $rule) {
-            [$start, $end] = $this->ruleWindow($rule, $window->localStart);
+        foreach ($ruleWindows as $ruleWindow) {
+            $start = $ruleWindow['start'];
+            $end = $ruleWindow['end'];
 
             if ($start->greaterThan($window->localStart) && $start->lessThan($window->localEnd)) {
                 $boundaries->push($start);
@@ -54,14 +61,15 @@ class CourtRateSchedule
         return $boundaries
             ->slice(0, -1)
             ->values()
-            ->map(function (CarbonImmutable $start, int $index) use ($boundaries, $resource, $rules): array {
+            ->map(function (CarbonImmutable $start, int $index) use ($boundaries, $resource, $ruleWindows): array {
                 /** @var CarbonImmutable $end */
                 $end = $boundaries[$index + 1];
-                $rule = $rules->first(function (CourtPricingRule $rule) use ($start, $end): bool {
-                    [$ruleStart, $ruleEnd] = $this->ruleWindow($rule, $start);
-
-                    return $ruleStart->lessThanOrEqualTo($start) && $ruleEnd->greaterThanOrEqualTo($end);
+                $ruleWindow = $ruleWindows->first(function (array $candidate) use ($start, $end): bool {
+                    return $candidate['start']->lessThanOrEqualTo($start)
+                        && $candidate['end']->greaterThanOrEqualTo($end);
                 });
+                /** @var CourtPricingRule|null $rule */
+                $rule = $ruleWindow['rule'] ?? null;
 
                 return [
                     'pricing_rule_id' => $rule?->getKey(),

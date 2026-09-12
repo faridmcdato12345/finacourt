@@ -18,7 +18,7 @@ class OperatingHoursTest extends TestCase
     {
         [$owner, $venue] = $this->ownerAndVenue();
         $hours = $this->validHours();
-        $hours[0] = ['day_of_week' => 0, 'is_closed' => true, 'opens_at' => null, 'closes_at' => null];
+        $hours[0] = ['day_of_week' => 0, 'is_closed' => true, 'is_24_hours' => false, 'opens_at' => null, 'closes_at' => null];
 
         $this->actingAs($owner)
             ->put(route('owner.venues.hours.update', $venue), ['hours' => $hours])
@@ -53,19 +53,58 @@ class OperatingHoursTest extends TestCase
         $this->assertDatabaseCount('operating_hours', 0);
     }
 
-    public function test_open_day_requires_times_with_closing_later_than_opening(): void
+    public function test_owner_can_save_midnight_overnight_and_24_hour_schedules(): void
     {
         [$owner, $venue] = $this->ownerAndVenue();
         $hours = $this->validHours();
+        $hours[1]['closes_at'] = '00:00';
         $hours[2]['opens_at'] = '22:00';
-        $hours[2]['closes_at'] = '08:00';
+        $hours[2]['closes_at'] = '03:00';
+        $hours[3] = [
+            'day_of_week' => 3,
+            'is_closed' => false,
+            'is_24_hours' => true,
+            'opens_at' => null,
+            'closes_at' => null,
+        ];
+
+        $this->actingAs($owner)
+            ->put(route('owner.venues.hours.update', $venue), ['hours' => $hours])
+            ->assertRedirect(route('owner.venues.show', $venue));
+
+        $this->assertDatabaseHas('operating_hours', [
+            'venue_id' => $venue->getKey(),
+            'day_of_week' => 1,
+            'opens_at' => '08:00:00',
+            'closes_at' => '00:00:00',
+        ]);
+        $this->assertDatabaseHas('operating_hours', [
+            'venue_id' => $venue->getKey(),
+            'day_of_week' => 2,
+            'opens_at' => '22:00:00',
+            'closes_at' => '03:00:00',
+        ]);
+        $this->assertDatabaseHas('operating_hours', [
+            'venue_id' => $venue->getKey(),
+            'day_of_week' => 3,
+            'opens_at' => '00:00:00',
+            'closes_at' => '00:00:00',
+        ]);
+    }
+
+    public function test_open_day_requires_times_and_equal_times_require_24_hour_option(): void
+    {
+        [$owner, $venue] = $this->ownerAndVenue();
+        $hours = $this->validHours();
         $hours[3]['opens_at'] = null;
+        $hours[4]['opens_at'] = '08:00';
+        $hours[4]['closes_at'] = '08:00';
 
         $this->actingAs($owner)
             ->put(route('owner.venues.hours.update', $venue), ['hours' => $hours])
             ->assertSessionHasErrors([
-                'hours.2.closes_at',
                 'hours.3.opens_at',
+                'hours.4.closes_at',
             ]);
 
         $this->assertDatabaseCount('operating_hours', 0);
@@ -97,12 +136,13 @@ class OperatingHoursTest extends TestCase
         return [$owner, $venue];
     }
 
-    /** @return array<int, array{day_of_week: int, is_closed: bool, opens_at: string, closes_at: string}> */
+    /** @return array<int, array{day_of_week: int, is_closed: bool, is_24_hours: bool, opens_at: string, closes_at: string}> */
     private function validHours(): array
     {
         return array_map(fn (int $day) => [
             'day_of_week' => $day,
             'is_closed' => false,
+            'is_24_hours' => false,
             'opens_at' => '08:00',
             'closes_at' => '22:00',
         ], range(0, 6));

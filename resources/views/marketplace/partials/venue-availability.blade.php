@@ -32,32 +32,37 @@
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <p class="text-sm font-semibold">Select your times on {{ $selectedResource->name }}</p>
-                        <p class="mt-1 text-xs text-slate-400">Choose any consecutive available times within today’s opening hours.</p>
+                        <p class="mt-1 text-xs text-slate-400">Choose any consecutive available times within this date’s opening hours.</p>
                     </div>
-                    <p class="shrink-0 text-xs text-slate-400">{{ $availability['opens_at'] }}–{{ $availability['closes_at'] }}</p>
+                    <p class="shrink-0 text-xs text-slate-400">{{ $availability['hours_label_12_hour'] }}</p>
                 </div>
                 <div class="mt-4 grid grid-cols-2 gap-2">
                     @foreach ($availability['slots'] as $slot)
                         @if ($slot['available'])
                             <a
-                                href="{{ route('player.bookings.create', array_filter(['venueSlug' => $venue->slug, 'resource' => $selectedResource->id, 'date' => $availabilityDate, 'start' => $slot['start_time'], 'duration' => $availabilityDuration, 'campaign' => $slot['campaign'] ?? null])) }}"
+                                href="{{ route('player.bookings.create', array_filter(['venueSlug' => $venue->slug, 'resource' => $selectedResource->id, 'date' => $slot['booking_date'], 'start' => $slot['start_time'], 'duration' => $availabilityDuration, 'campaign' => $slot['campaign'] ?? null])) }}"
                                 data-slot
                                 data-slot-index="{{ $loop->index }}"
+                                data-date="{{ $slot['booking_date'] }}"
                                 data-start="{{ $slot['start_time'] }}"
                                 data-end="{{ $slot['end_time'] }}"
+                                data-start-offset="{{ $slot['start_offset_minutes'] }}"
+                                data-end-offset="{{ $slot['end_offset_minutes'] }}"
+                                data-start-label="{{ $slot['start_label_12_hour'] }}"
+                                data-end-label="{{ $slot['end_label_12_hour'] }}"
                                 data-campaign="{{ $slot['campaign'] ?? '' }}"
                                 data-price="{{ $slot['total_amount'] }}"
                                 aria-pressed="false"
                                 class="rounded-xl border border-court-200 bg-court-50 px-2 py-3 text-center text-xs font-semibold text-court-800 hover:border-court-500"
-                                aria-label="Select {{ $slot['start_time'] }} to {{ $slot['end_time'] }}"
+                                aria-label="Select {{ $slot['start_label_12_hour'] }} to {{ $slot['end_label_12_hour'] }}"
                             >
-                                {{ $slot['start_time'] }}–{{ $slot['end_time'] }}
+                                {{ $slot['display_time_12_hour'] }}
                                 <span class="mt-1 block text-[10px] text-slate-500">₱{{ number_format((float) $slot['total_amount'], 2) }}</span>
                                 @if (($slot['has_time_based_price'] ?? false) && ! ($slot['campaign'] ?? null))<span class="mt-0.5 block text-[10px] text-court-700">Scheduled price</span>@endif
                                 @if ($slot['campaign'] ?? null)<span class="mt-1 block text-[10px] text-amber-700">{{ $slot['promotion_offer'] ?: 'Deal applies' }}</span>@endif
                             </a>
                         @else
-                            <span data-unavailable-slot data-start="{{ $slot['start_time'] }}" data-end="{{ $slot['end_time'] }}" class="rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center text-xs font-semibold text-slate-300 line-through">{{ $slot['start_time'] }}–{{ $slot['end_time'] }}</span>
+                            <span data-unavailable-slot data-start="{{ $slot['start_time'] }}" data-end="{{ $slot['end_time'] }}" class="rounded-xl border border-slate-100 bg-slate-50 px-2 py-3 text-center text-xs font-semibold text-slate-300 line-through">{{ $slot['display_time_12_hour'] }}</span>
                         @endif
                     @endforeach
                 </div>
