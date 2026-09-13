@@ -42,7 +42,11 @@ class AnalyticsReport
             'period' => ['from' => $period->from, 'to' => $period->to],
             'metrics' => [
                 'impressions' => (clone $events)->where('event_type', AnalyticsEventType::VenueImpression)->count(),
-                'unique_visitors' => (clone $events)->whereNotNull('visitor_hash')->distinct('visitor_hash')->count('visitor_hash'),
+                'unique_visitors' => (clone $events)
+                    ->where('event_type', '!=', AnalyticsEventType::ExternalBookingLinkClick)
+                    ->whereNotNull('visitor_hash')
+                    ->distinct('visitor_hash')
+                    ->count('visitor_hash'),
                 'profile_views' => $profileViews,
                 'availability_views' => (clone $events)->where('event_type', AnalyticsEventType::AvailabilityView)->count(),
                 'booking_starts' => (clone $bookings)->count(),

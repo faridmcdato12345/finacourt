@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Owner;
 
+use App\Enums\VisibilityLinkDestination;
 use App\Http\Controllers\Controller;
 use App\Models\Venue;
 use App\Tenancy\TenantContext;
@@ -33,7 +34,9 @@ class VisibilityController extends Controller
                 'resources.sport:id,name,is_active',
                 'operatingHours:id,venue_id,day_of_week,is_closed,opens_at,closes_at',
                 'photos:id,venue_id,is_primary',
-                'visibilityLinks.promotion:id,title',
+                'visibilityLinks' => fn ($query) => $query
+                    ->where('destination', '!=', VisibilityLinkDestination::ExternalBooking->value)
+                    ->with('promotion:id,title'),
                 'promotions:id,organization_id,venue_id,title,is_public',
                 'googleBusinessProfileConnection',
             ])

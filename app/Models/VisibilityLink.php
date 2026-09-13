@@ -9,14 +9,18 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'organization_id',
     'venue_id',
     'promotion_id',
+    'external_booking_destination_id',
     'created_by_user_id',
     'destination',
     'acquisition_source',
+    'label',
+    'campaign',
     'link_key',
     'token',
     'is_active',
@@ -26,7 +30,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class VisibilityLink extends Model
 {
     /** @use HasFactory<VisibilityLinkFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /** @return BelongsTo<Organization, $this> */
     public function organization(): BelongsTo
@@ -44,6 +48,12 @@ class VisibilityLink extends Model
     public function promotion(): BelongsTo
     {
         return $this->belongsTo(Promotion::class);
+    }
+
+    /** @return BelongsTo<ExternalBookingDestination, $this> */
+    public function externalBookingDestination(): BelongsTo
+    {
+        return $this->belongsTo(ExternalBookingDestination::class);
     }
 
     /** @return BelongsTo<User, $this> */
