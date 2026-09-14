@@ -15,5 +15,6 @@ readonly class VerifiedPaymentEvent
         public string $amount,
         public string $currency,
         public array $metadata = [],
+        public ?string $providerPaymentReference = null,
     ) {}
 }

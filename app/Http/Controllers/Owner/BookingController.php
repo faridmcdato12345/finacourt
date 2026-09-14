@@ -8,12 +8,14 @@ use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
+use App\Enums\RefundRequestStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CancelBookingRequest;
 use App\Http\Requests\StoreBookingRequest;
 use App\Models\Booking;
 use App\Models\CourtAvailabilityBlock;
 use App\Models\CourtResource;
+use App\Models\RefundRequest;
 use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -41,10 +43,29 @@ class BookingController extends Controller
                 'resource.sport:id,name',
                 'createdBy:id,name',
                 'payment:payments.id,payments.booking_id,payments.reference,payments.status,payments.mode,payments.amount,payments.venue_amount,payments.platform_service_fee_amount,payments.currency,payments.requires_review,payments.review_reason',
+                'payment.refundRequest',
             ])
             ->where('start_at', '>=', $localStart->utc())
             ->where('start_at', '<', $localEnd->utc())
             ->orderBy('start_at')
+            ->get()
+            ->map(fn (Booking $booking) => $this->bookingPayload($booking));
+
+        $refundBookings = $organization->bookings()
+            ->with([
+                'venue:id,name',
+                'resource:id,name,sport_id',
+                'resource.sport:id,name',
+                'createdBy:id,name',
+                'payment:payments.id,payments.booking_id,payments.reference,payments.status,payments.mode,payments.amount,payments.venue_amount,payments.platform_service_fee_amount,payments.currency,payments.requires_review,payments.review_reason',
+                'payment.refundRequest',
+            ])
+            ->whereHas('payment.refundRequest')
+            ->orderByDesc(RefundRequest::query()
+                ->select('requested_at')
+                ->whereColumn('refund_requests.booking_id', 'bookings.id')
+                ->limit(1))
+            ->limit(50)
             ->get()
             ->map(fn (Booking $booking) => $this->bookingPayload($booking));
 
@@ -66,6 +87,7 @@ class BookingController extends Controller
             'date' => $date,
             'timezone' => $timezone,
             'bookings' => $bookings,
+            'refundBookings' => $refundBookings,
             'courtBlocks' => $courtBlocks,
         ]);
     }
@@ -182,6 +204,22 @@ class BookingController extends Controller
             'payment_reference' => $booking->payment?->reference,
             'payment_requires_review' => $booking->payment?->requires_review ?? false,
             'payment_review_reason' => $booking->payment?->review_reason,
+            'refund_request' => $booking->payment?->refundRequest ? [
+                'id' => $booking->payment->refundRequest->getKey(),
+                'reference' => $booking->payment->refundRequest->reference,
+                'status' => $booking->payment->refundRequest->status->value,
+                'status_label' => $booking->payment->refundRequest->status->label(),
+                'amount' => $booking->payment->refundRequest->amount,
+                'currency' => $booking->payment->refundRequest->currency,
+                'reason' => $booking->payment->refundRequest->reason,
+                'reviewer_note' => $booking->payment->refundRequest->reviewer_note,
+                'failure_message' => $booking->payment->refundRequest->failure_message,
+                'requires_review' => $booking->payment->refundRequest->requires_review,
+                'can_approve' => $booking->payment->refundRequest->status === RefundRequestStatus::Requested,
+                'can_retry' => $booking->payment->refundRequest->status === RefundRequestStatus::Failed
+                    && ! $booking->payment->refundRequest->requires_review,
+                'can_reject' => $booking->payment->refundRequest->status === RefundRequestStatus::Requested,
+            ] : null,
             'can_mark_paid' => $booking->payment_mode === PaymentMode::PayAtVenue && in_array($booking->payment_status, [
                 PaymentStatus::Pending,
                 PaymentStatus::Failed,

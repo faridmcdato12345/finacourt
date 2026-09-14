@@ -24,6 +24,7 @@ class PaymentFactory extends Factory
             'refunded_amount' => '0.00',
             'currency' => 'PHP',
             'provider_reference' => null,
+            'provider_payment_reference' => null,
             'requires_review' => false,
             'review_reason' => null,
             'created_by_user_id' => User::factory(),

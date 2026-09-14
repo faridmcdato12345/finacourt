@@ -144,6 +144,10 @@ class OwnerAcquisitionController extends Controller
                 'answer' => 'Yes. Owners control their courts, opening hours, normal rates, availability, booking records, and published promotions from the owner workspace.',
             ],
             [
+                'question' => 'When can I receive my court earnings?',
+                'answer' => 'Verified online court earnings become available after the booked court time has ended and the 24-hour clearing period has passed. You can then request a payout any day if your payout details are active, your available balance meets the configured minimum, and no other payout is already queued or processing. Any transfer fee and the amount you will receive are shown before confirmation. Refunds and payments requiring review are not available for payout, and requesting a payout does not guarantee immediate or same-day receipt.',
+            ],
+            [
                 'question' => 'Can FinACourt help my venue get more players?',
                 'answer' => 'FinACourt can make a published venue discoverable in its marketplace, show grouped local search demand, help promote open court times, and help eligible past players return. It does not guarantee bookings or search rankings.',
             ],

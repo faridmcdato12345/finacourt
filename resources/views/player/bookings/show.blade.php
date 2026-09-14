@@ -8,6 +8,7 @@
         $canCancel = in_array($status, [App\Enums\BookingStatus::Hold, App\Enums\BookingStatus::Confirmed], true) && $booking->start_at->isFuture();
         $payment = $booking->payment;
         $paymentStatus = $payment?->effectiveStatus($booking);
+        $refundRequest = $payment?->refundRequest;
         $playerTotal = (float) $booking->player_total_amount > 0 ? $booking->player_total_amount : $booking->total_amount;
         $coverPhoto = $booking->venue->photos->first();
         $coverPhotoUrl = $coverPhoto
@@ -71,7 +72,31 @@
             @if ($status === App\Enums\BookingStatus::Hold)
                 <div data-player-hold-card class="relative overflow-hidden rounded-3xl border border-amber-200 bg-[linear-gradient(120deg,#fffbeb_0%,#ffffff_75%)] p-5 sm:p-6">
                     <div aria-hidden="true" class="absolute -right-10 -top-10 size-32 rounded-full border-[18px] border-amber-100"></div>
-                    <div class="relative"><p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Your time is in the locker</p><h2 class="mt-2 text-2xl font-semibold text-amber-950">Finish before the hold runs out</h2><p class="mt-2 text-sm leading-6 text-amber-800">Held until {{ $booking->expires_at->setTimezone($booking->timezone)->format('M j, Y · H:i') }}. FinACourt checks the court again before confirming.</p>@if ($booking->payment_mode === App\Enums\PaymentMode::HostedCheckout)@if ($hostedCheckoutAvailable)<form action="{{ route('player.bookings.checkout', $booking->reference) }}" method="post" data-requires-online class="mt-5">@csrf<button data-loading-label="Opening secure checkout…" class="min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white">Continue to secure checkout</button></form>@else<p class="mt-4 rounded-xl bg-white px-4 py-3 text-sm font-medium text-amber-900">Secure checkout is unavailable. This booking has not been confirmed or paid.</p>@endif @else<form action="{{ route('player.bookings.confirm', $booking->reference) }}" method="post" data-requires-online class="mt-5">@csrf<button data-loading-label="Confirming…" class="min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white">Confirm — pay at venue</button></form>@endif</div>
+                    <div class="relative">
+                        <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Your time is in the locker</p>
+                        <h2 class="mt-2 text-2xl font-semibold text-amber-950">Finish before the hold runs out</h2>
+                        <p class="mt-2 text-sm leading-6 text-amber-800">Held until {{ $booking->expires_at->setTimezone($booking->timezone)->format('M j, Y · H:i') }}. FinACourt checks the court again before confirming.</p>
+
+                        @if ($booking->payment_mode === App\Enums\PaymentMode::HostedCheckout)
+                            @if ($hostedCheckoutAvailable)
+                                <form action="{{ route('player.bookings.checkout', $booking->reference) }}" method="post" data-requires-online class="mt-5">
+                                    @csrf
+                                    <button data-loading-label="Opening secure checkout…" class="min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white">Continue to secure checkout</button>
+                                </form>
+
+                                @if ($payment?->provider_reference)
+                                    <a href="{{ route('player.bookings.payment.return', $booking->reference) }}" class="mt-3 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-300 bg-white px-5 py-3 text-sm font-semibold text-amber-900">I already paid — check payment status</a>
+                                @endif
+                            @else
+                                <p class="mt-4 rounded-xl bg-white px-4 py-3 text-sm font-medium text-amber-900">Secure checkout is unavailable. This booking has not been confirmed or paid.</p>
+                            @endif
+                        @else
+                            <form action="{{ route('player.bookings.confirm', $booking->reference) }}" method="post" data-requires-online class="mt-5">
+                                @csrf
+                                <button data-loading-label="Confirming…" class="min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white">Confirm — pay at venue</button>
+                            </form>
+                        @endif
+                    </div>
                 </div>
             @elseif ($status === App\Enums\BookingStatus::Confirmed)
                 <div data-booking-celebration class="rounded-3xl border border-court-200 bg-[linear-gradient(120deg,#effcf5_0%,#ffffff_78%)] p-5 sm:p-6">
@@ -79,7 +104,7 @@
                     <div class="relative">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-court-700">You’re ready to play</p>
                         <h2 class="mt-2 text-2xl font-semibold text-court-950">Reservation confirmed 🎉</h2>
-                        @if ($paymentStatus === App\Enums\PaymentStatus::Paid)<p class="mt-2 text-sm leading-6 text-court-800">@if ($payment?->mode === App\Enums\PaymentMode::HostedCheckout)Your online payment of ₱{{ number_format((float) $playerTotal, 2) }} was verified and recorded.@else The venue recorded the full ₱{{ number_format((float) $playerTotal, 2) }} payment.@endif</p>@elseif ($paymentStatus === App\Enums\PaymentStatus::Refunded)<p class="mt-2 text-sm leading-6 text-court-800">The venue recorded a full manual refund. No gateway transfer was performed by this application.</p>@else<p class="mt-2 text-sm leading-6 text-court-800">No online payment has been collected. Please pay ₱{{ number_format((float) $playerTotal, 2) }} directly at the venue.</p>@endif
+                        @if ($paymentStatus === App\Enums\PaymentStatus::Paid)<p class="mt-2 text-sm leading-6 text-court-800">@if ($payment?->mode === App\Enums\PaymentMode::HostedCheckout)Your online payment of ₱{{ number_format((float) $playerTotal, 2) }} was verified and recorded.@else The venue recorded the full ₱{{ number_format((float) $playerTotal, 2) }} payment.@endif</p>@elseif ($paymentStatus === App\Enums\PaymentStatus::Refunded)<p class="mt-2 text-sm leading-6 text-court-800">@if ($payment?->mode === App\Enums\PaymentMode::HostedCheckout)Your full online refund was confirmed by the payment provider.@else The venue recorded a full manual refund.@endif</p>@else<p class="mt-2 text-sm leading-6 text-court-800">No online payment has been collected. Please pay ₱{{ number_format((float) $playerTotal, 2) }} directly at the venue.</p>@endif
                     </div>
                 </div>
             @elseif ($status === App\Enums\BookingStatus::Expired)
@@ -110,6 +135,24 @@
                     <div class="flex flex-wrap items-center justify-between gap-4"><div class="flex items-center gap-3"><span class="grid size-11 place-items-center rounded-2xl bg-sky-50 text-sky-700"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span><div><p class="eyebrow">Payment check</p><h2 class="mt-1 text-xl font-semibold">How this game is paid</h2></div></div><span class="rounded-full bg-sky-50 px-3 py-1.5 text-sm font-semibold text-sky-800">{{ $paymentStatus->label() }}</span></div>
                     <dl class="mt-6 grid gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2"><div><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Payment choice</dt><dd class="mt-1 font-medium">{{ $payment->mode->label() }}</dd></div><div><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Your total</dt><dd class="mt-1 font-medium">₱{{ number_format((float) $payment->amount, 2) }} {{ $payment->currency }}</dd></div>@if ((float) $payment->platform_service_fee_amount > 0)<div><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Court price</dt><dd class="mt-1 font-medium">₱{{ number_format((float) $payment->venue_amount, 2) }}</dd></div><div><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">FinACourt fee</dt><dd class="mt-1 font-medium">₱{{ number_format((float) $payment->platform_service_fee_amount, 2) }}</dd></div>@endif</dl>
                     <p class="mt-5 text-[10px] font-medium text-slate-400">Payment reference {{ $payment->reference }}</p>
+                </section>
+            @endif
+
+            @if ($payment?->mode === App\Enums\PaymentMode::HostedCheckout && ($paymentStatus === App\Enums\PaymentStatus::Paid || $paymentStatus === App\Enums\PaymentStatus::Refunded || $refundRequest))
+                <section data-player-refund-card class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <div class="flex flex-wrap items-start justify-between gap-4">
+                        <div><p class="eyebrow">Refund</p><h2 class="mt-1 text-xl font-semibold">Online payment refund</h2></div>
+                        @if ($refundRequest)<span class="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700">{{ $refundRequest->status->label() }}</span>@elseif ($paymentStatus === App\Enums\PaymentStatus::Refunded)<span class="rounded-full bg-court-50 px-3 py-1.5 text-sm font-semibold text-court-800">Refunded</span>@endif
+                    </div>
+
+                    @if (! $refundRequest && $paymentStatus === App\Enums\PaymentStatus::Paid)
+                        <p class="mt-3 text-sm leading-6 text-slate-600">Submit a full refund request for venue review. Your booking remains active unless you cancel it or the venue approves this request.</p>
+                        <form action="{{ route('player.bookings.refunds.store', $booking->reference) }}" method="post" data-requires-online class="mt-5">@csrf<label class="block"><span class="text-sm font-semibold text-slate-800">Why are you requesting a refund?</span><textarea name="reason" rows="3" minlength="5" maxlength="500" required class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="Tell the venue what happened.">{{ old('reason') }}</textarea></label><button data-loading-label="Submitting request…" class="mt-4 min-h-11 rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white">Request full refund</button></form>
+                    @elseif ($refundRequest)
+                        <p class="mt-3 text-sm leading-6 text-slate-600">{{ match ($refundRequest->status) { App\Enums\RefundRequestStatus::Requested => 'The venue is reviewing your request. No refund has been sent yet.', App\Enums\RefundRequestStatus::Processing => 'The venue approved your request and FinACourt sent it to the payment provider.', App\Enums\RefundRequestStatus::Refunded => 'The provider confirmed your full refund. Posting time depends on your original payment method.', App\Enums\RefundRequestStatus::Rejected => 'The venue declined this request. Your payment was not changed.', App\Enums\RefundRequestStatus::Failed => $refundRequest->requires_review ? 'The provider outcome needs platform review before another attempt.' : 'The provider could not process the refund. The venue can retry it.' } }}</p>
+                        <div class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm"><p class="font-semibold text-slate-800">Your reason</p><p class="mt-1 whitespace-pre-line text-slate-600">{{ $refundRequest->reason }}</p>@if ($refundRequest->reviewer_note)<p class="mt-3 font-semibold text-slate-800">Venue response</p><p class="mt-1 whitespace-pre-line text-slate-600">{{ $refundRequest->reviewer_note }}</p>@endif</div>
+                        <p class="mt-4 text-[10px] font-medium text-slate-400">Refund reference {{ $refundRequest->reference }}</p>
+                    @endif
                 </section>
             @endif
 

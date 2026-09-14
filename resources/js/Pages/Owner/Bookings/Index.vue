@@ -1,9 +1,9 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, nextTick, onMounted } from 'vue';
 import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
 
-const props = defineProps({ date: String, timezone: String, bookings: Array, courtBlocks: Array });
+const props = defineProps({ date: String, timezone: String, bookings: Array, refundBookings: Array, courtBlocks: Array });
 const money = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' });
 const summary = computed(() => ({
     total: props.bookings.length,
@@ -12,6 +12,7 @@ const summary = computed(() => ({
     paid: props.bookings.filter((booking) => booking.payment_status_value === 'paid').length,
     value: props.bookings.filter((booking) => booking.status !== 'cancelled' && booking.status !== 'expired').reduce((sum, booking) => sum + Number(booking.total_amount), 0),
 }));
+const refundBookings = computed(() => props.refundBookings || []);
 const schedule = computed(() => {
     const groups = {};
     const add = (entry, kind) => {
@@ -33,7 +34,18 @@ function changeDate(event) { router.get('/owner/bookings', { date: event.target.
 function removeBlock(block) { if (window.confirm(`Reopen ${block.resource} ${block.is_all_day ? 'for the whole day' : `from ${block.start_time} to ${block.end_time}`}?`)) router.delete(`/owner/bookings/blocks/${block.id}`); }
 function cancelBooking(booking) { const reason = window.prompt(`Why is ${booking.reference} being cancelled? (optional)`, ''); if (reason !== null) router.patch(`/owner/bookings/${booking.id}/cancel`, { cancellation_reason: reason || null }); }
 function updatePayment(booking, status) { const labels = { paid: 'mark this payment paid', failed: 'record payment failure', cancelled: 'cancel this payment', refunded: 'record a full manual refund' }; const note = window.prompt(`Add a note to ${labels[status]}${status === 'refunded' ? ' (required)' : ' (optional)'}.`, ''); if (note !== null && (status !== 'refunded' || note.trim())) router.patch(`/owner/bookings/${booking.id}/payment`, { status, note: note || null }); }
+function approveRefund(booking, retry = false) { const note = window.prompt(`${retry ? 'Retry' : 'Approve'} the full ${booking.refund_request.currency} ${booking.refund_request.amount} refund? Add an optional note.`, ''); if (note !== null) router.post(`/owner/refunds/${booking.refund_request.id}/${retry ? 'retry' : 'approve'}`, { note: note || null }); }
+function rejectRefund(booking) { const note = window.prompt('Why is this refund request being declined? A clear response is required.', ''); if (note?.trim()) router.post(`/owner/refunds/${booking.refund_request.id}/reject`, { note: note.trim() }); }
 function statusClass(status) { return { confirmed: 'bg-court-100 text-court-800 border-court-200', hold: 'bg-amber-100 text-amber-800 border-amber-200', cancelled: 'bg-red-50 text-red-700 border-red-100', expired: 'bg-slate-100 text-slate-500 border-slate-200' }[status] || 'bg-slate-100 text-slate-600 border-slate-200'; }
+
+onMounted(async () => {
+    if (!window.location.hash.startsWith('#refund-request-')) return;
+
+    await nextTick();
+    const refundRequest = document.getElementById(window.location.hash.slice(1));
+    refundRequest?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    refundRequest?.focus({ preventScroll: true });
+});
 </script>
 
 <template>
@@ -43,6 +55,16 @@ function statusClass(status) { return { confirmed: 'bg-court-100 text-court-800 
             <div class="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p class="eyebrow">Today</p><h2 class="mt-2 text-3xl font-semibold tracking-[-0.035em] text-slate-950 sm:text-4xl">Bookings</h2><p class="mt-2 text-sm text-slate-500">All times shown in {{ timezone }}.</p></div><div class="flex flex-col gap-2 sm:flex-row"><Link href="/owner/bookings/blocks/create" class="rounded-xl border border-court-700 bg-white px-5 py-3 text-center text-sm font-semibold text-court-800">Block court time</Link><Link href="/owner/bookings/create" class="rounded-xl bg-court-700 px-5 py-3 text-center text-sm font-semibold text-white">+ Create booking</Link></div></div>
 
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"><section class="metric-card"><p class="text-sm text-slate-500">Today’s bookings</p><p class="mt-3 text-3xl font-semibold">{{ summary.total }}</p></section><section class="metric-card"><p class="text-sm text-slate-500">Confirmed</p><p class="mt-3 text-3xl font-semibold text-court-700">{{ summary.confirmed }}</p></section><section class="metric-card"><p class="text-sm text-slate-500">Held for now</p><p class="mt-3 text-3xl font-semibold text-amber-700">{{ summary.holds }}</p></section><section class="metric-card"><p class="text-sm text-slate-500">Paid bookings</p><p class="mt-3 text-3xl font-semibold">{{ summary.paid }}</p></section><section class="metric-card"><p class="text-sm text-slate-500">Value of today’s bookings</p><p class="mt-3 text-3xl font-semibold">{{ money.format(summary.value) }}</p></section></div>
+
+            <section v-if="refundBookings.length" id="refund-requests" class="app-card overflow-hidden">
+                <div class="border-b border-slate-100 px-5 py-5 sm:px-6"><p class="eyebrow">Action required</p><h3 class="mt-1 text-xl font-semibold">Refund requests <span class="text-slate-400">({{ refundBookings.length }})</span></h3><p class="mt-2 text-sm text-slate-500">Review these requests independently of the selected schedule date. Approval releases a future court slot and securely submits a full refund to the original payment provider.</p></div>
+                <div class="divide-y divide-slate-100">
+                    <article v-for="booking in refundBookings" :id="`refund-request-${booking.refund_request.id}`" :key="booking.refund_request.id" tabindex="-1" class="grid scroll-mt-6 gap-4 px-5 py-5 outline-none target:bg-amber-50/60 target:ring-2 target:ring-inset target:ring-amber-300 sm:px-6 lg:grid-cols-[1fr_auto] lg:items-center">
+                        <div><div class="flex flex-wrap items-center gap-2"><h4 class="font-semibold">{{ booking.customer_name }} · {{ booking.reference }}</h4><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">{{ booking.refund_request.status_label }}</span><span v-if="booking.refund_request.requires_review" class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">Platform review required</span></div><p class="mt-1 text-sm text-slate-600">{{ booking.venue }} · {{ booking.resource }} · {{ money.format(Number(booking.refund_request.amount)) }}</p><p class="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700"><strong>Player reason:</strong> {{ booking.refund_request.reason }}</p><p v-if="booking.refund_request.reviewer_note" class="mt-2 text-xs text-slate-500"><strong>Venue note:</strong> {{ booking.refund_request.reviewer_note }}</p><p v-if="booking.refund_request.failure_message" class="mt-2 text-xs text-red-700">{{ booking.refund_request.failure_message }}</p><p class="mt-2 text-[10px] text-slate-400">{{ booking.refund_request.reference }}</p></div>
+                        <div class="flex flex-wrap gap-2 lg:justify-end"><button v-if="booking.refund_request.can_approve" type="button" class="rounded-xl bg-court-700 px-4 py-2.5 text-sm font-semibold text-white" @click="approveRefund(booking)">Approve full refund</button><button v-if="booking.refund_request.can_reject" type="button" class="rounded-xl border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700" @click="rejectRefund(booking)">Decline</button><button v-if="booking.refund_request.can_retry" type="button" class="rounded-xl border border-court-700 px-4 py-2.5 text-sm font-semibold text-court-800" @click="approveRefund(booking, true)">Retry refund</button></div>
+                    </article>
+                </div>
+            </section>
 
             <section class="app-card overflow-hidden"><div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><p class="eyebrow">Court schedule</p><h3 class="mt-1 text-xl font-semibold">{{ date }}</h3></div><label><span class="sr-only">Schedule date</span><input type="date" :value="date" class="rounded-xl border-slate-300 text-sm" @change="changeDate"></label></div>
                 <div v-if="schedule.length" class="overflow-x-auto"><div class="min-w-[48rem]"><div v-for="row in schedule" :key="row.key" class="grid grid-cols-[11rem_1fr] border-b border-slate-100 last:border-0"><div class="border-r border-slate-100 px-5 py-4"><p class="font-semibold text-slate-900">{{ row.resource }}</p><p class="mt-1 text-xs text-slate-400">{{ row.venue }} · {{ row.sport }}</p></div><div class="flex gap-2 overflow-x-auto bg-[linear-gradient(90deg,rgba(241,245,249,.55)_1px,transparent_1px)] bg-[size:12.5%_100%] px-4 py-3"><div v-for="entry in row.entries" :key="`${entry.kind}-${entry.id}`" :class="['min-w-40 rounded-xl border px-3 py-2.5', entry.kind === 'block' ? 'border-slate-300 bg-slate-700 text-white' : statusClass(entry.status)]"><p class="text-xs font-semibold">{{ entry.is_all_day ? 'All day' : `${entry.start_time}–${entry.end_time}` }}</p><p class="mt-1 truncate text-xs">{{ entry.kind === 'block' ? entry.reason : entry.customer_name }}</p></div></div></div></div></div>

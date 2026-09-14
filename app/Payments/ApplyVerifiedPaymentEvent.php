@@ -14,15 +14,18 @@ class ApplyVerifiedPaymentEvent
     public function __construct(private readonly ApplyPaymentTransition $transitions) {}
 
     /** @return 'processed'|'duplicate'|'review' */
-    public function handle(string $provider, VerifiedPaymentEvent $event): string
-    {
+    public function handle(
+        string $provider,
+        VerifiedPaymentEvent $event,
+        string $source = 'provider_webhook',
+    ): string {
         $externalEventId = $provider.':'.$event->eventId;
 
         if ($this->eventExists($externalEventId)) {
             return 'duplicate';
         }
 
-        return DB::transaction(function () use ($provider, $event, $externalEventId): string {
+        return DB::transaction(function () use ($provider, $event, $externalEventId, $source): string {
             $payment = Payment::query()
                 ->where('reference', $event->paymentReference)
                 ->where('provider', $provider)
@@ -48,7 +51,7 @@ class ApplyVerifiedPaymentEvent
                 $payment->transitions()->create([
                     'from_status' => $payment->status,
                     'to_status' => $payment->status,
-                    'source' => 'provider_webhook',
+                    'source' => $source,
                     'external_event_id' => $externalEventId,
                     'note' => $problem,
                     'metadata' => [
@@ -65,17 +68,39 @@ class ApplyVerifiedPaymentEvent
                 $payment->update(['provider_reference' => $event->providerReference]);
             }
 
+            if ($payment->provider_payment_reference === null && $event->providerPaymentReference !== null) {
+                $payment->update(['provider_payment_reference' => $event->providerPaymentReference]);
+            }
+
+            $metadata = [
+                'amount' => $event->amount,
+                'currency' => $event->currency,
+                ...$event->metadata,
+            ];
+
+            // A checkout return and webhook can arrive at the same time with
+            // different event IDs. Record the second verified observation, but
+            // do not repeat confirmation analytics, settlement, or notifications.
+            if ($payment->status === $event->status) {
+                $payment->transitions()->create([
+                    'from_status' => $payment->status,
+                    'to_status' => $payment->status,
+                    'source' => $source,
+                    'external_event_id' => $externalEventId,
+                    'note' => 'Provider status was already applied.',
+                    'metadata' => $metadata,
+                ]);
+
+                return $payment->requires_review ? 'review' : 'duplicate';
+            }
+
             $payment = $this->transitions->handleLocked(
                 $payment,
                 $booking,
                 $event->status,
-                'provider_webhook',
+                $source,
                 externalEventId: $externalEventId,
-                metadata: [
-                    'amount' => $event->amount,
-                    'currency' => $event->currency,
-                    ...$event->metadata,
-                ],
+                metadata: $metadata,
             );
 
             return $payment->requires_review ? 'review' : 'processed';
@@ -93,6 +118,14 @@ class ApplyVerifiedPaymentEvent
     {
         if ($payment->provider_reference !== null && $payment->provider_reference !== $event->providerReference) {
             return 'Provider payment reference does not match the stored checkout reference.';
+        }
+
+        if (
+            $payment->provider_payment_reference !== null
+            && $event->providerPaymentReference !== null
+            && $payment->provider_payment_reference !== $event->providerPaymentReference
+        ) {
+            return 'Provider payment ID does not match the stored payment reference.';
         }
 
         $eventAmount = $this->cents($event->amount);

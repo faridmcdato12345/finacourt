@@ -237,6 +237,107 @@ class PaymentFlowTest extends TestCase
         });
     }
 
+    public function test_paymongo_checkout_return_securely_reconciles_a_paid_session_and_confirms_the_hold(): void
+    {
+        Notification::fake();
+        $this->enablePayMongo();
+        [, $venue, $resource, $owner] = $this->setupInventory();
+        $player = User::factory()->create();
+        $booking = $this->createHold($player, $venue, $resource);
+        $payment = $booking->payment;
+        $checkoutSessionId = 'cs_test_return_paid';
+        $providerPaymentId = 'pay_evt_after_return';
+
+        Http::fake([
+            'https://api.paymongo.test/v2/checkout_sessions' => Http::response([
+                'data' => [
+                    'id' => $checkoutSessionId,
+                    'attributes' => ['checkout_url' => "https://checkout.paymongo.test/{$checkoutSessionId}"],
+                ],
+            ]),
+            "https://api.paymongo.test/v1/checkout_sessions/{$checkoutSessionId}" => Http::response(
+                $this->payMongoCheckoutRetrievalPayload(
+                    $payment,
+                    $checkoutSessionId,
+                    $providerPaymentId,
+                ),
+            ),
+        ]);
+
+        $this->actingAs($player)
+            ->post(route('player.bookings.checkout', $booking->reference))
+            ->assertRedirect("https://checkout.paymongo.test/{$checkoutSessionId}");
+
+        $this->actingAs($player)
+            ->get(route('player.bookings.show', $booking->reference))
+            ->assertOk()
+            ->assertSee('I already paid — check payment status');
+
+        $this->actingAs($player)
+            ->get(route('player.bookings.payment.return', $booking->reference))
+            ->assertRedirect(route('player.bookings.show', $booking->reference))
+            ->assertSessionHas('status', 'Payment verified. Your court reservation is confirmed.');
+
+        $this->assertSame(PaymentStatus::Paid, $payment->refresh()->status);
+        $this->assertSame($providerPaymentId, $payment->provider_payment_reference);
+        $this->assertSame(BookingStatus::Confirmed, $booking->refresh()->status);
+        $this->assertDatabaseHas('payment_transitions', [
+            'payment_id' => $payment->getKey(),
+            'from_status' => PaymentStatus::Pending->value,
+            'to_status' => PaymentStatus::Paid->value,
+            'source' => 'checkout_reconciliation',
+        ]);
+        Http::assertSent(fn ($request): bool => $request->method() === 'GET'
+            && $request->url() === "https://api.paymongo.test/v1/checkout_sessions/{$checkoutSessionId}"
+            && $request->hasHeader('Authorization', 'Basic '.base64_encode('sk_test_fincourt:')));
+        Notification::assertSentToTimes($owner, OwnerBookingConfirmedNotification::class, 1);
+
+        $payload = $this->payMongoCheckoutPayload(
+            $payment,
+            $booking,
+            'evt_after_return',
+            $checkoutSessionId,
+        );
+        $this->postPayMongoWebhook($payload)->assertOk()->assertJsonPath('result', 'duplicate');
+        Notification::assertSentToTimes($owner, OwnerBookingConfirmedNotification::class, 1);
+    }
+
+    public function test_paymongo_checkout_return_keeps_an_unpaid_session_pending(): void
+    {
+        $this->enablePayMongo();
+        [, $venue, $resource] = $this->setupInventory();
+        $player = User::factory()->create();
+        $booking = $this->createHold($player, $venue, $resource);
+        $payment = $booking->payment;
+        $checkoutSessionId = 'cs_test_return_pending';
+
+        Http::fake([
+            'https://api.paymongo.test/v2/checkout_sessions' => Http::response([
+                'data' => [
+                    'id' => $checkoutSessionId,
+                    'attributes' => ['checkout_url' => "https://checkout.paymongo.test/{$checkoutSessionId}"],
+                ],
+            ]),
+            "https://api.paymongo.test/v1/checkout_sessions/{$checkoutSessionId}" => Http::response(
+                $this->payMongoCheckoutRetrievalPayload(
+                    $payment,
+                    $checkoutSessionId,
+                    'pay_pending_checkout',
+                    status: 'pending',
+                ),
+            ),
+        ]);
+
+        $this->actingAs($player)->post(route('player.bookings.checkout', $booking->reference));
+        $this->actingAs($player)
+            ->get(route('player.bookings.payment.return', $booking->reference))
+            ->assertRedirect(route('player.bookings.show', $booking->reference))
+            ->assertSessionHas('status', 'Payment is still pending. If you already paid, wait a moment and check the payment status again.');
+
+        $this->assertSame(PaymentStatus::Pending, $payment->refresh()->status);
+        $this->assertSame(BookingStatus::Hold, $booking->refresh()->status);
+    }
+
     public function test_paymongo_signed_checkout_webhook_marks_paid_and_confirms_hold(): void
     {
         $this->enablePayMongo();
@@ -709,6 +810,42 @@ class PaymentFlowTest extends TestCase
                             ]],
                         ],
                     ],
+                ],
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function payMongoCheckoutRetrievalPayload(
+        Payment $payment,
+        string $checkoutSessionId,
+        string $providerPaymentId,
+        string $status = 'paid',
+        int $amountCentavos = 65000,
+    ): array {
+        return [
+            'data' => [
+                'id' => $checkoutSessionId,
+                'type' => 'checkout_session',
+                'attributes' => [
+                    'livemode' => false,
+                    'reference_number' => $payment->reference,
+                    'metadata' => [
+                        'payment_reference' => $payment->reference,
+                        'expected_amount_centavos' => '65000',
+                    ],
+                    'payments' => [[
+                        'id' => $providerPaymentId,
+                        'type' => 'payment',
+                        'attributes' => [
+                            'amount' => $amountCentavos,
+                            'fee' => 1300,
+                            'net_amount' => $amountCentavos - 1300,
+                            'currency' => 'PHP',
+                            'status' => $status,
+                            'source' => ['type' => 'gcash'],
+                        ],
+                    ]],
                 ],
             ],
         ];

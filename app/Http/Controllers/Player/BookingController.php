@@ -13,12 +13,15 @@ use App\Enums\AcquisitionSource;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentMode;
+use App\Enums\PaymentStatus;
 use App\Enums\PlayerPaymentOption;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePlayerHoldRequest;
 use App\Marketplace\MarketplaceQuery;
 use App\Models\Booking;
 use App\Models\VenueReview;
+use App\Payments\ApplyVerifiedPaymentEvent;
+use App\Payments\Contracts\ReconcilesHostedCheckout;
 use App\Payments\PaymentProviderRegistry;
 use App\Payments\PlatformServiceFeeCalculator;
 use App\Payments\StartHostedCheckout;
@@ -227,6 +230,7 @@ class BookingController extends Controller
                 'resource:id,name,sport_id',
                 'resource.sport:id,name,slug',
                 'payment:payments.id,payments.booking_id,payments.status,payments.requires_review',
+                'payment.refundRequest:id,payment_id,status',
             ])
             ->orderByDesc('start_at')
             ->paginate(12);
@@ -290,13 +294,49 @@ class BookingController extends Controller
         return redirect()->away($session->url);
     }
 
-    public function paymentReturn(Request $request, string $reference): RedirectResponse
-    {
+    public function paymentReturn(
+        Request $request,
+        string $reference,
+        PaymentProviderRegistry $providers,
+        ApplyVerifiedPaymentEvent $applyEvent,
+    ): RedirectResponse {
         $booking = $this->playerBooking($request, $reference);
         Gate::authorize('viewAsPlayer', $booking);
+        $payment = $booking->payment;
+        $result = null;
+
+        if ($payment?->status === PaymentStatus::Pending && $payment->provider_reference !== null) {
+            $provider = $providers->find($payment->provider);
+
+            if ($provider instanceof ReconcilesHostedCheckout) {
+                try {
+                    $event = $provider->retrieveHostedCheckoutPayment($payment);
+
+                    if ($event !== null) {
+                        $result = $applyEvent->handle(
+                            $provider->key(),
+                            $event,
+                            source: 'checkout_reconciliation',
+                        );
+                    }
+                } catch (\Throwable $exception) {
+                    report($exception);
+                }
+            }
+        }
+
+        $booking->refresh();
+        $payment?->refresh();
+
+        $message = match (true) {
+            $payment?->requires_review === true, $result === 'review' => 'Payment was found, but the reservation needs review before the court can be confirmed.',
+            $payment?->status === PaymentStatus::Paid
+                && $booking->effectiveStatus() === BookingStatus::Confirmed => 'Payment verified. Your court reservation is confirmed.',
+            default => 'Payment is still pending. If you already paid, wait a moment and check the payment status again.',
+        };
 
         return redirect()->route('player.bookings.show', $booking->reference)
-            ->with('status', 'Checkout returned. Payment remains pending until a verified provider notification arrives.');
+            ->with('status', $message);
     }
 
     public function cancel(
@@ -389,7 +429,8 @@ class BookingController extends Controller
                 'venue.photos:id,venue_id,storage_path,alt_text,is_primary,sort_order',
                 'resource:id,name,sport_id',
                 'resource.sport:id,name,slug',
-                'payment:payments.id,payments.booking_id,payments.reference,payments.provider,payments.status,payments.mode,payments.amount,payments.venue_amount,payments.platform_service_fee_amount,payments.refunded_amount,payments.currency,payments.requires_review,payments.review_reason,payments.paid_at,payments.refunded_at',
+                'payment:payments.id,payments.booking_id,payments.reference,payments.provider,payments.provider_reference,payments.provider_payment_reference,payments.status,payments.mode,payments.amount,payments.venue_amount,payments.platform_service_fee_amount,payments.refunded_amount,payments.currency,payments.requires_review,payments.review_reason,payments.paid_at,payments.refunded_at',
+                'payment.refundRequest',
                 'review:id,booking_id,rating,body,status,moderation_note,created_at,published_at',
             ])
             ->firstOrFail();
