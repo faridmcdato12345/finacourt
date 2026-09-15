@@ -17,7 +17,7 @@ enum PaymentStatus: string
             self::Paid => 'Paid',
             self::Failed => 'Payment failed',
             self::Cancelled => 'Payment cancelled',
-            self::Refunded => 'Refund recorded',
+            self::Refunded => 'Refunded',
         };
     }
 }

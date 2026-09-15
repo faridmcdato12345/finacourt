@@ -45,6 +45,7 @@ use App\Http\Controllers\Owner\PayoutStatementController as OwnerPayoutStatement
 use App\Http\Controllers\Owner\PromotionController;
 use App\Http\Controllers\Owner\PsgcLocationController;
 use App\Http\Controllers\Owner\ReactivationCampaignController;
+use App\Http\Controllers\Owner\RefundRequestController as OwnerRefundRequestController;
 use App\Http\Controllers\Owner\SettlementController as OwnerSettlementController;
 use App\Http\Controllers\Owner\VenueClaimController;
 use App\Http\Controllers\Owner\VenueController;
@@ -78,6 +79,7 @@ use App\Http\Controllers\Player\BookingController as PlayerBookingController;
 use App\Http\Controllers\Player\MarketingPreferenceController as PlayerMarketingPreferenceController;
 use App\Http\Controllers\Player\NotificationController as PlayerNotificationController;
 use App\Http\Controllers\Player\ReactivationClickController;
+use App\Http\Controllers\Player\RefundRequestController as PlayerRefundRequestController;
 use App\Http\Controllers\Player\VenueReviewController as PlayerVenueReviewController;
 use App\Http\Controllers\Webhooks\PaymentWebhookController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
@@ -257,10 +259,14 @@ Route::prefix('player')->name('player.')->middleware(['auth', 'throttle:authenti
         ->middleware('throttle:player-booking')
         ->name('bookings.checkout');
     Route::get('/bookings/{reference}/payment/return', [PlayerBookingController::class, 'paymentReturn'])
+        ->middleware('throttle:player-booking')
         ->name('bookings.payment.return');
     Route::patch('/bookings/{reference}/cancel', [PlayerBookingController::class, 'cancel'])
         ->middleware('throttle:player-booking')
         ->name('bookings.cancel');
+    Route::post('/bookings/{reference}/refund-request', [PlayerRefundRequestController::class, 'store'])
+        ->middleware('throttle:player-booking')
+        ->name('bookings.refunds.store');
     Route::post('/bookings/{reference}/review', [PlayerVenueReviewController::class, 'store'])
         ->middleware('throttle:6,1')
         ->name('bookings.review.store');
@@ -341,6 +347,15 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
         ->name('bookings.cancel');
     Route::patch('/bookings/{booking}/payment', [PaymentController::class, 'update'])
         ->name('bookings.payment.update');
+    Route::post('/refunds/{refundRequest}/approve', [OwnerRefundRequestController::class, 'approve'])
+        ->whereNumber('refundRequest')
+        ->name('refunds.approve');
+    Route::post('/refunds/{refundRequest}/retry', [OwnerRefundRequestController::class, 'approve'])
+        ->whereNumber('refundRequest')
+        ->name('refunds.retry');
+    Route::post('/refunds/{refundRequest}/reject', [OwnerRefundRequestController::class, 'reject'])
+        ->whereNumber('refundRequest')
+        ->name('refunds.reject');
     Route::get('/earnings', OwnerSettlementController::class)->name('settlements.index');
     Route::put('/earnings/payment-details', [OwnerPayoutProfileController::class, 'update'])
         ->name('settlements.profile.update');

@@ -8,6 +8,8 @@ use App\Payments\Contracts\WebhookPaymentProvider;
 use App\Payments\Exceptions\InvalidWebhookSignature;
 use App\Payments\Exceptions\UnsupportedWebhookEvent;
 use App\Payments\PaymentProviderRegistry;
+use App\Payments\VerifiedRefundEvent;
+use App\Refunds\ApplyVerifiedRefundEvent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +21,7 @@ class PaymentWebhookController extends Controller
         string $provider,
         PaymentProviderRegistry $providers,
         ApplyVerifiedPaymentEvent $applyEvent,
+        ApplyVerifiedRefundEvent $applyRefundEvent,
     ): JsonResponse {
         $adapter = $providers->find($provider);
         abort_unless($adapter instanceof WebhookPaymentProvider, 404);
@@ -38,10 +41,12 @@ class PaymentWebhookController extends Controller
             return response()->json(['result' => 'ignored']);
         }
 
-        $result = $applyEvent->handle($adapter->key(), $event);
+        $result = $event instanceof VerifiedRefundEvent
+            ? $applyRefundEvent->handle($adapter->key(), $event)
+            : $applyEvent->handle($adapter->key(), $event);
 
         if ($result === 'review') {
-            Log::warning('Verified payment webhook requires review.', [
+            Log::warning('Verified payment or refund webhook requires review.', [
                 'provider' => $adapter->key(),
                 'event_id' => $event->eventId,
             ]);

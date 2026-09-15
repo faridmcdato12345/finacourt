@@ -121,6 +121,12 @@ class Booking extends Model
         return $this->hasMany(Payment::class);
     }
 
+    /** @return HasOne<RefundRequest, $this> */
+    public function refundRequest(): HasOne
+    {
+        return $this->hasOne(RefundRequest::class);
+    }
+
     /** @return HasMany<AnalyticsEvent, $this> */
     public function analyticsEvents(): HasMany
     {

@@ -277,8 +277,8 @@ function recordRefund(payment) {
 
             <section class="app-card overflow-hidden">
                 <div class="border-b border-slate-100 px-5 py-5 sm:px-6">
-                    <h2 class="text-xl font-semibold">Recent fee-bearing payments</h2>
-                    <p class="mt-2 text-sm text-slate-500">Useful for checking that player total, court price, and FinACourt fee are separated.</p>
+                    <h2 class="text-xl font-semibold">Recent online payments and refunds</h2>
+                    <p class="mt-2 text-sm text-slate-500">Review provider issues, refund requests, and the separation between court price and FinACourt fee.</p>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="min-w-full text-left text-sm">
@@ -297,6 +297,12 @@ function recordRefund(payment) {
                                 <td class="px-5 py-4 sm:px-6">
                                     <p class="font-semibold text-slate-950">{{ payment.reference }}</p>
                                     <p class="mt-1 text-xs text-slate-400">{{ payment.status }} · {{ payment.created_at }}</p>
+                                    <div v-if="payment.refund_request" class="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                                        <p class="font-semibold text-slate-800">{{ payment.refund_request.status }} · {{ payment.refund_request.reference }}</p>
+                                        <p class="mt-1">{{ payment.refund_request.reason }}</p>
+                                        <p v-if="payment.refund_request.failure_message" class="mt-1 text-red-700">{{ payment.refund_request.failure_message }}</p>
+                                    </div>
+                                    <p v-if="payment.requires_review" class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{{ payment.review_reason }}</p>
                                 </td>
                                 <td class="px-5 py-4">
                                     <p class="font-medium">{{ payment.venue || 'Venue unavailable' }}</p>
@@ -314,7 +320,7 @@ function recordRefund(payment) {
                                 </td>
                             </tr>
                             <tr v-if="!metrics.recent_payments.length">
-                                <td colspan="6" class="px-6 py-10 text-center text-slate-500">No service-fee payments yet.</td>
+                                <td colspan="6" class="px-6 py-10 text-center text-slate-500">No online payments yet.</td>
                             </tr>
                         </tbody>
                     </table>

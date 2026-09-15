@@ -154,11 +154,11 @@ class PaymentSettingsController extends Controller
                 ->with([
                     'booking:id,reference,venue_id,total_amount,platform_service_fee_amount,player_total_amount',
                     'booking.venue:id,name',
+                    'refundRequest:id,payment_id,reference,status,reason,failure_message,requires_review',
                 ])
                 ->where('mode', PaymentMode::HostedCheckout)
-                ->where('platform_service_fee_amount', '>', 0)
                 ->latest('id')
-                ->limit(8)
+                ->limit(20)
                 ->get()
                 ->map(fn (Payment $payment) => [
                     'id' => $payment->getKey(),
@@ -171,6 +171,15 @@ class PaymentSettingsController extends Controller
                     'platform_service_fee_amount' => $payment->platform_service_fee_amount,
                     'currency' => $payment->currency,
                     'created_at' => $payment->created_at?->toDateString(),
+                    'requires_review' => $payment->requires_review,
+                    'review_reason' => $payment->review_reason,
+                    'refund_request' => $payment->refundRequest ? [
+                        'reference' => $payment->refundRequest->reference,
+                        'status' => $payment->refundRequest->status->label(),
+                        'reason' => $payment->refundRequest->reason,
+                        'failure_message' => $payment->refundRequest->failure_message,
+                        'requires_review' => $payment->refundRequest->requires_review,
+                    ] : null,
                     'can_record_external_refund' => $payment->mode === PaymentMode::HostedCheckout
                         && $payment->status === PaymentStatus::Paid,
                 ])->all(),

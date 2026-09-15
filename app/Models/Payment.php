@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'organization_id',
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'refunded_amount',
     'currency',
     'provider_reference',
+    'provider_payment_reference',
     'requires_review',
     'review_reason',
     'paid_at',
@@ -73,6 +75,12 @@ class Payment extends Model
     public function settlementEntries(): HasMany
     {
         return $this->hasMany(OwnerSettlementEntry::class);
+    }
+
+    /** @return HasOne<RefundRequest, $this> */
+    public function refundRequest(): HasOne
+    {
+        return $this->hasOne(RefundRequest::class);
     }
 
     public function effectiveStatus(?Booking $booking = null): PaymentStatus

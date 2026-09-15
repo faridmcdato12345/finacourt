@@ -271,6 +271,18 @@
                 @endforeach
             </ul>
         </div>
+        <article class="app-card mt-8 grid gap-6 p-6 sm:p-8 lg:grid-cols-[1fr_0.9fr] lg:items-center" data-owner-benefit="access-your-earnings-when-you-need-them">
+            <div class="max-w-2xl">
+                <span class="grid size-11 place-items-center rounded-2xl bg-court-50 text-court-700">@include('marketplace.partials.icon', ['name' => 'check-circle', 'class' => 'size-5'])</span>
+                <h3 class="mt-5 text-2xl font-semibold tracking-tight text-slate-950">Access your earnings when you need them.</h3>
+                <p class="mt-3 text-sm leading-6 text-slate-600">Once your booking earnings become available, you can request a payout any day instead of waiting for the next scheduled payout.</p>
+            </div>
+            <ul class="grid gap-3 text-sm font-semibold text-slate-800 sm:grid-cols-3 lg:grid-cols-1">
+                @foreach (['Request available earnings any day', 'See pending and available earnings', 'Track payout request status'] as $item)
+                    <li class="flex items-center gap-3 rounded-2xl bg-court-50 px-4 py-3"><span class="text-court-600">✓</span><span>{{ $item }}</span></li>
+                @endforeach
+            </ul>
+        </article>
     </section>
 
     <section class="border-y border-slate-200 bg-court-50/40 py-16 sm:py-20">
@@ -313,12 +325,13 @@
                 <h2 class="mt-3 text-3xl font-bold tracking-[-0.03em]">Your venue. Your prices. Your decisions.</h2>
                 <p class="mt-4 leading-7 text-court-100/75">FinACourt can point out opportunities, but it does not quietly change the settings that matter to your business.</p>
             </div>
-            <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 @foreach ([
                     ['Your schedule', 'You choose when each court can be booked.'],
                     ['Your regular prices', 'Players cannot replace server-checked prices from their browser.'],
                     ['Your deals', 'You choose the court, time, and discount before publishing.'],
                     ['Your customer messages', 'You review and send; consent and cooling-off rules still apply.'],
+                    ['Your earnings', 'See what is pending and available, and request available earnings when you need them.'],
                 ] as [$title, $description])
                     <div class="rounded-2xl border border-white/10 bg-white/5 p-5"><p class="font-semibold">{{ $title }}</p><p class="mt-2 text-sm leading-6 text-court-100/65">{{ $description }}</p></div>
                 @endforeach

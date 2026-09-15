@@ -42,12 +42,22 @@ class OwnerAcquisitionLandingTest extends TestCase
             ->assertSee('Bring past players back')
             ->assertSee('Turn Google searches into booking opportunities')
             ->assertSee('Everything you need to manage court bookings')
+            ->assertSee('Access your earnings when you need them.')
+            ->assertSee('Once your booking earnings become available, you can request a payout any day instead of waiting for the next scheduled payout.')
+            ->assertSee('Request available earnings any day')
+            ->assertSee('See pending and available earnings')
+            ->assertSee('Track payout request status')
             ->assertSee('Built for sports venues in the Philippines')
             ->assertSee('Add another way for players to find you')
             ->assertSee('You do not have to set up everything alone')
             ->assertSee('Your venue. Your prices. Your decisions.')
+            ->assertSee('Your earnings')
+            ->assertSee('See what is pending and available, and request available earnings when you need them.')
             ->assertSee('Frequently asked questions')
             ->assertSee('What is court booking software?')
+            ->assertSee('When can I receive my court earnings?')
+            ->assertSee('request a payout any day')
+            ->assertSee('requesting a payout does not guarantee immediate or same-day receipt')
             ->assertSee('FinACourt does not create, edit, verify, publish, or rank your Google listing.')
             ->assertSee('FinACourt does not currently synchronize another provider’s calendar automatically.')
             ->assertSee('Product preview — your account shows real venue activity, not sample results.')
@@ -78,6 +88,9 @@ class OwnerAcquisitionLandingTest extends TestCase
             ->assertDontSee('guaranteed more bookings')
             ->assertDontSee('guaranteed Google rankings')
             ->assertDontSee('best court booking software')
+            ->assertDontSee('instant payout', false)
+            ->assertDontSee('instant withdrawal', false)
+            ->assertDontSee('daily automatic payouts', false)
             ->assertSee('application/ld+json', false);
 
         $this->get(route('marketplace.pricing'))
@@ -119,9 +132,9 @@ class OwnerAcquisitionLandingTest extends TestCase
             ->assertSee('<meta name="twitter:image" content="'.$image.'">', false);
 
         $this->assertSame(1, substr_count($content, '<h1'));
-        $this->assertSame(9, substr_count($content, '<details class="p-5'));
-        $this->assertSame(9, substr_count($content, 'data-details-question'));
-        $this->assertSame(9, substr_count($content, 'data-details-icon'));
+        $this->assertSame(10, substr_count($content, '<details class="p-5'));
+        $this->assertSame(10, substr_count($content, 'data-details-question'));
+        $this->assertSame(10, substr_count($content, 'data-details-icon'));
         $this->assertDoesNotMatchRegularExpression('/<meta[^>]+noindex/i', $content);
 
         $styles = file_get_contents(resource_path('css/app.css'));
@@ -153,12 +166,16 @@ class OwnerAcquisitionLandingTest extends TestCase
         $this->assertArrayNotHasKey('offers', $software);
 
         $faq = $schemas->firstWhere('@type', 'FAQPage');
-        $this->assertCount(9, $faq['mainEntity']);
+        $this->assertCount(10, $faq['mainEntity']);
         $this->assertSame('What is court booking software?', $faq['mainEntity'][0]['name']);
         $this->assertStringContainsString(
             'FinACourt adds marketplace discovery',
             $faq['mainEntity'][0]['acceptedAnswer']['text'],
         );
+        $payoutFaq = collect($faq['mainEntity'])->firstWhere('name', 'When can I receive my court earnings?');
+        $this->assertNotNull($payoutFaq);
+        $this->assertStringContainsString('request a payout any day', $payoutFaq['acceptedAnswer']['text']);
+        $this->assertStringContainsString('24-hour clearing period', $payoutFaq['acceptedAnswer']['text']);
     }
 
     public function test_owner_landing_destinations_remain_available(): void
