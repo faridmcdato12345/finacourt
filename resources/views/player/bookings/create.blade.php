@@ -31,7 +31,29 @@
                 <div class="rounded-2xl border border-red-200 bg-red-50 p-5"><h2 class="font-semibold text-red-900">This time cannot be held</h2><p class="mt-2 text-sm leading-6 text-red-700">{{ $availabilityError }}</p><a href="{{ route('marketplace.venues.show', $venue->slug) }}#availability" class="mt-4 inline-block font-semibold text-red-800">Choose another time →</a></div>
             @else
                 @guest
-                    <div class="app-card p-5 sm:p-6"><span class="grid size-11 place-items-center rounded-2xl bg-court-50 text-court-700"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0" /></svg></span><h2 class="mt-4 text-xl font-semibold">Sign in only when you’re ready</h2><p class="mt-2 text-sm leading-6 text-slate-600">Browsing stays public. An account keeps the reservation and private contact details visible only to you.</p><div class="mt-5 grid gap-3 sm:grid-cols-2"><a href="{{ route('player.login', ['return' => $returnUrl]) }}" class="rounded-xl bg-court-700 px-5 py-3 text-center font-semibold text-white">Sign in</a><a href="{{ route('player.register', ['return' => $returnUrl]) }}" class="rounded-xl border border-court-300 bg-white px-5 py-3 text-center font-semibold text-court-800">Create player account</a></div></div>
+                    <form action="{{ route('player.guest-access.store', $venue->slug) }}" method="post" class="app-card p-5 sm:p-6">
+                        @csrf
+                        <input type="hidden" name="resource" value="{{ $resource->id }}">
+                        <input type="hidden" name="date" value="{{ $date }}">
+                        <input type="hidden" name="start" value="{{ $startTime }}">
+                        <input type="hidden" name="duration" value="{{ $duration }}">
+                        @if ($campaign)<input type="hidden" name="campaign" value="{{ $campaign }}">@endif
+
+                        <span class="grid size-11 place-items-center rounded-2xl bg-court-50 text-court-700"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0" /></svg></span>
+                        <p class="mt-4 eyebrow">No password required</p>
+                        <h2 class="mt-2 text-xl font-semibold">Continue with a secure email link</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-600">We’ll create your player account and email a one-time link. Your bookings, cancellations, payment updates, and eligible refunds will stay available through the same email.</p>
+
+                        @if ($errors->any())<div class="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ $errors->first() }}</div>@endif
+                        <div class="mt-6 grid gap-5 sm:grid-cols-2">
+                            <label class="block"><span class="text-sm font-medium">Name</span><input name="name" value="{{ old('name') }}" autocomplete="name" required autofocus class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label>
+                            <label class="block"><span class="text-sm font-medium">Email</span><input name="email" type="email" value="{{ old('email') }}" autocomplete="email" required class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label>
+                        </div>
+                        <label class="mt-5 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><input name="account_terms" type="checkbox" value="1" required class="mt-1 rounded border-slate-300"><span>I agree to the <a href="{{ route('marketplace.terms', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</span></label>
+                        <button data-loading-label="Sending secure link…" class="mt-6 min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Email me a secure link</button>
+                        <p class="mt-4 text-center text-xs leading-5 text-slate-500">The link expires in {{ config('auth.passwordless.expire') }} minutes. This court is not held until you return and submit the reservation.</p>
+                        <div class="mt-5 border-t border-slate-100 pt-5 text-center text-sm text-slate-500">Already have an account? <a href="{{ route('player.login', ['return' => $returnUrl]) }}" class="font-semibold text-court-700">Sign in</a></div>
+                    </form>
                 @else
                     <form action="{{ route('player.bookings.store', $venue->slug) }}" method="post" data-requires-online class="app-card p-5 sm:p-6">
                         @csrf

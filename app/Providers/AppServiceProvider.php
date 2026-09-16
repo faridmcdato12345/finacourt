@@ -115,6 +115,16 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(5)->by($email.'|'.$request->ip());
         });
+        RateLimiter::for('passwordless-login', function (Request $request) {
+            $email = strtolower((string) $request->input('email'));
+
+            return [
+                Limit::perMinute(10)->by('passwordless-ip|'.$request->ip()),
+                Limit::perMinute(3)->by('passwordless-email|'.$email.'|'.$request->ip()),
+            ];
+        });
+        RateLimiter::for('passwordless-consume', fn (Request $request) => Limit::perMinute(10)
+            ->by($request->ip()));
         RateLimiter::for('social-login', fn (Request $request) => Limit::perMinute(20)
             ->by($request->ip()));
         RateLimiter::for('google-business-profile', fn (Request $request) => Limit::perHour(12)

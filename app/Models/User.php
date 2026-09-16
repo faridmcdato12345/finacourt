@@ -40,6 +40,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Booking::class, 'player_user_id');
     }
 
+    /** @return HasMany<PasswordlessLoginToken, $this> */
+    public function passwordlessLoginTokens(): HasMany
+    {
+        return $this->hasMany(PasswordlessLoginToken::class);
+    }
+
     /** @return HasMany<VenueReview, $this> */
     public function venueReviews(): HasMany
     {
