@@ -14,7 +14,18 @@
             @error('social')<p role="alert" class="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ $message }}</p>@enderror
             @include('player.auth.social-buttons')
 
-            <form action="{{ route('player.login') }}" method="post" class="{{ ($socialProviders ?? []) === [] ? 'mt-7 ' : '' }}space-y-5">
+            <form action="{{ route('player.magic-login.request') }}" method="post" class="{{ ($socialProviders ?? []) === [] ? 'mt-7 ' : '' }}space-y-4 rounded-2xl bg-court-50 p-5">
+                @csrf
+                @if (request()->query('return'))<input type="hidden" name="return" value="{{ request()->query('return') }}">@endif
+                <div><p class="font-semibold text-slate-950">Sign in without a password</p><p class="mt-1 text-sm leading-6 text-slate-600">We’ll email a short-lived, one-time link to your existing account.</p></div>
+                <label class="block"><span class="text-sm font-medium">Email</span><input name="email" type="email" value="{{ old('email') }}" autocomplete="email" required class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3"></label>
+                @error('email', 'magicLink')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
+                <button class="w-full rounded-xl border border-court-300 bg-white px-5 py-3 font-semibold text-court-800 hover:bg-court-100">Email me a secure link</button>
+            </form>
+
+            <div class="my-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-slate-400"><span class="h-px flex-1 bg-slate-200"></span>or use your password<span class="h-px flex-1 bg-slate-200"></span></div>
+
+            <form action="{{ route('player.login') }}" method="post" class="space-y-5">
                 @csrf
                 <label class="block"><span class="text-sm font-medium">Email</span><input name="email" type="email" value="{{ old('email') }}" autocomplete="email" required autofocus class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"></label>
                 @error('email')<p class="text-sm text-red-600">{{ $message }}</p>@enderror

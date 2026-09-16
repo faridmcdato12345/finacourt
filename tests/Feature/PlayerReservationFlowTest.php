@@ -11,11 +11,14 @@ use App\Models\Booking;
 use App\Models\CourtResource;
 use App\Models\OperatingHour;
 use App\Models\Organization;
+use App\Models\PasswordlessLoginToken;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
 use App\Models\VenuePhoto;
+use App\Notifications\PlayerMagicLoginNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
@@ -51,7 +54,8 @@ class PlayerReservationFlowTest extends TestCase
             ->assertSee('/storage/'.$coverPhoto->storage_path, false)
             ->assertSee('Players on the featured court')
             ->assertDontSee('Venue photo placeholder for '.$venue->name)
-            ->assertSee('Sign in only when you’re ready')
+            ->assertSee('Continue with a secure email link')
+            ->assertSee('name="email"', false)
             ->assertSee('₱650.00')
             ->assertDontSee('name="customer_name"', false);
     }
@@ -63,6 +67,102 @@ class PlayerReservationFlowTest extends TestCase
         $this->post(route('player.bookings.store', $venue->slug), $this->holdData($resource))
             ->assertRedirect(route('player.login'));
         $this->assertDatabaseCount('bookings', 0);
+    }
+
+    public function test_guest_can_create_a_passwordless_account_and_return_to_the_reservation(): void
+    {
+        Notification::fake();
+        [, $venue, $resource] = $this->setupInventory();
+        $date = $this->futureDate();
+        $reviewPath = $this->reviewUrl($venue, $resource, $date, false);
+
+        $this->post(route('player.guest-access.store', $venue->slug), [
+            'name' => 'Guest Player',
+            'email' => 'GUEST@example.com',
+            'resource' => $resource->getKey(),
+            'date' => $date,
+            'start' => '09:00',
+            'duration' => 60,
+            'account_terms' => '1',
+        ])->assertRedirect($reviewPath)
+            ->assertSessionHas('status');
+
+        $player = User::query()->where('email', 'guest@example.com')->firstOrFail();
+        $this->assertNull($player->email_verified_at);
+        $this->assertDatabaseHas('passwordless_login_tokens', [
+            'user_id' => $player->getKey(),
+            'consumed_at' => null,
+        ]);
+
+        $magicUrl = null;
+        Notification::assertSentTo(
+            $player,
+            PlayerMagicLoginNotification::class,
+            function (PlayerMagicLoginNotification $notification) use (&$magicUrl): bool {
+                $magicUrl = $notification->url;
+
+                return $notification->expiresInMinutes === 15;
+            },
+        );
+
+        $this->assertIsString($magicUrl);
+        $this->get($magicUrl)
+            ->assertRedirect($reviewPath)
+            ->assertSessionHas('status', 'Email verified. You are securely signed in.');
+
+        $player->refresh();
+        $this->assertAuthenticatedAs($player);
+        $this->assertNotNull($player->email_verified_at);
+        $this->assertNotNull(PasswordlessLoginToken::query()->firstOrFail()->consumed_at);
+
+        $this->post(route('player.bookings.store', $venue->slug), $this->holdData($resource))
+            ->assertRedirect();
+        $this->assertDatabaseHas('bookings', ['player_user_id' => $player->getKey()]);
+
+        $this->post(route('logout'));
+        $this->get($magicUrl)
+            ->assertRedirect(route('player.login'))
+            ->assertSessionHas('status');
+        $this->assertGuest();
+    }
+
+    public function test_passwordless_player_can_request_a_new_link_to_recover_booking_access_later(): void
+    {
+        Notification::fake();
+        $player = User::factory()->create(['email' => 'returning-player@example.com']);
+
+        $this->post(route('player.magic-login.request'), [
+            'email' => $player->email,
+            'return' => route('player.bookings.index', [], false),
+        ])->assertRedirect()
+            ->assertSessionHas('status');
+
+        $magicUrl = null;
+        Notification::assertSentTo(
+            $player,
+            PlayerMagicLoginNotification::class,
+            function (PlayerMagicLoginNotification $notification) use (&$magicUrl): bool {
+                $magicUrl = $notification->url;
+
+                return true;
+            },
+        );
+
+        $this->get($magicUrl)->assertRedirect(route('player.bookings.index', [], false));
+        $this->assertAuthenticatedAs($player);
+    }
+
+    public function test_passwordless_login_does_not_reveal_or_create_unknown_accounts(): void
+    {
+        Notification::fake();
+
+        $this->post(route('player.magic-login.request'), [
+            'email' => 'missing@example.com',
+        ])->assertRedirect()
+            ->assertSessionHas('status');
+
+        $this->assertDatabaseMissing('users', ['email' => 'missing@example.com']);
+        Notification::assertNothingSent();
     }
 
     public function test_player_can_register_and_login_during_the_booking_flow(): void

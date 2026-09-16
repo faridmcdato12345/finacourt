@@ -74,6 +74,7 @@ use App\Http\Controllers\Platform\VenueApplicationController as PlatformVenueApp
 use App\Http\Controllers\Platform\VenueDirectoryController as PlatformVenueDirectoryController;
 use App\Http\Controllers\Platform\VenueReviewController as PlatformVenueReviewController;
 use App\Http\Controllers\Player\Auth\AuthenticatedSessionController as PlayerAuthenticatedSessionController;
+use App\Http\Controllers\Player\Auth\PasswordlessLoginController;
 use App\Http\Controllers\Player\Auth\RegisteredUserController as PlayerRegisteredUserController;
 use App\Http\Controllers\Player\BookingController as PlayerBookingController;
 use App\Http\Controllers\Player\MarketingPreferenceController as PlayerMarketingPreferenceController;
@@ -136,6 +137,9 @@ Route::get('/go/{visibilityLink:token}', MarketplaceVisibilityLinkController::cl
 Route::get('/venues/{venueSlug}/reserve', [PlayerBookingController::class, 'create'])
     ->middleware('throttle:marketplace')
     ->name('player.bookings.create');
+Route::get('/player/magic-login/{token}', [PasswordlessLoginController::class, 'consume'])
+    ->middleware(['signed', 'throttle:passwordless-consume'])
+    ->name('player.magic-login.consume');
 Route::get('/booking/{reference}', [PlayerBookingController::class, 'share'])
     ->middleware(['signed', 'throttle:marketplace'])
     ->name('bookings.share');
@@ -154,6 +158,12 @@ Route::middleware('guest')->group(function () {
         ->name('player.login');
     Route::post('/player/login', [PlayerAuthenticatedSessionController::class, 'store'])
         ->middleware('throttle:login');
+    Route::post('/player/magic-login', [PasswordlessLoginController::class, 'requestForLogin'])
+        ->middleware('throttle:passwordless-login')
+        ->name('player.magic-login.request');
+    Route::post('/venues/{venueSlug}/guest-access', [PasswordlessLoginController::class, 'requestForReservation'])
+        ->middleware('throttle:passwordless-login')
+        ->name('player.guest-access.store');
     Route::get('/player/register', [PlayerRegisteredUserController::class, 'create'])
         ->name('player.register');
     Route::post('/player/register', [PlayerRegisteredUserController::class, 'store'])
