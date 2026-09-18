@@ -1,5 +1,6 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { computed, watch } from 'vue';
 import AppSelect from '../../../Components/AppSelect.vue';
 import FormError from '../../../Components/FormError.vue';
 import OwnerLayout from '../../../Layouts/OwnerLayout.vue';
@@ -29,6 +30,30 @@ const form = useForm({
     repeat: 'none',
     repeat_until: repeatUntil.toISOString().slice(0, 10),
 });
+const emergencyClosureHref = computed(() => {
+    const parameters = new URLSearchParams({
+        resource_id: String(form.resource_id),
+        block_date: form.block_date,
+        is_all_day: form.is_all_day ? '1' : '0',
+        reason: form.reason,
+    });
+
+    if (!form.is_all_day) {
+        parameters.set('start_time', form.start_time);
+        parameters.set('end_time', form.end_time);
+    }
+
+    return `/owner/court-closures/create?${parameters.toString()}`;
+});
+
+watch(
+    () => [form.resource_id, form.block_date, form.is_all_day, form.start_time, form.end_time, form.repeat, form.repeat_until],
+    () => {
+        if (form.errors.booking_conflict) {
+            form.clearErrors('booking_conflict', 'start_time');
+        }
+    },
+);
 
 function useReason(reason) {
     form.reason = reason;
@@ -56,6 +81,15 @@ function submit() {
 
             <form v-else class="mt-8 grid gap-6 lg:grid-cols-[1fr_20rem]" @submit.prevent="submit">
                 <div class="space-y-6">
+                    <section v-if="form.errors.booking_conflict" role="alert" class="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-950 shadow-sm">
+                        <p class="text-xs font-semibold uppercase tracking-wider text-red-700">Active booking found</p>
+                        <h3 class="mt-2 text-lg font-semibold">Use an Emergency closure for this period</h3>
+                        <p class="mt-2 text-sm leading-6 text-red-800">{{ form.errors.booking_conflict }}</p>
+                        <Link :href="emergencyClosureHref" class="mt-4 inline-flex rounded-xl bg-red-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-800">
+                            Go to Emergency closure →
+                        </Link>
+                    </section>
+
                     <section class="app-card p-6 sm:p-7">
                         <h3 class="text-lg font-semibold text-slate-950">Court and time</h3>
                         <p class="mt-1 text-sm text-slate-500">Choose exactly where and when bookings should be disabled.</p>

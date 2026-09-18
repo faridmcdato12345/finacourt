@@ -44,6 +44,7 @@ class BookingController extends Controller
                 'createdBy:id,name',
                 'payment:payments.id,payments.booking_id,payments.reference,payments.status,payments.mode,payments.amount,payments.venue_amount,payments.platform_service_fee_amount,payments.currency,payments.requires_review,payments.review_reason',
                 'payment.refundRequest',
+                'payment.refundRequest.courtClosure:id,reference',
             ])
             ->where('start_at', '>=', $localStart->utc())
             ->where('start_at', '<', $localEnd->utc())
@@ -59,8 +60,9 @@ class BookingController extends Controller
                 'createdBy:id,name',
                 'payment:payments.id,payments.booking_id,payments.reference,payments.status,payments.mode,payments.amount,payments.venue_amount,payments.platform_service_fee_amount,payments.currency,payments.requires_review,payments.review_reason',
                 'payment.refundRequest',
+                'payment.refundRequest.courtClosure:id,reference',
             ])
-            ->whereHas('payment.refundRequest')
+            ->whereHas('payment.refundRequest', fn ($query) => $query->whereNull('court_closure_id'))
             ->orderByDesc(RefundRequest::query()
                 ->select('requested_at')
                 ->whereColumn('refund_requests.booking_id', 'bookings.id')
@@ -76,9 +78,12 @@ class BookingController extends Controller
                 'resource:id,name,sport_id',
                 'resource.sport:id,name',
                 'createdBy:id,name',
+                'closure:id,reference',
             ])
             ->where('starts_at', '<', $localEnd->utc())
-            ->where('ends_at', '>', $localStart->utc())
+            ->where(fn ($query) => $query
+                ->whereNull('ends_at')
+                ->orWhere('ends_at', '>', $localStart->utc()))
             ->orderBy('starts_at')
             ->get()
             ->map(fn (CourtAvailabilityBlock $block) => $this->courtBlockPayload($block));
@@ -215,10 +220,14 @@ class BookingController extends Controller
                 'reviewer_note' => $booking->payment->refundRequest->reviewer_note,
                 'failure_message' => $booking->payment->refundRequest->failure_message,
                 'requires_review' => $booking->payment->refundRequest->requires_review,
-                'can_approve' => $booking->payment->refundRequest->status === RefundRequestStatus::Requested,
+                'court_closure_reference' => $booking->payment->refundRequest->courtClosure?->reference,
+                'can_approve' => $booking->payment->refundRequest->court_closure_id === null
+                    && $booking->payment->refundRequest->status === RefundRequestStatus::Requested,
                 'can_retry' => $booking->payment->refundRequest->status === RefundRequestStatus::Failed
+                    && $booking->payment->refundRequest->court_closure_id === null
                     && ! $booking->payment->refundRequest->requires_review,
-                'can_reject' => $booking->payment->refundRequest->status === RefundRequestStatus::Requested,
+                'can_reject' => $booking->payment->refundRequest->court_closure_id === null
+                    && $booking->payment->refundRequest->status === RefundRequestStatus::Requested,
             ] : null,
             'can_mark_paid' => $booking->payment_mode === PaymentMode::PayAtVenue && in_array($booking->payment_status, [
                 PaymentStatus::Pending,
@@ -238,7 +247,7 @@ class BookingController extends Controller
     private function courtBlockPayload(CourtAvailabilityBlock $block): array
     {
         $start = $block->starts_at->setTimezone($block->timezone);
-        $end = $block->ends_at->setTimezone($block->timezone);
+        $end = $block->ends_at?->setTimezone($block->timezone);
 
         return [
             'id' => $block->getKey(),
@@ -246,12 +255,15 @@ class BookingController extends Controller
             'resource' => $block->resource->name,
             'sport' => $block->resource->sport->name,
             'start_time' => $block->is_all_day ? 'All day' : $start->format('H:i'),
-            'end_time' => $block->is_all_day ? null : $end->format('H:i'),
+            'end_time' => $block->is_all_day || $end === null ? null : $end->format('H:i'),
             'is_all_day' => $block->is_all_day,
             'reason' => $block->reason,
             'is_recurring' => $block->series_token !== null,
             'created_by' => $block->createdBy?->name,
-            'can_remove' => $block->ends_at->isFuture(),
+            'is_emergency_closure' => $block->court_closure_id !== null,
+            'closure_reference' => $block->closure?->reference,
+            'can_remove' => $block->court_closure_id === null
+                && ($block->ends_at === null || $block->ends_at->isFuture()),
         ];
     }
 }

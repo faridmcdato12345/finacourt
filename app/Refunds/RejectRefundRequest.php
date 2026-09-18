@@ -21,6 +21,12 @@ class RejectRefundRequest
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            if ($refundRequest->court_closure_id !== null) {
+                throw ValidationException::withMessages([
+                    'refund' => 'A refund caused by an emergency closure cannot be declined. The platform must process or reconcile it.',
+                ]);
+            }
+
             if ($refundRequest->status !== RefundRequestStatus::Requested) {
                 throw ValidationException::withMessages([
                     'refund' => 'Only a pending refund request can be declined.',

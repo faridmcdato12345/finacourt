@@ -13,6 +13,7 @@ use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class CourtAvailabilityBlockTest extends TestCase
@@ -90,10 +91,29 @@ class CourtAvailabilityBlockTest extends TestCase
 
         $this->actingAs($owner)
             ->post(route('owner.booking-blocks.store'), $this->blockData($resource))
-            ->assertSessionHasErrors('start_time');
+            ->assertSessionHasErrors(['start_time', 'booking_conflict']);
 
         $this->assertDatabaseCount('court_availability_blocks', 0);
         $this->assertSame(BookingStatus::Confirmed, Booking::query()->firstOrFail()->status);
+
+        $this->actingAs($owner)
+            ->get(route('owner.court-closures.create', [
+                'resource_id' => $resource->getKey(),
+                'block_date' => $this->futureDate(),
+                'is_all_day' => false,
+                'start_time' => '09:00',
+                'end_time' => '10:00',
+                'reason' => 'Court resurfacing',
+            ]))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Owner/CourtClosures/Create')
+                ->where('formValues.scope', 'court')
+                ->where('formValues.resource_id', $resource->getKey())
+                ->where('formValues.starts_at', $this->futureDate().'T09:00')
+                ->where('formValues.until_reopened', false)
+                ->where('formValues.ends_at', $this->futureDate().'T10:00')
+                ->where('formValues.reason', 'Court resurfacing'));
     }
 
     public function test_all_day_block_disables_every_open_slot_and_can_be_reopened(): void

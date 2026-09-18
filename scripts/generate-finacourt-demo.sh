@@ -16,14 +16,25 @@ case "${variant}" in
         scenes=(intro discovery venue booking owner analytics links outro)
         scene_durations=(4.5 7.5 7.0 8.9 6.7 6.7 8.5 4.8)
         final_filename="finacourt-demo.mp4"
+        minimum_duration=45
+        maximum_duration=60.5
         ;;
     owner)
         scenes=(owner-intro owner-dashboard owner-bookings owner-analytics owner-links owner-promotions owner-visibility owner-outro)
         scene_durations=(4.0 7.0 7.0 8.0 10.0 7.0 6.0 5.0)
         final_filename="finacourt-owner-demo.mp4"
+        minimum_duration=45
+        maximum_duration=60.5
+        ;;
+    owner-earnings)
+        scenes=(owner-earnings)
+        scene_durations=(6.5)
+        final_filename="finacourt-owner-earnings-demo.mp4"
+        minimum_duration=5.5
+        maximum_duration=7.5
         ;;
     *)
-        echo "Unknown DEMO_VIDEO_VARIANT: ${variant}. Use standard or owner." >&2
+        echo "Unknown DEMO_VIDEO_VARIANT: ${variant}. Use standard, owner, or owner-earnings." >&2
         exit 1
         ;;
 esac
@@ -261,8 +272,8 @@ else
     exit 1
 fi
 
-if ! awk -v duration="${duration}" 'BEGIN { exit !(duration >= 45 && duration <= 60.5) }'; then
-    echo "Final duration ${duration}s is outside the required 45–60 second range." >&2
+if ! awk -v duration="${duration}" -v minimum="${minimum_duration}" -v maximum="${maximum_duration}" 'BEGIN { exit !(duration >= minimum && duration <= maximum) }'; then
+    echo "Final duration ${duration}s is outside the required ${minimum_duration}–${maximum_duration} second range." >&2
     exit 1
 fi
 

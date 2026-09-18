@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'organization_id',
+    'court_closure_id',
     'booking_id',
     'payment_id',
     'reference',
@@ -39,6 +40,12 @@ class RefundRequest extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /** @return BelongsTo<CourtClosure, $this> */
+    public function courtClosure(): BelongsTo
+    {
+        return $this->belongsTo(CourtClosure::class);
     }
 
     /** @return BelongsTo<Booking, $this> */

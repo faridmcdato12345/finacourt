@@ -106,6 +106,10 @@ class ApproveRefundRequest
             $payment = Payment::query()->whereKey($initial->payment_id)->lockForUpdate()->firstOrFail();
             $refundRequest = RefundRequest::query()->whereKey($refundRequestId)->lockForUpdate()->firstOrFail();
 
+            if ($refundRequest->court_closure_id !== null && ! $actor->is_platform_admin) {
+                abort(403, 'Emergency closure refunds require platform approval.');
+            }
+
             if (in_array($refundRequest->status, [RefundRequestStatus::Processing, RefundRequestStatus::Refunded], true)) {
                 return ['refundRequest' => $refundRequest, 'shouldSubmit' => false];
             }

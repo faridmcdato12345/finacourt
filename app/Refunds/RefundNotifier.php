@@ -48,7 +48,9 @@ class RefundNotifier
         [$title, $message] = match ($refundRequest->status) {
             RefundRequestStatus::Requested => [
                 'Refund request submitted',
-                'The venue will review your full refund request before any money is returned.',
+                $refundRequest->court_closure_id !== null
+                    ? 'Your booking was cancelled by an emergency closure. FinACourt will review the automatic full refund batch.'
+                    : 'The venue will review your full refund request before any money is returned.',
             ],
             RefundRequestStatus::Processing => [
                 'Refund approved and processing',
@@ -66,7 +68,9 @@ class RefundNotifier
                 'Refund needs attention',
                 $refundRequest->requires_review
                     ? 'The automatic refund could not be confirmed. FinACourt support must reconcile it before another attempt.'
-                    : 'The payment provider could not process the refund. The venue can review and retry it.',
+                    : ($refundRequest->court_closure_id !== null
+                        ? 'The payment provider could not process the refund. FinACourt will review and retry it.'
+                        : 'The payment provider could not process the refund. The venue can review and retry it.'),
             ],
         };
 

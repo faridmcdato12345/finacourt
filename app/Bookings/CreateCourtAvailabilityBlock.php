@@ -127,11 +127,12 @@ class CreateCourtAvailabilityBlock
                 if ($bookingConflict) {
                     throw ValidationException::withMessages([
                         'start_time' => "The block on {$window['date']} overlaps an active reservation or hold. Cancel or move that booking first.",
+                        'booking_conflict' => 'This court has active bookings during the selected period. A normal block cannot cancel or refund them. Use Emergency closure to notify players and start the refund process.',
                     ]);
                 }
 
                 $existingBlock = $existingBlocks->first(fn (CourtAvailabilityBlock $block) => $block->starts_at->lessThan($window['utc_end'])
-                    && $block->ends_at->greaterThan($window['utc_start']));
+                    && ($block->ends_at === null || $block->ends_at->greaterThan($window['utc_start'])));
 
                 if ($existingBlock) {
                     throw ValidationException::withMessages([

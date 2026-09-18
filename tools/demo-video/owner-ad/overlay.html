@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=1080, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; }
+        html, body { width: 1080px; height: 1920px; margin: 0; overflow: hidden; }
+        body {
+            position: relative;
+            color: #fff;
+            background: transparent;
+            font-family: Arial, Helvetica, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .center-axis {
+            position: absolute;
+            left: 50%;
+            width: 940px;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+        .logo {
+            display: block;
+            margin-inline: auto;
+            border-radius: 28%;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, .28);
+        }
+        .eyebrow {
+            color: #87efbe;
+            font-size: 32px;
+            font-weight: 800;
+            letter-spacing: .18em;
+            text-transform: uppercase;
+        }
+
+        /* The hook is transparent over a blurred, darkened real UI frame. */
+        .scene-hook .hook-content { top: 210px; }
+        .scene-hook .logo { width: 132px; height: 132px; }
+        .scene-hook .brand {
+            margin-top: 26px;
+            font-size: 38px;
+            font-weight: 800;
+            letter-spacing: .08em;
+        }
+        .scene-hook .eyebrow { margin-top: 105px; }
+        .scene-hook h1 {
+            max-width: 930px;
+            margin: 30px auto 0;
+            font-size: 82px;
+            line-height: 1.04;
+            letter-spacing: -.045em;
+            text-wrap: balance;
+            text-shadow: 0 8px 30px rgba(0, 0, 0, .45);
+        }
+        .scene-hook .hook-note {
+            display: inline-block;
+            margin-top: 58px;
+            padding: 20px 34px;
+            border: 1px solid rgba(255, 255, 255, .2);
+            border-radius: 999px;
+            color: #d5eee4;
+            background: rgba(3, 39, 31, .75);
+            font-size: 34px;
+            font-weight: 700;
+        }
+
+        /* UI scene overlays mask the old landscape caption and keep copy safe. */
+        .lower-shade {
+            position: absolute;
+            inset: 1080px 0 0;
+            background: linear-gradient(to bottom, rgba(5, 42, 33, 0), rgba(5, 42, 33, .95) 28%, #052a21 53%);
+        }
+        .scene-badge {
+            position: absolute;
+            top: 112px;
+            left: 70px;
+            padding: 15px 25px;
+            border: 1px solid rgba(255, 255, 255, .18);
+            border-radius: 999px;
+            color: #effff7;
+            background: rgba(5, 42, 33, .9);
+            font-size: 28px;
+            font-weight: 800;
+            letter-spacing: .13em;
+            text-transform: uppercase;
+            box-shadow: 0 15px 45px rgba(0, 0, 0, .22);
+        }
+        .caption-panel {
+            position: absolute;
+            left: 70px;
+            top: 1295px;
+            width: 940px;
+            min-height: 340px;
+            padding: 52px 48px 46px;
+            border: 1px solid rgba(135, 239, 190, .28);
+            border-radius: 40px;
+            background: rgba(5, 52, 41, .96);
+            box-shadow: 0 28px 80px rgba(0, 0, 0, .3);
+            text-align: left;
+        }
+        .caption-panel::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 48px;
+            bottom: 48px;
+            width: 11px;
+            border-radius: 999px;
+            background: #80e8b4;
+        }
+        .caption-panel h1 {
+            margin: 0;
+            font-size: 64px;
+            line-height: 1.07;
+            letter-spacing: -.04em;
+            text-wrap: balance;
+        }
+        .caption-panel p {
+            margin: 27px 0 0;
+            color: #c7e4d8;
+            font-size: 34px;
+            line-height: 1.3;
+        }
+        .demo-badge {
+            position: absolute;
+            right: 42px;
+            bottom: 35px;
+            padding: 12px 18px;
+            border-radius: 999px;
+            color: #073b2d;
+            background: #d9f8e9;
+            font-size: 20px;
+            font-weight: 900;
+            letter-spacing: .12em;
+        }
+
+        /* The CTA is rendered fresh so every element shares X=540. */
+        .scene-cta {
+            background:
+                radial-gradient(circle at 82% 18%, rgba(62, 174, 123, .32), transparent 30%),
+                radial-gradient(circle at 20% 86%, rgba(43, 133, 96, .25), transparent 32%),
+                linear-gradient(145deg, #031f19, #07503d 58%, #063227);
+        }
+        .scene-cta::before, .scene-cta::after {
+            content: '';
+            position: absolute;
+            border: 2px solid rgba(139, 238, 188, .12);
+            border-radius: 50%;
+        }
+        .scene-cta::before { width: 560px; height: 560px; right: -300px; top: 30px; }
+        .scene-cta::after { width: 700px; height: 700px; left: -410px; bottom: -260px; }
+        .scene-cta .cta-content { top: 185px; }
+        .scene-cta .logo { width: 178px; height: 178px; }
+        .scene-cta .brand {
+            margin-top: 26px;
+            font-size: 48px;
+            font-weight: 800;
+            letter-spacing: .08em;
+        }
+        .scene-cta h1 {
+            margin: 82px auto 0;
+            font-size: 62px;
+            line-height: 1.28;
+            letter-spacing: -.035em;
+        }
+        .offer {
+            width: 900px;
+            margin: 70px auto 0;
+            padding: 33px 42px;
+            border: 1px solid rgba(139, 238, 188, .28);
+            border-radius: 30px;
+            color: #dff8eb;
+            background: rgba(255, 255, 255, .07);
+            font-size: 37px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+        .cta-button {
+            width: 820px;
+            margin: 54px auto 0;
+            padding: 32px 30px;
+            border-radius: 999px;
+            color: #073b2d;
+            background: #f5fff9;
+            font-size: 43px;
+            font-weight: 900;
+            box-shadow: 0 20px 55px rgba(0, 0, 0, .24);
+        }
+        .domain {
+            margin-top: 56px;
+            color: #9cf0c6;
+            font-size: 40px;
+            font-weight: 800;
+            letter-spacing: .12em;
+        }
+    </style>
+</head>
+<body>
+<script>
+    const scene = new URLSearchParams(location.search).get('scene') || 'clean';
+    const middleScenes = {
+        bookings: {
+            badge: 'Bookings & schedules',
+            title: 'Manage bookings and schedules in one place.',
+            detail: 'See court availability, times, and confirmed reservations at a glance.',
+        },
+        analytics: {
+            badge: 'Source insights',
+            title: 'See where players are coming from.',
+            detail: 'Know where to focus your marketing.',
+        },
+        links: {
+            badge: 'Booking Links',
+            title: 'Already using another booking platform?',
+            detail: 'Keep it. Track the traffic going to it.',
+        },
+    };
+
+    document.body.className = `scene-${scene}`;
+
+    if (scene === 'hook') {
+        document.body.innerHTML = `
+            <main class="center-axis hook-content">
+                <img class="logo" src="file:///icons/finacourt-logo.png" alt="">
+                <div class="brand">FinACourt</div>
+                <div class="eyebrow">For court owners</div>
+                <h1>Still managing court reservations through Messenger?</h1>
+                <div class="hook-note">There’s a simpler way.</div>
+            </main>`;
+    } else if (middleScenes[scene]) {
+        const copy = middleScenes[scene];
+        document.body.innerHTML = `
+            <div class="lower-shade"></div>
+            <div class="scene-badge">${copy.badge}</div>
+            <section class="caption-panel">
+                <h1>${copy.title}</h1>
+                <p>${copy.detail}</p>
+                <span class="demo-badge">DEMO DATA</span>
+            </section>`;
+    } else if (scene === 'clean') {
+        document.body.innerHTML = '<div class="lower-shade"></div>';
+    } else if (scene === 'cta') {
+        document.body.innerHTML = `
+            <main class="center-axis cta-content">
+                <img class="logo" src="file:///icons/finacourt-logo.png" alt="">
+                <div class="brand">FinACourt</div>
+                <h1>Get more players.<br>Manage bookings.<br>Know what brings customers.</h1>
+                <div class="offer">Currently no monthly subscription<br>for court owners.</div>
+                <div class="cta-button">Message us for a quick demo</div>
+                <div class="domain">finacourt.asia</div>
+            </main>`;
+    } else {
+        throw new Error(`Unknown scene: ${scene}`);
+    }
+</script>
+</body>
+</html>

@@ -139,6 +139,12 @@ class Booking extends Model
         return $this->hasMany(OwnerSettlementEntry::class);
     }
 
+    /** @return HasOne<CourtClosureBooking, $this> */
+    public function courtClosureBooking(): HasOne
+    {
+        return $this->hasOne(CourtClosureBooking::class);
+    }
+
     /** @return HasOne<Payment, $this> */
     public function payment(): HasOne
     {

@@ -26,7 +26,9 @@ class RefundRequestController extends Controller
 
         return redirect()->route('player.bookings.show', $booking->reference)
             ->with('status', match ($refundRequest->status->value) {
-                'requested' => 'Your full refund request was sent to the venue for review.',
+                'requested' => $refundRequest->court_closure_id !== null
+                    ? 'Your booking was cancelled by an emergency closure. The full refund batch is awaiting FinACourt platform approval.'
+                    : 'Your full refund request was sent to the venue for review.',
                 'processing' => 'Your approved refund is already processing.',
                 'refunded' => 'This payment has already been refunded.',
                 'rejected' => 'This refund request was already reviewed and declined.',

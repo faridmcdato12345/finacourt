@@ -48,6 +48,12 @@ class Organization extends Model
         return $this->hasMany(CourtAvailabilityBlock::class);
     }
 
+    /** @return HasMany<CourtClosure, $this> */
+    public function courtClosures(): HasMany
+    {
+        return $this->hasMany(CourtClosure::class);
+    }
+
     /** @return HasMany<Promotion, $this> */
     public function promotions(): HasMany
     {

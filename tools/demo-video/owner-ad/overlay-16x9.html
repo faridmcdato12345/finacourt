@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=1920, initial-scale=1">
+    <style>
+        * { box-sizing: border-box; }
+        html, body { width: 1920px; height: 1080px; margin: 0; overflow: hidden; }
+        body {
+            position: relative;
+            color: #fff;
+            background: transparent;
+            font-family: Arial, Helvetica, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+        .center-axis {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+        .logo { display: block; border-radius: 28%; }
+
+        /* Keep the product visible on frame one while giving the hook contrast. */
+        .hook-scrim {
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, rgba(3, 31, 25, .98) 0%, rgba(3, 31, 25, .93) 32%, rgba(3, 31, 25, .56) 52%, rgba(3, 31, 25, .12) 78%),
+                linear-gradient(0deg, rgba(3, 31, 25, .85) 0%, transparent 24%);
+        }
+        .hook-content {
+            position: absolute;
+            left: 106px;
+            top: 92px;
+            width: 760px;
+        }
+        .hook-brand {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+        .hook-brand .logo {
+            width: 82px;
+            height: 82px;
+            box-shadow: 0 16px 42px rgba(0, 0, 0, .25);
+        }
+        .hook-brand-name {
+            font-size: 38px;
+            font-weight: 800;
+            letter-spacing: .08em;
+        }
+        .eyebrow {
+            margin-top: 110px;
+            color: #8ef1c1;
+            font-size: 25px;
+            font-weight: 900;
+            letter-spacing: .18em;
+            text-transform: uppercase;
+        }
+        .hook-content h1 {
+            margin: 24px 0 0;
+            max-width: 750px;
+            font-size: 68px;
+            line-height: 1.05;
+            letter-spacing: -.045em;
+            text-shadow: 0 8px 28px rgba(0, 0, 0, .35);
+        }
+        .hook-footer {
+            position: absolute;
+            left: 443px;
+            bottom: 27px;
+            width: 1020px;
+            min-height: 128px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 42px;
+            border: 1px solid rgba(255, 255, 255, .2);
+            border-radius: 26px;
+            color: #dcf6e9;
+            background: #063e30;
+            box-shadow: 0 22px 60px rgba(0, 0, 0, .28);
+            font-size: 34px;
+            font-weight: 900;
+        }
+        .scene-hook.v4 .eyebrow {
+            margin-top: 86px;
+            color: #a5f3cf;
+            font-size: 34px;
+            letter-spacing: .14em;
+        }
+        .scene-hook.v4 .hook-content h1 {
+            margin-top: 20px;
+            max-width: 790px;
+            font-size: 64px;
+            line-height: 1.04;
+        }
+        .scene-hook.v4 .hook-footer {
+            font-size: 31px;
+        }
+
+        /* Mask the prior long-demo toast, then add one concise ad caption. */
+        .footer-mask {
+            position: absolute;
+            inset: auto 0 0;
+            height: 220px;
+            background: linear-gradient(to bottom, rgba(3, 37, 29, 0), rgba(3, 37, 29, .96) 55%, #03251d 100%);
+        }
+        .caption-panel {
+            position: absolute;
+            left: 390px;
+            bottom: 24px;
+            width: 1140px;
+            min-height: 166px;
+            padding: 29px 180px 27px 48px;
+            border: 1px solid rgba(139, 238, 188, .32);
+            border-radius: 26px;
+            background: rgba(5, 58, 44, .98);
+            box-shadow: 0 22px 60px rgba(0, 0, 0, .28);
+        }
+        .caption-panel::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 28px;
+            bottom: 28px;
+            width: 9px;
+            border-radius: 999px;
+            background: #7de9b3;
+        }
+        .caption-panel h1 {
+            margin: 0;
+            font-size: 43px;
+            line-height: 1.08;
+            letter-spacing: -.025em;
+        }
+        .caption-panel p {
+            margin: 14px 0 0;
+            color: #cbe8dc;
+            font-size: 26px;
+            line-height: 1.2;
+        }
+        .demo-badge {
+            position: absolute;
+            right: 38px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 12px 19px;
+            border-radius: 999px;
+            color: #073b2d;
+            background: #d9f8e9;
+            font-size: 18px;
+            font-weight: 900;
+            letter-spacing: .12em;
+        }
+
+        /* Fresh landscape CTA. The logo center is exactly (960, 540). */
+        .scene-cta {
+            background:
+                radial-gradient(circle at 84% 20%, rgba(62, 174, 123, .32), transparent 27%),
+                radial-gradient(circle at 13% 86%, rgba(43, 133, 96, .26), transparent 31%),
+                linear-gradient(145deg, #031f19, #07503d 58%, #063227);
+        }
+        .scene-cta::before, .scene-cta::after {
+            content: '';
+            position: absolute;
+            border: 2px solid rgba(139, 238, 188, .12);
+            border-radius: 50%;
+        }
+        .scene-cta::before { width: 520px; height: 520px; right: -170px; top: -130px; }
+        .scene-cta::after { width: 620px; height: 620px; left: -260px; bottom: -330px; }
+        .cta-headline {
+            top: 72px;
+            width: 1420px;
+            font-size: 54px;
+            font-weight: 900;
+            line-height: 1.12;
+            letter-spacing: -.035em;
+        }
+        .cta-brand {
+            top: 334px;
+            width: 700px;
+            font-size: 36px;
+            font-weight: 850;
+            letter-spacing: .1em;
+        }
+        .cta-logo {
+            position: absolute;
+            left: 960px;
+            top: 540px;
+            width: 154px;
+            height: 154px;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 22px 65px rgba(0, 0, 0, .3);
+        }
+        .offer {
+            top: 665px;
+            width: 980px;
+            padding: 22px 34px;
+            border: 1px solid rgba(139, 238, 188, .3);
+            border-radius: 24px;
+            color: #e1f9ec;
+            background: rgba(255, 255, 255, .07);
+            font-size: 29px;
+            font-weight: 750;
+        }
+        .cta-button {
+            top: 790px;
+            width: 720px;
+            padding: 24px 28px;
+            border-radius: 999px;
+            color: #073b2d;
+            background: #f5fff9;
+            font-size: 35px;
+            font-weight: 900;
+            box-shadow: 0 20px 55px rgba(0, 0, 0, .24);
+        }
+        .domain {
+            top: 934px;
+            width: 700px;
+            color: #9cf0c6;
+            font-size: 30px;
+            font-weight: 850;
+            letter-spacing: .14em;
+        }
+    </style>
+</head>
+<body>
+<script>
+    const parameters = new URLSearchParams(location.search);
+    const scene = parameters.get('scene') || 'clean';
+    const variant = parameters.get('variant') || 'v1';
+    const middleScenes = {
+        bookings: {
+            title: 'Manage bookings and schedules in one place.',
+            detail: 'See court availability, times, and confirmed reservations at a glance.',
+        },
+        analytics: {
+            title: 'See where players are coming from.',
+            detail: 'Know where to focus your marketing.',
+        },
+        earnings: {
+            title: 'Access available earnings when you need them.',
+            detail: 'Request a payout once your earnings become available.',
+        },
+        links: {
+            title: 'Already using another booking platform?',
+            detail: 'Keep it. Track the traffic going to it.',
+        },
+    };
+
+    document.body.className = `scene-${scene}`;
+
+    if (scene === 'hook') {
+        const isV4 = variant === 'v4';
+        document.body.classList.toggle('v4', isV4);
+        document.body.innerHTML = `
+            <div class="hook-scrim"></div>
+            <main class="hook-content">
+                <div class="hook-brand">
+                    <img class="logo" src="file:///icons/finacourt-logo.png" alt="">
+                    <span class="hook-brand-name">FinACourt</span>
+                </div>
+                <div class="eyebrow">${isV4 ? 'COURT OWNERS:' : 'For court owners'}</div>
+                <h1>${isV4 ? 'Want more control over your bookings, player sources, and earnings?' : 'Still managing court reservations through Messenger?'}</h1>
+            </main>
+            <div class="hook-footer">${isV4 ? 'Bookings + player sources + earnings control' : 'There’s a simpler way.'}</div>`;
+    } else if (middleScenes[scene]) {
+        const copy = middleScenes[scene];
+        document.body.innerHTML = `
+            <div class="footer-mask"></div>
+            <section class="caption-panel">
+                <h1>${copy.title}</h1>
+                <p>${copy.detail}</p>
+                <span class="demo-badge">DEMO DATA</span>
+            </section>`;
+    } else if (scene === 'clean') {
+        document.body.innerHTML = '<div class="footer-mask"></div>';
+    } else if (scene === 'cta') {
+        const headline = variant === 'v4'
+            ? 'Manage bookings.<br>Know what brings players.<br>Stay in control of your earnings.'
+            : variant === 'v2'
+                ? 'Get more players. Manage bookings.<br>Stay in control of your earnings.'
+                : 'Get more players. Manage bookings.<br>Know what brings customers.';
+        document.body.innerHTML = `
+            <div class="center-axis cta-headline">${headline}</div>
+            <div class="center-axis cta-brand">FinACourt</div>
+            <img class="logo cta-logo" src="file:///icons/finacourt-logo.png" alt="">
+            <div class="center-axis offer">Currently no monthly subscription for court owners.</div>
+            <div class="center-axis cta-button">Message us for a quick demo</div>
+            <div class="center-axis domain">finacourt.asia</div>`;
+    } else {
+        throw new Error(`Unknown scene: ${scene}`);
+    }
+</script>
+</body>
+</html>
