@@ -4,6 +4,7 @@ namespace App\Payments;
 
 use App\Analytics\AnalyticsRecorder;
 use App\Enums\BookingStatus;
+use App\Enums\CourtClosureBookingStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Booking;
 use App\Models\Payment;
@@ -93,6 +94,12 @@ class ApplyPaymentTransition
             $this->settlements->recordPaidPayment($payment);
         } elseif ($target === PaymentStatus::Refunded) {
             $this->settlements->recordRefund($payment, $actor);
+            $payment->courtClosureBooking()
+                ->where('refund_required', false)
+                ->update([
+                    'status' => CourtClosureBookingStatus::Refunded->value,
+                    'failure_message' => null,
+                ]);
         }
 
         if ($target === PaymentStatus::Paid) {

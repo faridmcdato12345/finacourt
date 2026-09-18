@@ -203,7 +203,7 @@ class AvailabilityService
                             && $booking->end_at->greaterThan($cursor->utc()),
                     ) && ! $courtBlocks->contains(
                         fn (CourtAvailabilityBlock $block) => $block->starts_at->lessThan($end->utc())
-                            && $block->ends_at->greaterThan($cursor->utc()),
+                            && ($block->ends_at === null || $block->ends_at->greaterThan($cursor->utc())),
                     );
 
                     $slots->put($key, [

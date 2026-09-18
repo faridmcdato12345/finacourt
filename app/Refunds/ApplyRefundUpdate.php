@@ -2,6 +2,7 @@
 
 namespace App\Refunds;
 
+use App\CourtClosures\RefreshCourtClosureRefundStatus;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\RefundRequestStatus;
@@ -19,6 +20,7 @@ class ApplyRefundUpdate
     public function __construct(
         private readonly ApplyPaymentTransition $paymentTransitions,
         private readonly RefundNotifier $notifications,
+        private readonly RefreshCourtClosureRefundStatus $closureRefunds,
     ) {}
 
     /** @param array<string, mixed> $metadata */
@@ -197,8 +199,12 @@ class ApplyRefundUpdate
             $this->notifications->statusChanged($result->refundRequest);
         }
 
-        if ($result->result === 'review') {
+        if ($result->result === 'review' && $result->refundRequest->court_closure_id === null) {
             $this->notifications->platformReviewRequired($result->refundRequest);
+        }
+
+        if ($result->result !== 'duplicate' && $result->refundRequest->court_closure_id !== null) {
+            $this->closureRefunds->handle($result->refundRequest->court_closure_id);
         }
 
         return $result;

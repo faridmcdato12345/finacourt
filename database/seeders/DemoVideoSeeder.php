@@ -8,6 +8,8 @@ use App\Enums\AnalyticsEventType;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
 use App\Enums\MembershipRole;
+use App\Enums\OwnerPayoutMethod;
+use App\Enums\OwnerSettlementEntryType;
 use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
 use App\Enums\PromotionDiscountType;
@@ -25,11 +27,16 @@ use App\Models\CourtResource;
 use App\Models\Membership;
 use App\Models\OperatingHour;
 use App\Models\Organization;
+use App\Models\OwnerPayout;
+use App\Models\OwnerPayoutProfile;
+use App\Models\OwnerSettlementEntry;
+use App\Models\Payment;
 use App\Models\Promotion;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
 use App\Models\VisibilityLink;
+use App\Settlements\OwnerSettlementLedger;
 use App\Visibility\VisibilityLinkManager;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -147,10 +154,11 @@ class DemoVideoSeeder extends Seeder
             $this->clearPreviousRecordedBooking($venue, $player);
             $promotion = $this->seedPromotion($venue);
             $this->seedAnalytics($venue, $resources, $promotion);
+            $this->seedOwnerEarnings($organization, $owner);
             $this->seedExternalBookingLinks($venue, $owner);
         });
 
-        $this->command?->info('FinACourt demo-video venue, accounts, bookings, analytics, and Booking Links seeded.');
+        $this->command?->info('FinACourt demo-video venue, accounts, bookings, analytics, earnings, and Booking Links seeded.');
     }
 
     private function user(string $email, string $name): User
@@ -197,6 +205,97 @@ class DemoVideoSeeder extends Seeder
         )->delete();
         DB::table('payments')->whereIn('booking_id', $bookingIds)->delete();
         DB::table('bookings')->whereIn('id', $bookingIds)->delete();
+    }
+
+    private function seedOwnerEarnings(Organization $organization, User $owner): void
+    {
+        // This organization exists only for local/staging product-video work.
+        // Keep its earnings page deterministic and free of incidental checkout
+        // tests without changing the real settlement or payout workflows.
+        OwnerSettlementEntry::query()
+            ->where('organization_id', $organization->getKey())
+            ->delete();
+        OwnerPayout::query()
+            ->where('organization_id', $organization->getKey())
+            ->delete();
+
+        OwnerPayoutProfile::query()->updateOrCreate(
+            ['organization_id' => $organization->getKey()],
+            [
+                'method' => OwnerPayoutMethod::Gcash,
+                'account_name' => 'FinACourt Demo Venue',
+                'details' => ['mobile_number' => '09000000000'],
+                'is_active' => true,
+                'updated_by_user_id' => $owner->getKey(),
+            ],
+        );
+
+        OwnerSettlementEntry::query()->updateOrCreate(
+            ['source_key' => 'demo-video:available-owner-earnings'],
+            [
+                'organization_id' => $organization->getKey(),
+                'payment_id' => null,
+                'booking_id' => null,
+                'owner_payout_id' => null,
+                'type' => OwnerSettlementEntryType::AdminAdjustment,
+                'amount' => '8750.00',
+                'currency' => 'PHP',
+                'description' => 'Synthetic available balance for the FinACourt product video.',
+                'occurred_at' => now()->subDays(4),
+                'available_at' => now()->subDays(3),
+                'metadata' => ['is_demo' => true, 'purpose' => 'owner_earnings_video'],
+                'created_by_user_id' => $owner->getKey(),
+            ],
+        );
+
+        $futureBookings = Booking::query()
+            ->where('organization_id', $organization->getKey())
+            ->where('reference', 'like', 'BK-VIDEO-%')
+            ->where('start_at', '>', now())
+            ->orderBy('start_at')
+            ->limit(2)
+            ->get();
+
+        $ledger = app(OwnerSettlementLedger::class);
+
+        foreach ($futureBookings as $index => $booking) {
+            $serviceFee = '25.00';
+            $playerTotal = number_format((float) $booking->total_amount + (float) $serviceFee, 2, '.', '');
+            $booking->update([
+                'payment_mode' => PaymentMode::HostedCheckout,
+                'payment_status' => PaymentStatus::Paid,
+                'platform_service_fee_amount' => $serviceFee,
+                'player_total_amount' => $playerTotal,
+            ]);
+
+            $payment = Payment::query()->updateOrCreate(
+                ['reference' => sprintf('PAY-VIDEO-EARNINGS-PENDING-%02d', $index + 1)],
+                [
+                    'organization_id' => $organization->getKey(),
+                    'booking_id' => $booking->getKey(),
+                    'provider' => 'demo_video',
+                    'mode' => PaymentMode::HostedCheckout,
+                    'status' => PaymentStatus::Paid,
+                    'amount' => $playerTotal,
+                    'venue_amount' => $booking->total_amount,
+                    'platform_service_fee_amount' => $serviceFee,
+                    'refunded_amount' => '0.00',
+                    'currency' => 'PHP',
+                    'provider_reference' => sprintf('demo-video-earnings-%02d', $index + 1),
+                    'provider_payment_reference' => sprintf('pay_demo_video_%02d', $index + 1),
+                    'requires_review' => false,
+                    'review_reason' => null,
+                    'paid_at' => now()->subHour(),
+                    'failed_at' => null,
+                    'cancelled_at' => null,
+                    'refunded_at' => null,
+                    'created_by_user_id' => $booking->player_user_id,
+                    'verified_by_user_id' => $owner->getKey(),
+                ],
+            );
+
+            $ledger->recordPaidPayment($payment->fresh(['booking']));
+        }
     }
 
     private function seedPromotion(Venue $venue): Promotion

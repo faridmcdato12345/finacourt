@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'organization_id',
     'venue_id',
     'resource_id',
+    'court_closure_id',
     'starts_at',
     'ends_at',
     'timezone',
@@ -42,6 +43,12 @@ class CourtAvailabilityBlock extends Model
         return $this->belongsTo(CourtResource::class, 'resource_id');
     }
 
+    /** @return BelongsTo<CourtClosure, $this> */
+    public function closure(): BelongsTo
+    {
+        return $this->belongsTo(CourtClosure::class, 'court_closure_id');
+    }
+
     /** @return BelongsTo<User, $this> */
     public function createdBy(): BelongsTo
     {
@@ -67,7 +74,9 @@ class CourtAvailabilityBlock extends Model
         CarbonInterface $endsAt,
     ): void {
         $query->where('starts_at', '<', $endsAt)
-            ->where('ends_at', '>', $startsAt);
+            ->where(function (Builder $query) use ($startsAt): void {
+                $query->whereNull('ends_at')->orWhere('ends_at', '>', $startsAt);
+            });
     }
 
     protected function casts(): array

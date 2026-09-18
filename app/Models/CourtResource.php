@@ -68,6 +68,13 @@ class CourtResource extends Model
         return $this->hasMany(CourtAvailabilityBlock::class, 'resource_id');
     }
 
+    /** @return BelongsToMany<CourtClosure, $this> */
+    public function courtClosures(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(CourtClosure::class, 'court_closure_resources', 'resource_id', 'court_closure_id')
+            ->withTimestamps();
+    }
+
     /** @return HasMany<Promotion, $this> */
     public function promotions(): HasMany
     {

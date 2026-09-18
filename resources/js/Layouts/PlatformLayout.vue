@@ -18,6 +18,7 @@ const page = usePage();
                     <Link href="/platform/dashboard" class="text-slate-300 hover:text-white">Overview</Link>
                     <Link href="/platform/analytics" class="text-slate-300 hover:text-white">Analytics</Link>
                     <Link href="/platform/payments" class="text-slate-300 hover:text-white">Payments</Link>
+                    <Link href="/platform/court-closures" class="text-slate-300 hover:text-white">Closure refunds</Link>
                     <Link href="/platform/owner-payouts" class="text-slate-300 hover:text-white">Owner payouts</Link>
                     <Link href="/platform/growth" class="text-slate-300 hover:text-white">Growth rules</Link>
                     <Link href="/platform/reviews" class="text-slate-300 hover:text-white">Reviews</Link>
@@ -31,6 +32,7 @@ const page = usePage();
             </div>
         </header>
         <main id="main-content" tabindex="-1" class="mx-auto max-w-7xl px-5 py-10 sm:px-8">
+            <div v-if="page.props.flash?.status" role="status" class="mb-6 rounded-xl border border-court-200 bg-court-50 px-4 py-3 text-sm font-medium text-court-900">{{ page.props.flash.status }}</div>
             <slot />
         </main>
     </div>

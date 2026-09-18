@@ -29,6 +29,7 @@ use App\Http\Controllers\Owner\BookingAvailabilityController;
 use App\Http\Controllers\Owner\BookingController;
 use App\Http\Controllers\Owner\BookingLinkController as OwnerBookingLinkController;
 use App\Http\Controllers\Owner\CourtAvailabilityBlockController;
+use App\Http\Controllers\Owner\CourtClosureController as OwnerCourtClosureController;
 use App\Http\Controllers\Owner\CourtPricingRuleController;
 use App\Http\Controllers\Owner\CourtResourceController;
 use App\Http\Controllers\Owner\DashboardController as OwnerDashboardController;
@@ -59,6 +60,7 @@ use App\Http\Controllers\Partner\LeadController as PartnerLeadController;
 use App\Http\Controllers\Platform\AnalyticsController as PlatformAnalyticsController;
 use App\Http\Controllers\Platform\CommissionEntryController as PlatformCommissionEntryController;
 use App\Http\Controllers\Platform\CommissionRuleController as PlatformCommissionRuleController;
+use App\Http\Controllers\Platform\CourtClosureController as PlatformCourtClosureController;
 use App\Http\Controllers\Platform\DashboardController as PlatformDashboardController;
 use App\Http\Controllers\Platform\GrowthRecommendationController as PlatformGrowthRecommendationController;
 use App\Http\Controllers\Platform\OwnerPayoutController as PlatformOwnerPayoutController;
@@ -350,6 +352,13 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
     Route::delete('/bookings/blocks/{block}', [CourtAvailabilityBlockController::class, 'destroy'])
         ->whereNumber('block')
         ->name('booking-blocks.destroy');
+    Route::get('/court-closures', [OwnerCourtClosureController::class, 'index'])->name('court-closures.index');
+    Route::get('/court-closures/create', [OwnerCourtClosureController::class, 'create'])->name('court-closures.create');
+    Route::post('/court-closures/preview', [OwnerCourtClosureController::class, 'preview'])->name('court-closures.preview');
+    Route::post('/court-closures', [OwnerCourtClosureController::class, 'store'])->name('court-closures.store');
+    Route::patch('/court-closures/{closure}/reopen', [OwnerCourtClosureController::class, 'reopen'])
+        ->whereNumber('closure')
+        ->name('court-closures.reopen');
     Route::get('/bookings', [BookingController::class, 'index'])->name('bookings.index');
     Route::get('/bookings/create', [BookingController::class, 'create'])->name('bookings.create');
     Route::post('/bookings', [BookingController::class, 'store'])->name('bookings.store');
@@ -450,6 +459,13 @@ Route::prefix('platform')->name('platform.')->middleware(['auth', 'platform.admi
     Route::get('/analytics', PlatformAnalyticsController::class)->name('analytics');
     Route::get('/growth', PlatformGrowthRecommendationController::class)->name('growth.index');
     Route::get('/payments', [PlatformPaymentSettingsController::class, 'index'])->name('payments.index');
+    Route::get('/court-closures', [PlatformCourtClosureController::class, 'index'])->name('court-closures.index');
+    Route::post('/court-closures/{closure}/approve', [PlatformCourtClosureController::class, 'approve'])
+        ->whereNumber('closure')
+        ->name('court-closures.approve');
+    Route::post('/court-closures/{closure}/retry', [PlatformCourtClosureController::class, 'retry'])
+        ->whereNumber('closure')
+        ->name('court-closures.retry');
     Route::post('/payments/service-fees', [PlatformPaymentSettingsController::class, 'store'])->name('payments.service-fees.store');
     Route::patch('/payments/service-fees/{rule}', [PlatformPaymentSettingsController::class, 'update'])->name('payments.service-fees.update');
     Route::post('/payments/{payment}/record-refund', PlatformPaymentRefundController::class)->name('payments.refunds.store');

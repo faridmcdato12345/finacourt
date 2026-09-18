@@ -58,7 +58,9 @@ class EmptySlotFinder
                 'availabilityBlocks' => fn ($query) => $query
                     ->active()
                     ->where('starts_at', '<', $utcEnd)
-                    ->where('ends_at', '>', $now->utc()),
+                    ->where(fn ($query) => $query
+                        ->whereNull('ends_at')
+                        ->orWhere('ends_at', '>', $now->utc())),
                 'promotionSlots' => fn ($query) => $query
                     ->whereBetween('slot_date', [$now->toDateString(), $lastDay->toDateString()])
                     ->whereHas('promotion', fn ($query) => $query
@@ -175,7 +177,7 @@ class EmptySlotFinder
         return $bookings->contains(fn (Booking $booking) => $booking->start_at->lessThan($end->utc())
             && $booking->end_at->greaterThan($start->utc()))
             || $courtBlocks->contains(fn (CourtAvailabilityBlock $block) => $block->starts_at->lessThan($end->utc())
-                && $block->ends_at->greaterThan($start->utc()));
+                && ($block->ends_at === null || $block->ends_at->greaterThan($start->utc())));
     }
 
     /** @param Collection<int, PromotionSlot> $slots */

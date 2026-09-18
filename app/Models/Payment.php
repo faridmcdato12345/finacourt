@@ -83,6 +83,12 @@ class Payment extends Model
         return $this->hasOne(RefundRequest::class);
     }
 
+    /** @return HasOne<CourtClosureBooking, $this> */
+    public function courtClosureBooking(): HasOne
+    {
+        return $this->hasOne(CourtClosureBooking::class);
+    }
+
     public function effectiveStatus(?Booking $booking = null): PaymentStatus
     {
         $booking ??= $this->relationLoaded('booking') ? $this->booking : null;

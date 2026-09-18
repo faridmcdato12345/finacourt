@@ -13,6 +13,7 @@ const scenes = new Set([
     'owner-intro',
     'owner-dashboard',
     'owner-bookings',
+    'owner-earnings',
     'owner-analytics',
     'owner-links',
     'owner-promotions',
@@ -458,6 +459,13 @@ async function prepare() {
             await waitForSelector('input[type="date"]');
             await injectCaption('See bookings and schedules', 'Court, time, player, status and booking value at a glance.', { demo: true });
             break;
+        case 'owner-earnings':
+            await login('owner');
+            await navigate('/owner/earnings');
+            await waitForText('Your court earnings');
+            await waitForText('Review early payout');
+            await injectCaption('Access available earnings when you need them', 'Request a payout once your earnings become available.', { demo: true });
+            break;
         case 'owner-analytics':
             await login('owner');
             await navigate(`/owner/analytics?venue=${manifest.venue_id}`);
@@ -575,6 +583,9 @@ async function perform() {
             await sleep(3300);
             await injectCaption('Court schedules stay easy to scan', 'Confirmed reservations and open court time are organized by court.', { demo: true });
             await sleep(3700);
+            break;
+        case 'owner-earnings':
+            await sleep(6500);
             break;
         case 'owner-analytics':
             await sleep(3200);

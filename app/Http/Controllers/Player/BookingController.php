@@ -431,6 +431,7 @@ class BookingController extends Controller
                 'resource.sport:id,name,slug',
                 'payment:payments.id,payments.booking_id,payments.reference,payments.provider,payments.provider_reference,payments.provider_payment_reference,payments.status,payments.mode,payments.amount,payments.venue_amount,payments.platform_service_fee_amount,payments.refunded_amount,payments.currency,payments.requires_review,payments.review_reason,payments.paid_at,payments.refunded_at',
                 'payment.refundRequest',
+                'payment.refundRequest.courtClosure:id,reason',
                 'review:id,booking_id,rating,body,status,moderation_note,created_at,published_at',
             ])
             ->firstOrFail();
