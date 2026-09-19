@@ -68,6 +68,83 @@ class AutomaticRefundWorkflowTest extends TestCase
         Notification::assertSentTo($player, RefundNotification::class, fn (RefundNotification $notification): bool => $notification->kind === 'refund_requested');
     }
 
+    public function test_player_cannot_request_a_refund_inside_the_24_hour_cutoff(): void
+    {
+        [, , $player, $booking, $payment] = $this->setupOnlinePayment();
+        $booking->update([
+            'start_at' => now('UTC')->addHours(23),
+            'end_at' => now('UTC')->addHours(24),
+        ]);
+        $payment->update(['paid_at' => now('UTC')->subMinutes(16)]);
+
+        $response = $this->actingAs($player)
+            ->post(route('player.bookings.refunds.store', $booking->reference), [
+                'reason' => 'The team can no longer attend the booking.',
+            ])
+            ->assertSessionHasErrors('refund');
+
+        $this->assertStringContainsString(
+            'Player-requested refunds must normally be submitted at least 24 hours before the booking begins.',
+            $response->getSession()->get('errors')->first('refund'),
+        );
+
+        $this->assertDatabaseCount('refund_requests', 0);
+        Notification::assertNothingSent();
+
+        $this->get(route('player.bookings.show', $booking->reference))
+            ->assertOk()
+            ->assertSee('The player refund window has closed')
+            ->assertSee('This booking included a 15-minute refund grace period after payment.')
+            ->assertDontSee('Request full refund');
+    }
+
+    public function test_new_short_notice_booking_receives_a_15_minute_refund_grace_period(): void
+    {
+        [, , $player, $booking] = $this->setupOnlinePayment();
+        $booking->update([
+            'start_at' => now('UTC')->addHours(3),
+            'end_at' => now('UTC')->addHours(4),
+        ]);
+
+        $this->actingAs($player)
+            ->get(route('player.bookings.show', $booking->reference))
+            ->assertOk()
+            ->assertSee('This short-notice booking has a 15-minute refund grace period after payment.')
+            ->assertSee('Request full refund');
+
+        $this->post(route('player.bookings.refunds.store', $booking->reference), [
+            'reason' => 'We noticed immediately that the selected time was wrong.',
+        ])->assertRedirect(route('player.bookings.show', $booking->reference));
+
+        $this->assertDatabaseHas('refund_requests', [
+            'booking_id' => $booking->getKey(),
+            'status' => RefundRequestStatus::Requested->value,
+        ]);
+    }
+
+    public function test_player_can_request_a_refund_at_the_exact_configured_deadline(): void
+    {
+        $this->travelTo('2026-09-19 10:00:00');
+        config()->set('refunds.player_request_cutoff_hours', 48);
+        [, , $player, $booking, $payment] = $this->setupOnlinePayment();
+        $booking->update([
+            'start_at' => now('UTC')->addHours(48),
+            'end_at' => now('UTC')->addHours(49),
+        ]);
+        $payment->update(['paid_at' => now('UTC')->subMinutes(16)]);
+
+        $this->actingAs($player)
+            ->post(route('player.bookings.refunds.store', $booking->reference), [
+                'reason' => 'The team can no longer attend the booking.',
+            ])
+            ->assertRedirect(route('player.bookings.show', $booking->reference));
+
+        $this->assertDatabaseHas('refund_requests', [
+            'booking_id' => $booking->getKey(),
+            'status' => RefundRequestStatus::Requested->value,
+        ]);
+    }
+
     public function test_owner_can_decline_request_without_changing_booking_or_payment(): void
     {
         [$organization, $owner, $player, $booking, $payment] = $this->setupOnlinePayment();

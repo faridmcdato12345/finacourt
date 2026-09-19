@@ -16,7 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class RequestRefund
 {
-    public function __construct(private readonly RefundNotifier $notifications) {}
+    public function __construct(
+        private readonly RefundNotifier $notifications,
+        private readonly PlayerRefundEligibility $eligibility,
+    ) {}
 
     public function handle(Booking $booking, User $player, string $reason): RefundRequest
     {
@@ -47,6 +50,12 @@ class RequestRefund
             if ($payment->mode !== PaymentMode::HostedCheckout || $payment->status !== PaymentStatus::Paid) {
                 throw ValidationException::withMessages([
                     'refund' => 'Only a completed online payment can be submitted for an automatic refund.',
+                ]);
+            }
+
+            if (! $this->eligibility->canRequest($booking, $payment)) {
+                throw ValidationException::withMessages([
+                    'refund' => $this->eligibility->rejectionMessage($booking, $payment),
                 ]);
             }
 

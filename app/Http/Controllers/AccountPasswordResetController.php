@@ -120,7 +120,7 @@ class AccountPasswordResetController extends Controller
         Auth::login($resetUser);
         $request->session()->regenerate();
 
-        $destination = $resetUser->memberships()->exists()
+        $destination = $resetUser->memberships()->active()->exists()
             ? route('owner.account.edit')
             : route('player.account.edit');
 

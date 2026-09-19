@@ -49,6 +49,7 @@ class ResolveTenant
         return Membership::query()
             ->with('organization')
             ->where('user_id', $userId)
+            ->active()
             ->when($organizationId, fn ($query) => $query->where('organization_id', $organizationId))
             ->oldest('id')
             ->first();

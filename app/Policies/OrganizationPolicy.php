@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\MembershipRole;
 use App\Enums\OrganizationPermission;
 use App\Models\Membership;
 use App\Models\Organization;
@@ -29,7 +30,7 @@ class OrganizationPolicy
     public function manageMembers(User $user, Organization $organization): bool
     {
         return $user->is_platform_admin
-            || $this->membership($user, $organization)?->hasPermission(OrganizationPermission::ManageStaff) === true;
+            || $this->membership($user, $organization)?->role === MembershipRole::Owner;
     }
 
     public function manageInventory(User $user, Organization $organization): bool
@@ -48,6 +49,7 @@ class OrganizationPolicy
     {
         return $user->memberships()
             ->where('organization_id', $organization->getKey())
+            ->active()
             ->first();
     }
 }
