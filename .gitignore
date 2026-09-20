@@ -22,6 +22,7 @@
 /storage/*.key
 /storage/pail
 /vendor
+/output
 /output/demo-video/control/
 /output/demo-video/debug-*.png
 /output/demo-video/manifest.json

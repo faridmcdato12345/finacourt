@@ -48,6 +48,8 @@ use App\Http\Controllers\Owner\PsgcLocationController;
 use App\Http\Controllers\Owner\ReactivationCampaignController;
 use App\Http\Controllers\Owner\RefundRequestController as OwnerRefundRequestController;
 use App\Http\Controllers\Owner\SettlementController as OwnerSettlementController;
+use App\Http\Controllers\Owner\StaffInvitationController as OwnerStaffInvitationController;
+use App\Http\Controllers\Owner\TeamController as OwnerTeamController;
 use App\Http\Controllers\Owner\VenueClaimController;
 use App\Http\Controllers\Owner\VenueController;
 use App\Http\Controllers\Owner\VenueOnboardingController;
@@ -84,6 +86,7 @@ use App\Http\Controllers\Player\NotificationController as PlayerNotificationCont
 use App\Http\Controllers\Player\ReactivationClickController;
 use App\Http\Controllers\Player\RefundRequestController as PlayerRefundRequestController;
 use App\Http\Controllers\Player\VenueReviewController as PlayerVenueReviewController;
+use App\Http\Controllers\StaffInvitationAcceptanceController;
 use App\Http\Controllers\Webhooks\PaymentWebhookController;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
@@ -142,6 +145,14 @@ Route::get('/venues/{venueSlug}/reserve', [PlayerBookingController::class, 'crea
 Route::get('/player/magic-login/{token}', [PasswordlessLoginController::class, 'consume'])
     ->middleware(['signed', 'throttle:passwordless-consume'])
     ->name('player.magic-login.consume');
+Route::get('/staff-invitations/{token}', [StaffInvitationAcceptanceController::class, 'show'])
+    ->where('token', '[a-f0-9]{64}')
+    ->middleware('throttle:30,1')
+    ->name('staff-invitations.show');
+Route::post('/staff-invitations/{token}/accept', [StaffInvitationAcceptanceController::class, 'accept'])
+    ->where('token', '[a-f0-9]{64}')
+    ->middleware('throttle:6,1')
+    ->name('staff-invitations.accept');
 Route::get('/booking/{reference}', [PlayerBookingController::class, 'share'])
     ->middleware(['signed', 'throttle:marketplace'])
     ->name('bookings.share');
@@ -205,7 +216,7 @@ Route::middleware('auth')->group(function () {
         ->middleware(['verified', 'throttle:6,1'])
         ->name('owner.social-setup.store');
     Route::get('/email/verify', function (Request $request, OwnerClaimInvitationContext $claimInvitation) {
-        $isOwner = $request->user()->memberships()->exists();
+        $isOwner = $request->user()->memberships()->active()->exists();
         $accountRoute = $isOwner
             ? 'owner.account.edit'
             : 'player.account.edit';
@@ -225,7 +236,7 @@ Route::middleware('auth')->group(function () {
         $request->fulfill();
 
         $user = $request->user();
-        $ownerMembership = $user->memberships()->with('organization')->oldest('id')->first();
+        $ownerMembership = $user->memberships()->active()->with('organization')->oldest('id')->first();
 
         if ($ownerMembership !== null) {
             $request->session()->put('tenant.organization_id', $ownerMembership->organization_id);
@@ -315,6 +326,29 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
         ->middleware('throttle:google-business-profile')
         ->name('google-business-profile.callback');
     Route::get('/dashboard', OwnerDashboardController::class)->name('dashboard');
+    Route::get('/team', [OwnerTeamController::class, 'index'])->name('team.index');
+    Route::patch('/team/{membership}', [OwnerTeamController::class, 'update'])
+        ->whereNumber('membership')
+        ->name('team.update');
+    Route::patch('/team/{membership}/suspend', [OwnerTeamController::class, 'suspend'])
+        ->whereNumber('membership')
+        ->name('team.suspend');
+    Route::patch('/team/{membership}/reactivate', [OwnerTeamController::class, 'reactivate'])
+        ->whereNumber('membership')
+        ->name('team.reactivate');
+    Route::delete('/team/{membership}', [OwnerTeamController::class, 'destroy'])
+        ->whereNumber('membership')
+        ->name('team.destroy');
+    Route::post('/team/invitations', [OwnerStaffInvitationController::class, 'store'])
+        ->middleware('throttle:6,1')
+        ->name('team.invitations.store');
+    Route::post('/team/invitations/{invitation}/resend', [OwnerStaffInvitationController::class, 'resend'])
+        ->whereNumber('invitation')
+        ->middleware('throttle:6,1')
+        ->name('team.invitations.resend');
+    Route::delete('/team/invitations/{invitation}', [OwnerStaffInvitationController::class, 'revoke'])
+        ->whereNumber('invitation')
+        ->name('team.invitations.revoke');
     Route::get('/analytics', OwnerAnalyticsController::class)->name('analytics');
     Route::get('/booking-links', [OwnerBookingLinkController::class, 'index'])
         ->name('booking-links.index');

@@ -26,8 +26,16 @@ class Organization extends Model
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'memberships')
-            ->withPivot(['id', 'role', 'permissions', 'joined_at'])
+            ->wherePivotNull('suspended_at')
+            ->wherePivotNull('removed_at')
+            ->withPivot(['id', 'role', 'permissions', 'joined_at', 'suspended_at', 'removed_at'])
             ->withTimestamps();
+    }
+
+    /** @return HasMany<StaffInvitation, $this> */
+    public function staffInvitations(): HasMany
+    {
+        return $this->hasMany(StaffInvitation::class);
     }
 
     /** @return HasMany<Venue, $this> */

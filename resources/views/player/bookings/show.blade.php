@@ -146,9 +146,26 @@
                         @if ($refundRequest)<span class="rounded-full bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700">{{ $isClosureRefund && $refundRequest->status === App\Enums\RefundRequestStatus::Requested ? 'Awaiting platform approval' : $refundRequest->status->label() }}</span>@elseif ($paymentStatus === App\Enums\PaymentStatus::Refunded)<span class="rounded-full bg-court-50 px-3 py-1.5 text-sm font-semibold text-court-800">Refunded</span>@endif
                     </div>
 
-                    @if (! $refundRequest && $paymentStatus === App\Enums\PaymentStatus::Paid)
+                    @if (! $refundRequest && $paymentStatus === App\Enums\PaymentStatus::Paid && $refundPolicy['can_request'])
                         <p class="mt-3 text-sm leading-6 text-slate-600">Submit a full refund request for venue review. Your booking remains active unless you cancel it or the venue approves this request.</p>
-                        <form action="{{ route('player.bookings.refunds.store', $booking->reference) }}" method="post" data-requires-online class="mt-5">@csrf<label class="block"><span class="text-sm font-semibold text-slate-800">Why are you requesting a refund?</span><textarea name="reason" rows="3" minlength="5" maxlength="500" required class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="Tell the venue what happened.">{{ old('reason') }}</textarea></label><button data-loading-label="Submitting request…" class="mt-4 min-h-11 rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white">Request full refund</button></form>
+                        @if ($refundPolicy['is_using_grace'])
+                            <p class="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs leading-5 text-amber-950">This short-notice booking has a {{ $refundPolicy['grace_minutes'] }}-minute refund grace period after payment. Submit your request before {{ $refundPolicy['deadline'] }}.</p>
+                        @else
+                            <p class="mt-3 rounded-xl bg-court-50 px-4 py-3 text-xs leading-5 text-court-900">Requests close {{ $refundPolicy['cutoff_hours'] }} {{ Illuminate\Support\Str::plural('hour', $refundPolicy['cutoff_hours']) }} before game time. Your deadline is {{ $refundPolicy['deadline'] }}.</p>
+                        @endif
+                        @error('refund')<p role="alert" class="mt-3 text-sm text-red-600">{{ $message }}</p>@enderror
+                        <form action="{{ route('player.bookings.refunds.store', $booking->reference) }}" method="post" data-requires-online class="mt-5">@csrf<label class="block"><span class="text-sm font-semibold text-slate-800">Why are you requesting a refund?</span><textarea name="reason" rows="3" minlength="5" maxlength="500" required class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="Tell the venue what happened.">{{ old('reason') }}</textarea>@error('reason')<span class="mt-1 block text-sm text-red-600">{{ $message }}</span>@enderror</label><button data-loading-label="Submitting request…" class="mt-4 min-h-11 rounded-xl bg-court-700 px-5 py-3 text-sm font-semibold text-white">Request full refund</button></form>
+                    @elseif (! $refundRequest && $paymentStatus === App\Enums\PaymentStatus::Paid)
+                        <div class="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+                            <p class="font-semibold">The player refund window has closed</p>
+                            @if ($refundPolicy['had_short_notice_grace'])
+                                <p class="mt-1">This booking included a {{ $refundPolicy['grace_minutes'] }}-minute refund grace period after payment. It ended at {{ $refundPolicy['deadline'] }}.</p>
+                            @else
+                                <p class="mt-1">Refund requests close {{ $refundPolicy['cutoff_hours'] }} {{ Illuminate\Support\Str::plural('hour', $refundPolicy['cutoff_hours']) }} before game time. The deadline was {{ $refundPolicy['deadline'] }}.</p>
+                            @endif
+                            <p class="mt-2 text-xs">If the venue closes or the court becomes unavailable, the emergency-closure workflow can still issue a full refund.</p>
+                        </div>
+                        @error('refund')<p role="alert" class="mt-3 text-sm text-red-600">{{ $message }}</p>@enderror
                     @elseif ($refundRequest)
                         <p class="mt-3 text-sm leading-6 text-slate-600">{{ match ($refundRequest->status) { App\Enums\RefundRequestStatus::Requested => $isClosureRefund ? 'Your booking was cancelled by an emergency closure. FinACourt is reviewing the full-refund batch; no refund has been sent yet.' : 'The venue is reviewing your request. No refund has been sent yet.', App\Enums\RefundRequestStatus::Processing => $isClosureRefund ? 'FinACourt approved the closure batch and sent your refund to the payment provider.' : 'The venue approved your request and FinACourt sent it to the payment provider.', App\Enums\RefundRequestStatus::Refunded => 'The provider confirmed your full refund. Posting time depends on your original payment method.', App\Enums\RefundRequestStatus::Rejected => 'The venue declined this request. Your payment was not changed.', App\Enums\RefundRequestStatus::Failed => $refundRequest->requires_review ? 'The provider outcome needs platform review before another attempt.' : ($isClosureRefund ? 'The provider could not process the refund. FinACourt will review and retry it.' : 'The provider could not process the refund. The venue can retry it.') } }}</p>
                         <div class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm"><p class="font-semibold text-slate-800">{{ $isClosureRefund ? 'Closure reason' : 'Your reason' }}</p><p class="mt-1 whitespace-pre-line text-slate-600">{{ $isClosureRefund ? ($refundRequest->courtClosure?->reason ?? $refundRequest->reason) : $refundRequest->reason }}</p>@if ($refundRequest->reviewer_note)<p class="mt-3 font-semibold text-slate-800">{{ $isClosureRefund ? 'Platform note' : 'Venue response' }}</p><p class="mt-1 whitespace-pre-line text-slate-600">{{ $refundRequest->reviewer_note }}</p>@endif</div>
@@ -196,7 +213,23 @@
             @if ($canCancel)
                 <details class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
                     <summary class="cursor-pointer list-none font-semibold text-slate-700">Can’t make this game? <span data-details-icon class="float-right text-slate-400">＋</span></summary>
-                    <form action="{{ route('player.bookings.cancel', $booking->reference) }}" method="post" data-requires-online class="mt-4 border-t border-slate-100 pt-4">@csrf @method('PATCH')<label class="block"><span class="text-sm font-semibold text-red-900">Cancel reservation</span><textarea name="cancellation_reason" rows="2" maxlength="500" placeholder="Reason (optional)" class="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"></textarea></label><button data-loading-label="Cancelling…" class="mt-3 min-h-11 w-full rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700">Cancel this booking</button></form>
+                    <form action="{{ route('player.bookings.cancel', $booking->reference) }}" method="post" data-requires-online class="mt-4 border-t border-slate-100 pt-4">
+                        @csrf
+                        @method('PATCH')
+                        @if ($payment?->mode === App\Enums\PaymentMode::HostedCheckout && $paymentStatus === App\Enums\PaymentStatus::Paid)
+                            <p class="mb-4 rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900">
+                                Cancelling releases the court but does not automatically return your payment.
+                                @if ($refundRequest)
+                                    Your existing refund request keeps its current review status.
+                                @elseif ($refundPolicy['can_request'])
+                                    Submit the separate full-refund request before {{ $refundPolicy['deadline'] }}.
+                                @else
+                                    Your player refund deadline has passed.
+                                @endif
+                            </p>
+                        @endif
+                        <label class="block"><span class="text-sm font-semibold text-red-900">Cancel reservation</span><textarea name="cancellation_reason" rows="2" maxlength="500" placeholder="Reason (optional)" class="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"></textarea></label><button data-loading-label="Cancelling…" class="mt-3 min-h-11 w-full rounded-xl border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700">Cancel this booking</button>
+                    </form>
                 </details>
             @endif
         </aside>

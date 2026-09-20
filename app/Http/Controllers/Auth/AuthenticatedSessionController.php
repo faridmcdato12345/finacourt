@@ -56,7 +56,7 @@ class AuthenticatedSessionController extends Controller
             return redirect()->intended(route('partner.dashboard'));
         }
 
-        $membership = $user->memberships()->with('organization')->oldest('id')->first();
+        $membership = $user->memberships()->active()->with('organization')->oldest('id')->first();
 
         if ($membership !== null) {
             if (! $user->hasVerifiedEmail()) {

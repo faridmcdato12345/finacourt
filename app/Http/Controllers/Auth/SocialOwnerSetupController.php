@@ -21,7 +21,7 @@ class SocialOwnerSetupController extends Controller
         Request $request,
         OwnerClaimInvitationContext $claimInvitation,
     ): Response|RedirectResponse {
-        $membership = $request->user()->memberships()->with('organization')->oldest('id')->first();
+        $membership = $request->user()->memberships()->active()->with('organization')->oldest('id')->first();
 
         if ($membership !== null) {
             return redirect()->route($membership->role === MembershipRole::Owner
@@ -50,7 +50,7 @@ class SocialOwnerSetupController extends Controller
 
         $organization = DB::transaction(function () use ($request, $validated, $partnerAttribution): Organization {
             $user = $request->user()->newQuery()->lockForUpdate()->findOrFail($request->user()->getKey());
-            $existing = $user->memberships()->oldest('id')->first();
+            $existing = $user->memberships()->active()->oldest('id')->first();
 
             if ($existing !== null) {
                 return $existing->organization;

@@ -28,6 +28,7 @@ use App\Payments\StartHostedCheckout;
 use App\Promotions\PromotionApplicability;
 use App\Promotions\PromotionMarketplace;
 use App\Promotions\PromotionTracker;
+use App\Refunds\PlayerRefundEligibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -259,16 +260,28 @@ class BookingController extends Controller
         Request $request,
         string $reference,
         PaymentProviderRegistry $providers,
+        PlayerRefundEligibility $refundEligibility,
     ): View {
         $booking = $this->playerBooking($request, $reference);
         Gate::authorize('viewAsPlayer', $booking);
         $provider = $booking->payment ? $providers->find($booking->payment->provider) : null;
+        $refundDeadline = $refundEligibility->deadline($booking, $booking->payment);
 
         return view('player.bookings.show', [
             'booking' => $booking,
             'canReview' => $request->user()->can('create', [VenueReview::class, $booking]),
             'shareUrl' => URL::signedRoute('bookings.share', $booking->reference),
             'hostedCheckoutAvailable' => $provider?->supportsHostedCheckout() ?? false,
+            'refundPolicy' => [
+                'can_request' => $refundEligibility->canRequest($booking, $booking->payment),
+                'cutoff_hours' => $refundEligibility->cutoffHours(),
+                'grace_minutes' => $refundEligibility->graceMinutes(),
+                'is_using_grace' => $refundEligibility->isUsingGrace($booking, $booking->payment),
+                'had_short_notice_grace' => $refundEligibility->hasShortNoticeGrace($booking, $booking->payment),
+                'deadline' => $refundDeadline
+                    ->setTimezone($booking->timezone)
+                    ->format('M j, Y g:i A').' ('.$booking->timezone.')',
+            ],
             ...$this->seo("Booking {$booking->reference}", route('player.bookings.show', $booking->reference)),
         ]);
     }
