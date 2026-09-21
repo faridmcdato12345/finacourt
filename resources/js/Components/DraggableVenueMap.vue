@@ -132,8 +132,8 @@ onBeforeUnmount(() => {
     transform: rotate(-45deg);
     border: 3px solid white;
     border-radius: 50% 50% 50% 0;
-    background: #17895a;
-    box-shadow: 0 5px 14px rgb(8 41 30 / 35%);
+    background: #0284c7;
+    box-shadow: 0 5px 14px rgb(8 47 73 / 35%);
 }
 
 .venue-location-marker__dot {
@@ -145,10 +145,10 @@ onBeforeUnmount(() => {
     transform: translate(-50%, -50%);
     border-radius: 9999px;
     background: white;
-    box-shadow: inset 0 0 0 3px #82ddb0;
+    box-shadow: inset 0 0 0 3px #7dd3fc;
 }
 
 .venue-location-marker.leaflet-drag-target .venue-location-marker__pin {
-    box-shadow: 0 9px 20px rgb(8 41 30 / 42%);
+    box-shadow: 0 9px 20px rgb(8 47 73 / 42%);
 }
 </style>

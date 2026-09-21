@@ -36,7 +36,7 @@ function themeDocument() {
         },
     };
     const themeColor = {
-        value: '#146d4a',
+        value: '#0369a1',
         setAttribute(_name, value) {
             this.value = value;
         },
@@ -68,7 +68,7 @@ test('applying dark mode updates the page, browser color, and accessible control
     assert.equal(applyTheme(DARK_THEME, documentRef), DARK_THEME);
     assert.equal(documentRef.documentElement.dataset.theme, DARK_THEME);
     assert.equal(documentRef.documentElement.style.colorScheme, DARK_THEME);
-    assert.equal(themeColor.value, '#071f17');
+    assert.equal(themeColor.value, '#071d2e');
     assert.equal(attributes.get('aria-pressed'), 'true');
     assert.equal(attributes.get('aria-label'), 'Switch to light mode');
     assert.equal(label.textContent, 'Switch to light mode');

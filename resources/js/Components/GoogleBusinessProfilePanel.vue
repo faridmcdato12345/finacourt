@@ -56,7 +56,7 @@ async function copyUrl() {
 
 <template>
     <section id="google-business-profile" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div class="grid gap-6 border-b border-slate-200 bg-[linear-gradient(120deg,#f0fbf5_0%,#ffffff_66%)] p-6 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div class="grid gap-6 border-b border-slate-200 bg-[linear-gradient(120deg,#f0f9ff_0%,#ffffff_66%)] p-6 lg:grid-cols-[1fr_auto] lg:items-center">
             <div>
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-court-700">Google visibility</p>
                 <h3 class="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Help players find this venue on Google</h3>

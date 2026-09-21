@@ -55,7 +55,7 @@ export function applyTheme(theme, documentRef = globalThis.document) {
     root.style.colorScheme = nextTheme;
 
     const themeColor = documentRef.querySelector('meta[name="theme-color"]');
-    themeColor?.setAttribute('content', nextTheme === DARK_THEME ? '#071f17' : '#146d4a');
+    themeColor?.setAttribute('content', nextTheme === DARK_THEME ? '#071d2e' : '#0369a1');
     updateThemeControls(nextTheme, documentRef);
 
     return nextTheme;

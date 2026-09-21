@@ -100,7 +100,7 @@
                     </div>
                 </div>
             @elseif ($status === App\Enums\BookingStatus::Confirmed)
-                <div data-booking-celebration class="rounded-3xl border border-court-200 bg-[linear-gradient(120deg,#effcf5_0%,#ffffff_78%)] p-5 sm:p-6">
+                <div data-booking-celebration class="rounded-3xl border border-court-200 bg-[linear-gradient(120deg,#f0f9ff_0%,#ffffff_78%)] p-5 sm:p-6">
                     <div aria-hidden="true" class="player-confetti"><span></span><span></span><span></span><span></span><span></span><span></span></div>
                     <div class="relative">
                         <p class="text-xs font-semibold uppercase tracking-[0.18em] text-court-700">You’re ready to play</p>

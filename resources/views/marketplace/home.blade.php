@@ -18,8 +18,10 @@
 
     <section data-player-hero class="relative overflow-hidden border-b border-slate-200 bg-white">
         <div class="absolute inset-y-0 right-0 hidden w-[48%] lg:block">
-            <div class="court-visual h-full">
-                <div class="absolute inset-0 bg-gradient-to-r from-white via-white/25 to-transparent"></div>
+            <div class="relative h-full" data-home-hero-placeholder>
+                <img src="{{ asset('assets/placeholder.png') }}" alt="" aria-hidden="true" loading="eager" decoding="async" fetchpriority="high" class="absolute inset-0 size-full object-cover object-center">
+                <div aria-hidden="true" class="absolute inset-0 bg-court-950/15"></div>
+                <div aria-hidden="true" class="absolute inset-0 bg-gradient-to-r from-white via-white/35 to-transparent"></div>
                 @if ($socialProof['player_count'] > 0)
                     @include('marketplace.partials.player-social-proof', ['class' => 'absolute bottom-10 right-10'])
                 @else
@@ -126,7 +128,7 @@
         @endif
 
         @if ($featuredPromotion)
-            <div data-featured-deal @if ($featuredCoverPhotoUrl) data-featured-deal-cover @endif class="relative mt-7 overflow-hidden rounded-2xl border {{ $featuredCoverPhotoUrl ? 'border-court-950/15 bg-court-950' : 'border-court-100 bg-[linear-gradient(100deg,#eefbf4_0%,#fbfefc_52%,#e4f6eb_100%)]' }} px-4 py-4 shadow-[0_12px_35px_rgba(20,109,74,0.12)] sm:px-6">
+            <div data-featured-deal @if ($featuredCoverPhotoUrl) data-featured-deal-cover @endif class="relative mt-7 overflow-hidden rounded-2xl border {{ $featuredCoverPhotoUrl ? 'border-court-950/15 bg-court-950' : 'border-court-100 bg-[linear-gradient(100deg,#f0f9ff_0%,#fbfdff_52%,#e0f2fe_100%)]' }} px-4 py-4 shadow-[0_12px_35px_rgba(3,105,161,0.14)] sm:px-6">
                 @if ($featuredCoverPhotoUrl)
                     <img src="{{ $featuredCoverPhotoUrl }}" alt="" aria-hidden="true" decoding="async" class="absolute inset-0 size-full object-cover object-center">
                     <div aria-hidden="true" class="absolute inset-0 bg-gradient-to-r from-court-950/95 via-court-950/80 to-court-900/50"></div>
@@ -151,7 +153,7 @@
     </section>
 
     @if ($directoryListings->isNotEmpty())
-        <section data-directory-venues class="border-t border-slate-200 bg-[linear-gradient(180deg,#f8fbf9_0%,#ffffff_100%)]">
+        <section data-directory-venues class="border-t border-slate-200 bg-[linear-gradient(180deg,#f7fbff_0%,#ffffff_100%)]">
             <div class="page-shell py-14 sm:py-16">
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div class="max-w-3xl">
@@ -166,9 +168,9 @@
                     @foreach ($directoryListings as $listing)
                         <article class="flex w-[calc(100vw-3rem)] max-w-[22rem] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:w-[22rem]">
                             <div class="relative flex min-h-32 items-end overflow-hidden bg-court-950 p-5 text-white">
-                                <div aria-hidden="true" class="absolute -right-12 -top-14 size-44 rounded-full border border-white/15"></div>
-                                <div aria-hidden="true" class="absolute -right-3 top-8 size-24 rotate-12 rounded-2xl border border-white/15"></div>
-                                <span class="relative inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-3.5']) Not yet bookable</span>
+                                <img data-directory-cover-placeholder src="{{ asset('assets/placeholder.png') }}" alt="{{ $listing->name }} venue cover photo placeholder" loading="lazy" decoding="async" class="absolute inset-0 size-full object-cover">
+                                <div aria-hidden="true" class="absolute inset-0 bg-gradient-to-t from-court-950/75 via-court-950/10 to-black/10"></div>
+                                <span class="relative z-10 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1.5 text-xs font-semibold text-amber-800 shadow-sm">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-3.5']) Not yet bookable</span>
                             </div>
                             <div class="flex flex-1 flex-col p-5">
                                 <h3 class="text-xl font-semibold tracking-tight text-slate-950"><a href="{{ route('marketplace.directory.show', $listing->slug) }}" class="hover:text-court-700">{{ $listing->name }}</a></h3>

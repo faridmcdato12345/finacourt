@@ -7,11 +7,11 @@ const page = usePage();
 </script>
 
 <template>
-    <div class="min-h-screen bg-[#f5f8f6]">
+    <div class="min-h-screen bg-[#f6f9fc]">
         <header class="border-b border-court-900 bg-court-950 text-white">
             <div class="mx-auto flex min-h-18 max-w-7xl items-center justify-between gap-4 px-5 py-4 sm:px-8">
                 <div>
-                    <a href="/partner/dashboard" class="flex items-center gap-2.5 text-lg font-bold tracking-[0.12em]"><img :src="'/icons/finacourt-logo-192.png'" alt="" class="size-9 rounded-xl object-cover" width="36" height="36">FinACourt</a>
+                    <a href="/partner/dashboard" class="flex items-center gap-2.5 text-lg font-bold tracking-[0.12em]"><img :src="'/icons/app-logo.png'" alt="" class="size-9 rounded-xl object-contain" width="36" height="36">FinACourt</a>
                     <p class="mt-0.5 text-xs uppercase tracking-wider text-court-200">Sales partner workspace</p>
                 </div>
                 <nav class="flex items-center gap-2 text-sm sm:gap-4" aria-label="Sales partner navigation">

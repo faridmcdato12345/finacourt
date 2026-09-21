@@ -10,7 +10,7 @@ const page = usePage();
         <header class="border-b border-slate-200/80 bg-white/90 backdrop-blur">
             <div class="mx-auto flex h-18 max-w-7xl items-center justify-between px-5 sm:px-8">
                 <a href="/" class="flex items-center gap-3 font-semibold tracking-tight text-slate-950">
-                    <img :src="'/icons/finacourt-logo-192.png'" alt="" class="size-10 rounded-xl object-cover shadow-sm" width="40" height="40">
+                    <img :src="'/icons/app-logo.png'" alt="" class="size-10 rounded-xl object-contain shadow-sm" width="40" height="40">
                     <span>FinACourt</span>
                 </a>
 

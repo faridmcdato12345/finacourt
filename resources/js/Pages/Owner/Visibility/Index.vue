@@ -65,7 +65,7 @@ async function copy(value, key) {
             </div>
 
             <article v-for="venue in venues" :key="venue.id" class="app-card overflow-hidden" data-visibility-venue>
-                <div class="grid gap-6 border-b border-slate-200 bg-[linear-gradient(120deg,#f0fbf5_0%,#ffffff_62%)] p-5 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
+                <div class="grid gap-6 border-b border-slate-200 bg-[linear-gradient(120deg,#f0f9ff_0%,#ffffff_62%)] p-5 sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
                             <h2 class="text-2xl font-semibold tracking-tight text-slate-950">{{ venue.name }}</h2>

@@ -7,7 +7,7 @@ import ThemeToggle from '../Components/ThemeToggle.vue';
         <section class="flex min-h-screen flex-col px-5 py-6 sm:px-10 lg:px-14">
             <div class="flex items-center justify-between gap-4">
                 <a href="/" class="flex w-fit items-center gap-3 font-semibold tracking-tight text-slate-950">
-                    <img :src="'/icons/finacourt-logo-192.png'" alt="" class="size-10 rounded-xl object-cover" width="40" height="40">
+                    <img :src="'/icons/app-logo.png'" alt="" class="size-10 rounded-xl object-contain" width="40" height="40">
                     <span class="tracking-[0.1em] text-court-900">FinACourt</span>
                 </a>
                 <ThemeToggle />
