@@ -30,11 +30,10 @@ class PwaNotificationTest extends TestCase
         $this->assertSame('FinACourt', $manifest['name']);
         $this->assertSame('standalone', $manifest['display']);
         $this->assertSame('/', $manifest['scope']);
-        $this->assertSame('#146d4a', $manifest['theme_color']);
-        $this->assertCount(3, $manifest['icons']);
-        $this->assertSame('/icons/finacourt-logo-192.png', $manifest['icons'][0]['src']);
-        $this->assertSame('/icons/finacourt-logo-512.png', $manifest['icons'][1]['src']);
-        $this->assertSame('/icons/finacourt-logo-maskable-512.png', $manifest['icons'][2]['src']);
+        $this->assertSame('#0369a1', $manifest['theme_color']);
+        $this->assertSame('/icons/app-logo.png', $manifest['icons'][0]['src']);
+        $this->assertSame('1254x1254', $manifest['icons'][0]['sizes']);
+        $this->assertCount(1, $manifest['icons']);
 
         foreach ($manifest['icons'] as $icon) {
             $path = public_path(ltrim($icon['src'], '/'));
@@ -76,6 +75,8 @@ class PwaNotificationTest extends TestCase
         $this->assertStringContainsString('@media (prefers-reduced-motion: reduce)', $styles);
         $this->assertStringContainsString("matchMedia('(prefers-reduced-motion: reduce)')", $behavior);
         $this->assertStringContainsString('IntersectionObserver', $behavior);
+        $this->assertStringContainsString("rootMargin: '0px 0px -7% 0px', threshold: 0", $behavior);
+        $this->assertStringNotContainsString('threshold: 0.06', $behavior);
     }
 
     public function test_response_headers_allow_only_narrow_public_caching(): void

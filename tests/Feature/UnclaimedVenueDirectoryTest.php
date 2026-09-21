@@ -400,6 +400,8 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->get(route('marketplace.home'))
             ->assertOk()
             ->assertSee('data-directory-venues', false)
+            ->assertSee('data-directory-cover-placeholder', false)
+            ->assertSee('/assets/placeholder.png', false)
             ->assertSee('More places to play')
             ->assertSee($listing->name)
             ->assertSee(route('marketplace.directory.show', $listing->slug), false)

@@ -33,7 +33,10 @@ class PublicMarketplaceTest extends TestCase
             ->assertOk()
             ->assertSee('<h1', false)
             ->assertSee('Find and book courts')
-            ->assertSee('/icons/finacourt-logo-192.png', false)
+            ->assertSee('/icons/app-logo.png', false)
+            ->assertSee('data-home-hero-placeholder', false)
+            ->assertSee('/assets/placeholder.png', false)
+            ->assertSee('data-venue-cover-placeholder', false)
             ->assertSee('Server-checked availability')
             ->assertSee('id="google-data-use"', false)
             ->assertSee('When you choose to connect Google')
@@ -65,6 +68,8 @@ class PublicMarketplaceTest extends TestCase
             ->assertSee('data-public-number', false)
             ->assertSee('data-public-number-config', false)
             ->assertSee('<input id="maximum-hourly-price" type="number" name="max_price"', false)
+            ->assertSee('data-venue-cover-placeholder', false)
+            ->assertSee('/assets/placeholder.png', false)
             ->assertSee($venue->name);
 
         $this->get(route('marketplace.venues.show', $venue->slug))

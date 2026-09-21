@@ -7,28 +7,16 @@
     "scope": "/",
     "display": "standalone",
     "orientation": "portrait-primary",
-    "background_color": "#fafaf9",
-    "theme_color": "#146d4a",
+    "background_color": "#f6f9fc",
+    "theme_color": "#0369a1",
     "lang": "en",
     "categories": ["sports", "business", "lifestyle"],
     "icons": [
         {
-            "src": "/icons/finacourt-logo-192.png",
-            "sizes": "192x192",
+            "src": "/icons/app-logo.png",
+            "sizes": "1254x1254",
             "type": "image/png",
             "purpose": "any"
-        },
-        {
-            "src": "/icons/finacourt-logo-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any"
-        },
-        {
-            "src": "/icons/finacourt-logo-maskable-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
         }
     ],
     "shortcuts": [
@@ -36,13 +24,13 @@
             "name": "Find courts",
             "short_name": "Find courts",
             "url": "/courts?source=pwa-shortcut",
-            "icons": [{ "src": "/icons/finacourt-logo-192.png", "sizes": "192x192" }]
+            "icons": [{ "src": "/icons/app-logo.png", "sizes": "1254x1254", "type": "image/png" }]
         },
         {
             "name": "My bookings",
             "short_name": "Bookings",
             "url": "/player/bookings",
-            "icons": [{ "src": "/icons/finacourt-logo-192.png", "sizes": "192x192" }]
+            "icons": [{ "src": "/icons/app-logo.png", "sizes": "1254x1254", "type": "image/png" }]
         }
     ]
 }

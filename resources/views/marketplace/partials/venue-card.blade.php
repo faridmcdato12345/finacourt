@@ -37,7 +37,8 @@
                 <img src="{{ $coverPhotoUrl }}" alt="{{ $coverPhoto->alt_text ?: $venue->name.' venue cover photo' }}" loading="lazy" decoding="async" class="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.025]">
                 <div class="absolute inset-0 bg-gradient-to-t from-court-950/85 via-court-950/10 to-black/20"></div>
             @else
-                <div class="court-visual absolute inset-0" role="img" aria-label="Venue photo placeholder for {{ $venue->name }}"></div>
+                <img data-venue-cover-placeholder src="{{ asset('assets/placeholder.png') }}" alt="{{ $venue->name }} venue cover photo placeholder" loading="lazy" decoding="async" class="absolute inset-0 size-full object-cover transition duration-500 group-hover:scale-[1.025]">
+                <div aria-hidden="true" class="absolute inset-0 bg-gradient-to-t from-court-950/80 via-court-950/10 to-black/15"></div>
             @endif
             <div class="relative z-10 flex items-start justify-between gap-3">
                 <div>@if ($promotion)<span class="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-court-800 shadow-sm">{{ $promotion->offerLabel() ?: 'Promoted' }}</span>@endif</div>

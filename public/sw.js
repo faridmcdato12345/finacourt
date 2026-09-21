@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'finacourt-v2';
+const CACHE_VERSION = 'finacourt-v3';
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PUBLIC_CACHE = `${CACHE_VERSION}-public`;
 const OFFLINE_URL = '/offline.html';
@@ -7,9 +7,7 @@ const PUBLIC_MAX_AGE_MS = 5 * 60 * 1000;
 const PRECACHE = [
     OFFLINE_URL,
     '/manifest.webmanifest',
-    '/icons/finacourt-logo-192.png',
-    '/icons/finacourt-logo-512.png',
-    '/icons/finacourt-logo-maskable-512.png',
+    '/icons/app-logo.png',
 ];
 
 self.addEventListener('install', (event) => {
@@ -115,8 +113,8 @@ self.addEventListener('push', (event) => {
     const payload = event.data.json();
     event.waitUntil(self.registration.showNotification(payload.title || 'FinACourt', {
         body: payload.message,
-        icon: '/icons/finacourt-logo-192.png',
-        badge: '/icons/finacourt-logo-192.png',
+        icon: '/icons/app-logo.png',
+        badge: '/icons/app-logo.png',
         data: { url: payload.url || '/player/bookings' },
         tag: payload.tag,
     }));

@@ -4,13 +4,13 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
-        <meta name="theme-color" content="#146d4a">
+        <meta name="theme-color" content="#0369a1">
         <meta name="color-scheme" content="light dark">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
         <link rel="manifest" href="/manifest.webmanifest">
-        <link rel="icon" type="image/png" href="/icons/finacourt-logo-192.png">
-        <link rel="apple-touch-icon" href="/icons/finacourt-logo-192.png">
+        <link rel="icon" type="image/png" sizes="1254x1254" href="/icons/app-logo.png">
+        <link rel="apple-touch-icon" href="/icons/app-logo.png">
 
         @include('partials.theme-bootstrap')
 

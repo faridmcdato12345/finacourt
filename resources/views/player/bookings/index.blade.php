@@ -49,7 +49,7 @@
 
         @if ($notifications->isNotEmpty())
             <section data-player-card class="mb-9 overflow-hidden rounded-3xl border border-court-100 bg-white shadow-sm" aria-labelledby="notifications-heading">
-                <div class="flex flex-col gap-3 border-b border-court-100 bg-[linear-gradient(100deg,#effcf5_0%,#ffffff_70%)] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+                <div class="flex flex-col gap-3 border-b border-court-100 bg-[linear-gradient(100deg,#f0f9ff_0%,#ffffff_70%)] p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                     <div class="flex items-center gap-3">
                         <span class="grid size-11 place-items-center rounded-2xl bg-court-700 text-white shadow-md shadow-court-900/15">@include('marketplace.partials.icon', ['name' => 'calendar', 'class' => 'size-5'])</span>
                         <div><p class="text-xs font-semibold uppercase tracking-[0.16em] text-court-700">Game-day updates</p><h2 id="notifications-heading" class="mt-1 text-xl font-semibold">Anything new with your games?</h2></div>

@@ -60,7 +60,7 @@ class ReactivationNotification extends Notification implements ShouldQueue
             'venueName' => $venue->name,
             'ctaUrl' => $url,
             'preferencesUrl' => route('player.preferences.edit'),
-            'logoUrl' => asset('icons/finacourt-logo-192.png'),
+            'logoUrl' => asset('icons/app-logo.png'),
             'suggestedCourt' => $this->recipient->suggestedResource?->name,
             'suggestedDate' => $this->recipient->suggested_date?->format('D, M j'),
             'suggestedTime' => $this->formatSuggestedTime(),

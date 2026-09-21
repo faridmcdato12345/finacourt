@@ -1,6 +1,6 @@
 <script setup>
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import AppSelect from '../Components/AppSelect.vue';
 import LogoutForm from '../Components/LogoutForm.vue';
 import ThemeToggle from '../Components/ThemeToggle.vue';
@@ -20,6 +20,7 @@ const showSetupProgress = computed(() => (
     && !venueSetup.value.is_complete
 ));
 const ownerLandingUrl = computed(() => isWorkspaceRestricted.value ? '/owner/onboarding/venue' : (isEmailVerified.value ? '/owner/dashboard' : '/owner/account'));
+const mobileNavigationOpen = ref(false);
 
 function isActive(prefix) {
     return page.url.startsWith(prefix);
@@ -30,45 +31,69 @@ function switchOrganization(id) {
         router.post(`/owner/organizations/${id}/activate`);
     }
 }
+
+function closeMobileNavigation() {
+    mobileNavigationOpen.value = false;
+}
+
+watch(() => page.url, closeMobileNavigation);
 </script>
 
 <template>
-    <div class="min-h-screen bg-[#f6f8f5]">
-        <header class="sticky top-0 z-40 border-b border-court-900 bg-court-950 text-white lg:hidden">
+    <div class="min-h-screen bg-[#f6f9fc]">
+        <header class="sticky top-0 z-40 border-b border-court-900 bg-court-950 text-white lg:hidden" @keydown.esc="closeMobileNavigation">
             <div class="flex h-16 items-center justify-between gap-4 px-4">
                 <a :href="ownerLandingUrl" class="flex items-center gap-2.5 text-lg font-bold tracking-[0.08em]">
-                    <img :src="'/icons/finacourt-logo-192.png'" alt="" class="size-9 rounded-xl object-cover" width="36" height="36">
+                    <img :src="'/icons/app-logo.png'" alt="" class="size-9 rounded-xl object-contain" width="36" height="36">
                     FinACourt
                 </a>
                 <div class="flex items-center gap-2">
                     <ThemeToggle />
-                    <a href="/" class="rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold text-court-100">Public site</a>
+                    <button
+                        type="button"
+                        class="grid size-10 place-items-center rounded-xl border border-white/20 text-court-100 transition hover:bg-white/10 hover:text-white"
+                        aria-controls="owner-mobile-menu"
+                        :aria-expanded="mobileNavigationOpen"
+                        :aria-label="mobileNavigationOpen ? 'Close owner navigation' : 'Open owner navigation'"
+                        @click="mobileNavigationOpen = !mobileNavigationOpen"
+                    >
+                        <svg v-if="!mobileNavigationOpen" viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+                        <svg v-else viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
+                    </button>
                 </div>
             </div>
-            <nav class="owner-mobile-navigation scrollbar-none flex gap-1 overflow-x-auto px-3 pb-3 text-sm" aria-label="Mobile owner navigation">
-                <Link v-if="showSetupProgress" href="/owner/onboarding/venue" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/onboarding') ? 'bg-white text-court-950' : 'text-court-100']">Setup progress</Link>
-                <template v-if="isEmailVerified && !isWorkspaceRestricted">
-                    <Link href="/owner/dashboard" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/dashboard') ? 'bg-white text-court-950' : 'text-court-100']">Home</Link>
-                    <Link v-if="abilities.manage_inventory" href="/owner/venues" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/venues') ? 'bg-white text-court-950' : 'text-court-100']">Venues</Link>
-                    <Link v-if="abilities.manage_bookings" href="/owner/bookings" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/bookings') ? 'bg-white text-court-950' : 'text-court-100']">Bookings</Link>
-                    <Link v-if="abilities.manage_bookings" href="/owner/court-closures" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/court-closures') ? 'bg-white text-court-950' : 'text-court-100']">Emergency closures</Link>
-                    <Link v-if="organization?.role === 'owner'" href="/owner/team" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/team') ? 'bg-white text-court-950' : 'text-court-100']">Team</Link>
-                    <Link v-if="organization?.role === 'owner'" href="/owner/earnings" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/earnings') ? 'bg-white text-court-950' : 'text-court-100']">Earnings</Link>
-                    <Link v-if="abilities.manage_bookings" href="/owner/reactivation" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/reactivation') ? 'bg-white text-court-950' : 'text-court-100']">Customers</Link>
-                    <Link v-if="abilities.manage_inventory" href="/owner/promotions" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/promotions') ? 'bg-white text-court-950' : 'text-court-100']">Promotions</Link>
-                    <Link v-if="abilities.manage_inventory" href="/owner/booking-links" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/booking-links') ? 'bg-white text-court-950' : 'text-court-100']">Booking Links</Link>
-                    <Link v-if="abilities.manage_inventory" href="/owner/visibility" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/visibility') ? 'bg-white text-court-950' : 'text-court-100']">Get found</Link>
-                    <Link href="/owner/growth" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/growth') ? 'bg-white text-court-950' : 'text-court-100']">Growth opportunities</Link>
-                    <Link href="/owner/analytics" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/analytics') ? 'bg-white text-court-950' : 'text-court-100']">Visits</Link>
-                </template>
-                <Link v-if="isEmailVerified && organization?.role === 'owner'" href="/owner/directory-claims" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/directory-claims') ? 'bg-white text-court-950' : 'text-court-100']">Venue requests</Link>
-                <Link href="/owner/account" :class="['whitespace-nowrap rounded-lg px-3 py-2', isActive('/owner/account') ? 'bg-white text-court-950' : 'text-court-100']">My account</Link>
-            </nav>
+            <div v-show="mobileNavigationOpen" id="owner-mobile-menu" class="border-t border-white/10 px-3 pb-4 pt-3">
+                <div class="mb-3 flex items-center justify-between gap-3 rounded-xl bg-white/8 px-4 py-3 text-xs">
+                    <div class="min-w-0"><p class="truncate font-semibold text-white">{{ organization?.name }}</p><p class="mt-0.5 capitalize text-court-200">{{ organization?.role || 'Platform administrator' }}</p></div>
+                    <a href="/" class="shrink-0 rounded-lg border border-white/15 px-3 py-2 font-semibold text-court-100 hover:bg-white/10" @click="closeMobileNavigation">Public site ↗</a>
+                </div>
+                <nav class="owner-mobile-navigation filter-scrollbar grid max-h-[calc(100dvh-10.5rem)] gap-1 overflow-y-auto pr-1 text-sm sm:grid-cols-2" aria-label="Mobile owner navigation" @click="closeMobileNavigation">
+                    <Link v-if="showSetupProgress" href="/owner/onboarding/venue" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/onboarding') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Setup progress</Link>
+                    <template v-if="isEmailVerified && !isWorkspaceRestricted">
+                        <Link href="/owner/dashboard" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/dashboard') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Home</Link>
+                        <Link v-if="abilities.manage_inventory" href="/owner/venues" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/venues') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Venues & courts</Link>
+                        <Link v-if="abilities.manage_bookings" href="/owner/bookings" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/bookings') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Bookings</Link>
+                        <Link v-if="abilities.manage_bookings" href="/owner/court-closures" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/court-closures') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Emergency closures</Link>
+                        <Link v-if="organization?.role === 'owner'" href="/owner/team" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/team') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Team & staff</Link>
+                        <Link v-if="organization?.role === 'owner'" href="/owner/earnings" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/earnings') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Court earnings</Link>
+                        <Link v-if="abilities.manage_bookings" href="/owner/reactivation" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/reactivation') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Customers</Link>
+                        <Link v-if="abilities.manage_inventory" href="/owner/promotions" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/promotions') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Promotions</Link>
+                        <Link v-if="abilities.manage_inventory" href="/owner/booking-links" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/booking-links') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Booking Links</Link>
+                        <Link v-if="abilities.manage_inventory" href="/owner/visibility" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/visibility') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Get found</Link>
+                        <Link href="/owner/growth" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/growth') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Growth opportunities</Link>
+                        <Link href="/owner/analytics" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/analytics') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Visits & bookings</Link>
+                    </template>
+                    <Link v-if="isEmailVerified && organization?.role === 'owner'" href="/owner/directory-claims" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/directory-claims') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Venue requests</Link>
+                    <Link href="/owner/account" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/account') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">My account</Link>
+                    <Link v-if="user?.is_platform_admin" href="/platform/dashboard" class="rounded-xl px-4 py-3 font-medium text-court-100 hover:bg-white/10 hover:text-white">Platform administration</Link>
+                    <LogoutForm class="rounded-xl px-4 py-3 text-left font-medium text-court-100 hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60" />
+                </nav>
+            </div>
         </header>
 
-        <aside class="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-y-auto bg-[linear-gradient(180deg,#063c2a_0%,#075438_54%,#073b2b_100%)] px-4 py-6 text-white lg:flex">
+        <aside class="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-y-auto bg-[linear-gradient(180deg,#082f49_0%,#075985_54%,#082f49_100%)] px-4 py-6 text-white lg:flex">
             <a href="/" class="flex items-center gap-3 px-3 text-xl font-bold tracking-[0.1em]">
-                <img :src="'/icons/finacourt-logo-192.png'" alt="" class="size-10 rounded-xl object-cover" width="40" height="40">
+                <img :src="'/icons/app-logo.png'" alt="" class="size-10 rounded-xl object-contain" width="40" height="40">
                 FinACourt
             </a>
 

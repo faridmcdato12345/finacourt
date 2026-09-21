@@ -252,7 +252,7 @@ function bindPlayerExperience() {
             entry.target.classList.add('is-visible');
             observer.unobserve(entry.target);
         });
-    }, { rootMargin: '0px 0px -7% 0px', threshold: 0.06 });
+    }, { rootMargin: '0px 0px -7% 0px', threshold: 0 });
 
     revealTargets.forEach((target) => observer.observe(target));
     requestAnimationFrame(() => {
@@ -377,8 +377,8 @@ async function bindNotificationPermission(registration) {
         if (localStorage.getItem(key)) continue;
         await registration.showNotification(item.title, {
             body: item.message,
-            icon: '/icons/finacourt-logo-192.png',
-            badge: '/icons/finacourt-logo-192.png',
+            icon: '/icons/app-logo.png',
+            badge: '/icons/app-logo.png',
             data: { url: item.url },
             tag: item.id,
         });
