@@ -139,6 +139,30 @@
                     </section>
                 </div>
 
+                @if ($venue->loyalty_active)
+                    <section data-venue-loyalty class="rounded-2xl border border-court-200 bg-court-50 p-5 sm:p-6">
+                        <div class="flex items-start gap-3">
+                            <span aria-hidden="true" class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-xl text-amber-600">★</span>
+                            <div>
+                                <p class="eyebrow">Venue loyalty</p>
+                                <h2 class="mt-1 text-xl font-semibold tracking-tight text-court-950">Play more, earn a court discount</h2>
+                            </div>
+                        </div>
+                        <div class="mt-5 grid gap-3 sm:grid-cols-3">
+                            <div class="rounded-xl border border-court-100 bg-white p-4"><p class="text-lg font-semibold text-court-950">1 stamp</p><p class="mt-1 text-xs text-slate-600">Per qualifying completed game</p></div>
+                            <div class="rounded-xl border border-court-100 bg-white p-4"><p class="text-lg font-semibold text-court-950">{{ $venue->loyalty_stamps_required }} stamps</p><p class="mt-1 text-xs text-slate-600">Unlock one reward</p></div>
+                            <div class="rounded-xl border border-court-100 bg-white p-4"><p class="text-lg font-semibold text-court-950">{{ number_format((float) $venue->loyalty_discount_percent, 2) }}% off</p><p class="mt-1 text-xs text-slate-600">Court price, capped at ₱{{ number_format((float) $venue->loyalty_discount_cap, 2) }}</p></div>
+                        </div>
+                        <p class="mt-4 text-sm leading-6 text-court-900">Play an online-paid game of at least 60 minutes to earn a stamp after it ends and payment is verified, up to one stamp per player per venue-local day. Choose when to use a reward; it does not expire and can stack with an eligible deal. The deal applies first, then loyalty applies to the remaining court price. Cancelled or refunded games do not earn stamps.</p>
+                    </section>
+                @else
+                    <section data-venue-loyalty class="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
+                        <p class="eyebrow">Venue loyalty</p>
+                        <h2 class="mt-1 text-xl font-semibold tracking-tight text-slate-900">Loyalty rewards are not active</h2>
+                        <p class="mt-3 text-sm leading-6 text-slate-600">New bookings at this venue do not earn stamps right now. Stamps and rewards earned before a pause remain available to use.</p>
+                    </section>
+                @endif
+
                 <section class="app-card overflow-hidden">
                     <div class="border-b border-slate-100 px-5 py-5 sm:px-6"><p class="eyebrow">Inventory</p><h2 class="mt-1 text-xl font-semibold tracking-tight">Courts and pricing</h2></div>
                     <div class="divide-y divide-slate-100">

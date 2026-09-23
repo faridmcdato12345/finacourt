@@ -3,6 +3,7 @@
 @section('content')
     @php
         $status = $booking->effectiveStatus();
+        $gameEnded = $status === App\Enums\BookingStatus::Confirmed && $booking->end_at->lessThanOrEqualTo(now());
         $start = $booking->start_at->setTimezone($booking->timezone);
         $end = $booking->end_at->setTimezone($booking->timezone);
         $canCancel = in_array($status, [App\Enums\BookingStatus::Hold, App\Enums\BookingStatus::Confirmed], true) && $booking->start_at->isFuture();
@@ -11,6 +12,7 @@
         $refundRequest = $payment?->refundRequest;
         $isClosureRefund = $refundRequest?->court_closure_id !== null;
         $playerTotal = (float) $booking->player_total_amount > 0 ? $booking->player_total_amount : $booking->total_amount;
+        $dealSavings = max(0, (float) $booking->discount_amount - (float) ($loyaltyRewardDiscount ?? 0));
         $coverPhoto = $booking->venue->photos->first();
         $coverPhotoUrl = $coverPhoto
             ? Illuminate\Support\Facades\Storage::disk('public')->url($coverPhoto->storage_path)
@@ -38,6 +40,7 @@
                         <span class="rounded-full px-3 py-1.5 text-xs font-bold {{ $statusTone }}">{{ $status->label() }}</span>
                         <span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-court-100 backdrop-blur">{{ $booking->resource->sport->name }}</span>
                         @if ($booking->promotion_title)<span class="rounded-full bg-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-950">Deal applied</span>@endif
+                        @if ($loyaltyRewardDiscount)<span class="rounded-full bg-court-300 px-3 py-1.5 text-xs font-semibold text-court-950">Loyalty reward −₱{{ number_format((float) $loyaltyRewardDiscount, 2) }}</span>@endif
                     </div>
                     <p class="mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-court-300">Your game pass</p>
                     <h1 class="mt-2 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">{{ $booking->venue->name }}</h1>
@@ -66,10 +69,67 @@
             @if (session('status'))<p role="status" aria-live="polite" class="rounded-2xl border border-court-200 bg-court-50 px-5 py-4 text-sm font-medium text-court-800">{{ session('status') }}</p>@endif
             @if ($errors->any())<p role="alert" class="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{{ $errors->first() }}</p>@endif
 
+            @if ($booking->venue->loyalty_active || $booking->loyalty_eligible || $loyaltyBalance['stamps'] > 0 || $loyaltyBalance['reward_debt'] > 0)
+                <section data-loyalty-progress class="rounded-3xl border border-court-200 bg-court-50 p-5 sm:p-6">
+                    <p class="eyebrow">Venue loyalty</p>
+                    <h2 class="mt-2 text-xl font-semibold text-court-950">Your stamps at {{ $booking->venue->name }}</h2>
+                    <p class="mt-2 text-sm text-court-900">You have <strong>{{ $loyaltyBalance['stamps'] }} earned {{ Illuminate\Support\Str::plural('stamp', $loyaltyBalance['stamps']) }}</strong> and <strong>{{ $loyaltyBalance['rewards_available'] }} {{ Illuminate\Support\Str::plural('reward', $loyaltyBalance['rewards_available']) }} ready</strong>.</p>
+                    @if ($loyaltyBalance['rewards_available'] > 0)
+                        <p class="mt-2 text-sm text-court-800">You can choose to use one reward on a future online booking, including a booking with a deal.</p>
+                    @else
+                        <p class="mt-2 text-sm text-court-800"><strong>{{ $loyaltyBalance['stamps_needed'] }} more qualifying {{ Illuminate\Support\Str::plural('game', $loyaltyBalance['stamps_needed']) }}</strong> needed to unlock a reward. Stamps are added only after an online-paid game is completed, at most once per venue-local day.</p>
+                    @endif
+                    @if ($loyaltyBalance['reward_debt'] > 0)
+                        <p class="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-950">A refunded game removed a stamp after a reward was used. New qualifying stamps must cover that used reward before another becomes available.</p>
+                    @endif
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                        @forelse ($loyaltyBalance['rewards'] as $card)
+                            <div class="rounded-xl border border-court-100 bg-white p-4 text-sm text-slate-700">
+                                <p class="font-semibold text-slate-950">{{ $card['stamps_required'] }} {{ Illuminate\Support\Str::plural('stamp', $card['stamps_required']) }} = {{ number_format((float) $card['discount_percent'], 2) }}% off</p>
+                                <p class="mt-1">{{ $card['stamps'] }} earned under these terms · {{ $card['rewards_available'] }} {{ Illuminate\Support\Str::plural('reward', $card['rewards_available']) }} ready</p>
+                                <p class="mt-1 text-xs text-slate-500">
+                                    @if ($card['rewards_available'] > 0)
+                                        Reward unlocked
+                                        @if ($card['stamps'] % $card['stamps_required'] > 0)
+                                            · {{ $card['stamps'] % $card['stamps_required'] }}/{{ $card['stamps_required'] }} toward another reward
+                                        @endif
+                                    @else
+                                        {{ $card['stamps'] % $card['stamps_required'] }}/{{ $card['stamps_required'] }} toward a reward
+                                    @endif
+                                    · capped at ₱{{ number_format((float) $card['discount_cap'], 2) }}
+                                </p>
+                            </div>
+                        @empty
+                            <div class="rounded-xl border border-court-100 bg-white p-4 text-sm text-slate-700">
+                                <p class="font-semibold text-slate-950">Current offer: {{ $booking->venue->loyalty_stamps_required }} {{ Illuminate\Support\Str::plural('stamp', $booking->venue->loyalty_stamps_required) }} = {{ number_format((float) $booking->venue->loyalty_discount_percent, 2) }}% off</p>
+                                <p class="mt-1">0/{{ $booking->venue->loyalty_stamps_required }} earned · capped at ₱{{ number_format((float) $booking->venue->loyalty_discount_cap, 2) }}</p>
+                            </div>
+                        @endforelse
+                    </div>
+                    @if ($booking->payment_status === App\Enums\PaymentStatus::Refunded)
+                        <p class="mt-4 text-xs text-amber-900">This booking was refunded, so it cannot earn or keep a loyalty stamp.</p>
+                    @elseif ($loyaltyRefundBlocked)
+                        <p class="mt-4 text-xs text-amber-900">This booking's stamp is on hold while its refund is being reviewed. It returns if the request is declined; a completed refund removes it.</p>
+                    @elseif ($loyaltyStampEarned)
+                        <p class="mt-4 text-xs text-court-800">This completed booking added one of the earned stamps shown above.</p>
+                    @elseif ($booking->loyalty_eligible && in_array($status, [App\Enums\BookingStatus::Hold, App\Enums\BookingStatus::Confirmed], true) && $booking->payment_status !== App\Enums\PaymentStatus::Refunded)
+                        @if ($gameEnded && $booking->loyalty_processed_at === null)
+                            <p class="mt-4 text-xs text-court-800">Your game has ended. Your stamp is being checked and will appear here after the next loyalty sync if this booking qualifies.</p>
+                        @elseif ($gameEnded)
+                            <p class="mt-4 text-xs text-court-800">No additional stamp was awarded for this booking. Only one game per venue-local day can earn a stamp.</p>
+                        @else
+                            <p class="mt-4 text-xs text-court-800">This reservation has not earned a stamp yet. It can add one after the game ends and online payment is verified, provided no other game at this venue earned a stamp for you that day.</p>
+                        @endif
+                    @endif
+                    @unless ($booking->venue->loyalty_active)
+                        <p class="mt-2 text-xs text-slate-600">This venue has paused new loyalty earning. Stamps and eligible bookings earned before the pause remain honored.</p>
+                    @endunless
+                </section>
+            @endif
+
             @if ($payment?->requires_review)
                 <div class="rounded-3xl border border-amber-200 bg-amber-50 p-5 sm:p-6"><div class="flex items-start gap-3"><span class="grid size-10 shrink-0 place-items-center rounded-2xl bg-amber-200 text-amber-900">!</span><div><h2 class="font-semibold text-amber-950">Let’s double-check your payment</h2><p class="mt-2 text-sm leading-6 text-amber-800">A payment update arrived after the reservation changed. Please contact the venue before relying on this game pass.</p></div></div></div>
             @endif
-
             @if ($status === App\Enums\BookingStatus::Hold)
                 <div data-player-hold-card class="relative overflow-hidden rounded-3xl border border-amber-200 bg-[linear-gradient(120deg,#fffbeb_0%,#ffffff_75%)] p-5 sm:p-6">
                     <div aria-hidden="true" class="absolute -right-10 -top-10 size-32 rounded-full border-[18px] border-amber-100"></div>
@@ -100,12 +160,19 @@
                     </div>
                 </div>
             @elseif ($status === App\Enums\BookingStatus::Confirmed)
-                <div data-booking-celebration class="rounded-3xl border border-court-200 bg-[linear-gradient(120deg,#f0f9ff_0%,#ffffff_78%)] p-5 sm:p-6">
+                <div data-booking-celebration @if ($gameEnded) data-post-game-message @endif class="rounded-3xl border border-court-200 bg-[linear-gradient(120deg,#f0f9ff_0%,#ffffff_78%)] p-5 sm:p-6">
                     <div aria-hidden="true" class="player-confetti"><span></span><span></span><span></span><span></span><span></span><span></span></div>
                     <div class="relative">
-                        <p class="text-xs font-semibold uppercase tracking-[0.18em] text-court-700">You’re ready to play</p>
-                        <h2 class="mt-2 text-2xl font-semibold text-court-950">Reservation confirmed 🎉</h2>
-                        @if ($paymentStatus === App\Enums\PaymentStatus::Paid)<p class="mt-2 text-sm leading-6 text-court-800">@if ($payment?->mode === App\Enums\PaymentMode::HostedCheckout)Your online payment of ₱{{ number_format((float) $playerTotal, 2) }} was verified and recorded.@else The venue recorded the full ₱{{ number_format((float) $playerTotal, 2) }} payment.@endif</p>@elseif ($paymentStatus === App\Enums\PaymentStatus::Refunded)<p class="mt-2 text-sm leading-6 text-court-800">@if ($payment?->mode === App\Enums\PaymentMode::HostedCheckout)Your full online refund was confirmed by the payment provider.@else The venue recorded a full manual refund.@endif</p>@else<p class="mt-2 text-sm leading-6 text-court-800">No online payment has been collected. Please pay ₱{{ number_format((float) $playerTotal, 2) }} directly at the venue.</p>@endif
+                        @if ($gameEnded)
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-court-700">Game complete</p>
+                            <h2 class="mt-2 text-2xl font-semibold text-court-950">Thanks for playing! 🎉</h2>
+                            <p class="mt-2 text-sm leading-6 text-court-800">Your game at {{ $booking->venue->name }} has finished. We hope to see you on court again soon.</p>
+                            @if ($loyaltyStampEarned)<p class="mt-2 text-sm font-semibold leading-6 text-court-900">You earned a loyalty stamp from this game. Your updated total is shown above.</p>@endif
+                        @else
+                            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-court-700">You’re ready to play</p>
+                            <h2 class="mt-2 text-2xl font-semibold text-court-950">Reservation confirmed 🎉</h2>
+                            @if ($paymentStatus === App\Enums\PaymentStatus::Paid)<p class="mt-2 text-sm leading-6 text-court-800">@if ($payment?->mode === App\Enums\PaymentMode::HostedCheckout)Your online payment of ₱{{ number_format((float) $playerTotal, 2) }} was verified and recorded.@else The venue recorded the full ₱{{ number_format((float) $playerTotal, 2) }} payment.@endif</p>@elseif ($paymentStatus === App\Enums\PaymentStatus::Refunded)<p class="mt-2 text-sm leading-6 text-court-800">@if ($payment?->mode === App\Enums\PaymentMode::HostedCheckout)Your full online refund was confirmed by the payment provider.@else The venue recorded a full manual refund.@endif</p>@else<p class="mt-2 text-sm leading-6 text-court-800">No online payment has been collected. Please pay ₱{{ number_format((float) $playerTotal, 2) }} directly at the venue.</p>@endif
+                        @endif
                     </div>
                 </div>
             @elseif ($status === App\Enums\BookingStatus::Expired)
@@ -115,7 +182,7 @@
             @endif
 
             @if ($booking->promotion_title)
-                <div class="relative overflow-hidden rounded-3xl border border-amber-200 bg-amber-50 p-5 sm:p-6"><div aria-hidden="true" class="absolute -right-5 -top-5 rotate-12 text-7xl font-black text-amber-200/60">%</div><div class="relative"><p class="text-xs font-semibold uppercase tracking-wider text-amber-700">Nice! Your deal is locked in</p><h2 class="mt-2 text-xl font-semibold text-amber-950">{{ $booking->promotion_title }}</h2><p class="mt-2 text-sm leading-6 text-amber-800">You saved ₱{{ number_format((float) $booking->discount_amount, 2) }}. Your final court price stays the same even if this deal changes later.</p></div></div>
+                <div class="relative overflow-hidden rounded-3xl border border-amber-200 bg-amber-50 p-5 sm:p-6"><div aria-hidden="true" class="absolute -right-5 -top-5 rotate-12 text-7xl font-black text-amber-200/60">%</div><div class="relative"><p class="text-xs font-semibold uppercase tracking-wider text-amber-700">Nice! Your deal is locked in</p><h2 class="mt-2 text-xl font-semibold text-amber-950">{{ $booking->promotion_title }}</h2><p class="mt-2 text-sm leading-6 text-amber-800">Your deal saved ₱{{ number_format($dealSavings, 2) }}.@if ($loyaltyRewardDiscount) Your loyalty reward saved another ₱{{ number_format((float) $loyaltyRewardDiscount, 2) }}.@endif Your final court price stays the same even if this deal changes later.</p></div></div>
             @endif
 
             <section data-player-card class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

@@ -10,6 +10,7 @@ Artisan::command('inspire', function () {
 
 Schedule::command('bookings:send-reminders')->hourly()->withoutOverlapping();
 Schedule::command('refunds:reconcile-processing')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('loyalty:sync-stamps')->everyTenMinutes()->withoutOverlapping();
 Schedule::command('owners:payout-scheduled')
     ->dailyAt('00:30')
     ->timezone((string) config('settlements.timezone', 'Asia/Manila'))

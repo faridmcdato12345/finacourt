@@ -37,6 +37,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'claimed_at',
     'verified_at',
     'marketplace_review_requested_at',
+    'loyalty_active',
+    'loyalty_terms_version',
+    'loyalty_stamps_required',
+    'loyalty_discount_percent',
+    'loyalty_discount_cap',
 ])]
 class Venue extends Model
 {
@@ -213,6 +218,11 @@ class Venue extends Model
             'coordinates_verified_at' => 'immutable_datetime',
             'google_place_id_verified_at' => 'immutable_datetime',
             'is_published' => 'boolean',
+            'loyalty_active' => 'boolean',
+            'loyalty_terms_version' => 'integer',
+            'loyalty_stamps_required' => 'integer',
+            'loyalty_discount_percent' => 'decimal:2',
+            'loyalty_discount_cap' => 'decimal:2',
             'claimed_at' => 'datetime',
             'verified_at' => 'datetime',
             'marketplace_review_requested_at' => 'datetime',

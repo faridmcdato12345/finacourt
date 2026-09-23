@@ -77,6 +77,43 @@ body {
     @apply text-xs font-semibold uppercase tracking-[0.16em] text-court-700;
 }
 
+.loyalty-progress {
+    display: block;
+    width: 100%;
+    height: 0.75rem;
+    appearance: none;
+    overflow: hidden;
+    border: 0;
+    border-radius: 9999px;
+    background-color: #dbeafe;
+}
+
+@media (min-width: 1024px) {
+    [data-loyalty-carousel] {
+        scrollbar-color: #9bbbd1 transparent;
+        scrollbar-width: thin;
+    }
+}
+
+.loyalty-progress::-webkit-progress-bar {
+    background-color: #dbeafe;
+}
+
+.loyalty-progress::-webkit-progress-value {
+    border-radius: 9999px;
+    background-color: #fbbf24;
+}
+
+.loyalty-progress::-moz-progress-bar {
+    border-radius: 9999px;
+    background-color: #fbbf24;
+}
+
+html[data-theme='dark'] .loyalty-progress,
+html[data-theme='dark'] .loyalty-progress::-webkit-progress-bar {
+    background-color: #155276;
+}
+
 .app-select {
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none'%3E%3Cpath d='m6 8 4 4 4-4' stroke='%23146d4a' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 

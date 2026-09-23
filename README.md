@@ -53,10 +53,14 @@ docker compose down
 | `db` | MySQL 8.4 with persistent named storage | `db` |
 | `node` | Node 22 and Vite development server | `node` |
 | `test` | One-off PHP test runner using the isolated MySQL test database | `test` |
-| `scheduler` | Laravel scheduler for idempotent booking reminders | `scheduler` |
+| `scheduler` | Laravel scheduler for booking reminders, refund reconciliation, and venue loyalty stamps | `scheduler` |
 | `queue` | Laravel database-queue worker for transactional email and retryable Google profile discovery | `queue` |
 
-Redis remains unnecessary. The database-backed `queue` service sends retryable court-owner confirmation emails after a booking transaction commits and performs Google Business Profile discovery outside the OAuth callback. The scheduler is required only for reminders; booking holds and availability remain logically correct without either background process.
+Redis remains unnecessary. The database-backed `queue` service sends retryable court-owner confirmation emails after a booking transaction commits and performs Google Business Profile discovery outside the OAuth callback. The scheduler also awards venue loyalty stamps after paid games end; booking holds and availability remain logically correct without either background process.
+
+### Venue loyalty pilot
+
+Loyalty is inactive by default for every venue. An owner can activate or pause it and set the stamps-per-reward, court-price discount percentage, and peso cap on the dedicated `/owner/loyalty` page; staff cannot change these settings. A booking made while active qualifies for one stamp after a confirmed, online-paid game of at least 60 minutes ends, with at most one stamp per player/venue/local day. A reservation does not earn a stamp immediately; the private booking page shows earned stamps, available rewards, and the number of further qualifying completed games needed. The default terms are five stamps for 10% off (maximum ₱100), but owners may change them for new reward cycles. Partially completed stamp cards finish under their original terms rather than becoming stranded. Earned stamps and rewards retain their terms even if the owner changes settings or pauses loyalty. Players explicitly choose whether to redeem at online checkout; there is no weekday or time-of-day restriction and no stamp expiry. Rewards stack with applicable deals: the promotion is applied first, then the loyalty percentage and peso cap apply to the remaining court price. Pending or unresolved refunds suspend associated stamps; declined requests restore them, while confirmed refunds permanently reverse them. If a spent reward loses its earning stamps, later earned reward cards first cover that deficit across terms versions. Expired unpaid reward holds release their reservation. The `loyalty:sync-stamps` scheduled command runs every ten minutes and is idempotent.
 
 ## Tests and quality checks
 
@@ -200,7 +204,7 @@ Owners and staff with `inventory.manage` can manage campaigns at `/owner/promoti
 
 Each promotion receives an immutable server-generated campaign token. Public deals appear at `/deals`, on eligible venue pages, and as badges within the existing discovery ordering. Promotions do not buy ranking or reorder organic results. Inactive, private, expired, unpublished-inventory, or resource-mismatched campaigns are excluded from public surfaces. Invalid or stale campaign tokens fail booking validation rather than silently charging a higher price.
 
-Only one campaign token can enter the booking flow, so promotions never stack. During the existing resource-locked booking transaction, the server locks and revalidates the promotion against the selected tenant, venue, resource, local date, weekday, and complete time interval. It calculates the final price itself and stores the promotion ID, token, title, original prices, final prices, and discount amount on the booking. Payment attempts continue to use that final booking snapshot. Later edits to the resource or promotion cannot alter an existing booking.
+Only one campaign token can enter the booking flow, so multiple promotions never stack with each other. A player may additionally choose to redeem one earned loyalty reward on the post-promotion court price. During the existing resource-locked booking transaction, the server locks and revalidates the promotion against the selected tenant, venue, resource, local date, weekday, and complete time interval. It calculates the final price itself and stores the promotion ID, token, title, original prices, final prices, and discount amount on the booking. Payment attempts continue to use that final booking snapshot. Later edits to the resource or promotion cannot alter an existing booking.
 
 Promotion counters remain available as lightweight lifetime summaries, but impressions and clicks are now backed by the daily-deduplicated Phase 8 event pipeline. Attributed booking starts are incremented transactionally, while exact booking status and revenue remain derivable from linked bookings and their price snapshots.
 
@@ -226,7 +230,7 @@ Traffic attribution uses a centralized source taxonomy and a privacy-limited 30-
 - **Booking revenue** is the immutable value snapshot on those completed bookings. It includes confirmed pay-at-venue bookings with pending collection and is therefore attributed booking value, not guaranteed cash collected. Failed, cancelled, and fully refunded payments are excluded.
 - **Conversion rate** is completed bookings divided by profile views. Very small traffic samples can be volatile, and bookings may complete after the viewed date range.
 - **New customer** means the player’s first qualifying confirmed marketplace booking with that organization occurred in the selected range. A returning customer has an earlier qualifying booking with that organization. Guests without a durable player account cannot be classified.
-- **Promotion performance** combines event-backed impressions/clicks with qualifying bookings and immutable booking price/promotion snapshots. Promotions do not stack.
+- **Promotion performance** combines event-backed impressions/clicks with qualifying bookings and immutable booking price/promotion snapshots. Multiple promotions do not stack; one loyalty reward can also apply.
 
 Queries use composite event-type/entity/time indexes, an organization/time/visitor index, booking attribution indexes, and grouped database aggregates; owner reports never load raw events into the browser. Phase 11 adds normalized and indexed demand dimensions so dashboards no longer aggregate important search filters out of JSON. This is appropriate for MVP scale. At sustained high event volume, the next scaling step is a scheduled daily aggregate table with incremental backfill—not increasingly large raw-event scans. Analytics requires no queue, Redis service, or external BI warehouse; the Phase 9 scheduler is used only for booking reminders.
 

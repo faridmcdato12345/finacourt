@@ -37,6 +37,7 @@ use App\Http\Controllers\Owner\ExternalBookingDestinationController;
 use App\Http\Controllers\Owner\GoogleBusinessProfileController;
 use App\Http\Controllers\Owner\GrowthRecommendationController as OwnerGrowthRecommendationController;
 use App\Http\Controllers\Owner\GrowthRecommendationStateController as OwnerGrowthRecommendationStateController;
+use App\Http\Controllers\Owner\LoyaltyController as OwnerLoyaltyController;
 use App\Http\Controllers\Owner\OperatingHoursController;
 use App\Http\Controllers\Owner\OrganizationContextController;
 use App\Http\Controllers\Owner\PaymentController;
@@ -350,6 +351,7 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
         ->whereNumber('invitation')
         ->name('team.invitations.revoke');
     Route::get('/analytics', OwnerAnalyticsController::class)->name('analytics');
+    Route::get('/loyalty', OwnerLoyaltyController::class)->name('loyalty.index');
     Route::get('/booking-links', [OwnerBookingLinkController::class, 'index'])
         ->name('booking-links.index');
     Route::patch('/booking-links/{visibilityLink}', [OwnerBookingLinkController::class, 'update'])
@@ -453,6 +455,10 @@ Route::prefix('owner')->name('owner.')->middleware(['auth', 'verified', 'tenant'
     Route::delete('/venues/{venue}/google-business-profile', [GoogleBusinessProfileController::class, 'disconnect'])
         ->middleware('throttle:google-business-profile')
         ->name('venues.google-business-profile.disconnect');
+    Route::patch('/venues/{venue}/loyalty', [\App\Http\Controllers\Owner\VenueLoyaltyController::class, 'update'])
+        ->name('venues.loyalty.update');
+    Route::patch('/venues/{venue}/loyalty/terms', [\App\Http\Controllers\Owner\VenueLoyaltyController::class, 'terms'])
+        ->name('venues.loyalty.terms');
     Route::patch('/venues/{venue}/photos/{photo}', [VenuePhotoController::class, 'update'])
         ->name('venues.photos.update');
     Route::delete('/venues/{venue}/photos/{photo}', [VenuePhotoController::class, 'destroy'])

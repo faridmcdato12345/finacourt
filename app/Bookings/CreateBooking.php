@@ -3,12 +3,15 @@
 namespace App\Bookings;
 
 use App\Analytics\SnapshotBookingAttribution;
+use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentMode;
 use App\Enums\PaymentStatus;
+use App\Loyalty\VenueLoyalty;
 use App\Models\Booking;
 use App\Models\CourtResource;
 use App\Models\User;
+use App\Models\Venue;
 use App\Payments\CreatePaymentAttempt;
 use App\Payments\PlatformServiceFeeCalculator;
 use App\Promotions\PromotionApplicability;
@@ -26,6 +29,7 @@ class CreateBooking
         private readonly PlatformServiceFeeCalculator $serviceFees,
         private readonly PromotionApplicability $promotions,
         private readonly SnapshotBookingAttribution $attribution,
+        private readonly VenueLoyalty $loyalty,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -45,6 +49,8 @@ class CreateBooking
             }
 
             $resource->load('venue.organization');
+            // A venue row serializes reward reservations and owner toggles.
+            $venue = Venue::query()->whereKey($resource->venue_id)->lockForUpdate()->firstOrFail();
             $window = $this->availability->window(
                 $resource,
                 $data['booking_date'],
@@ -73,6 +79,41 @@ class CreateBooking
             $paymentMode = ($data['create_payment'] ?? false)
                 ? $this->createPayment->mode($paymentProvider)
                 : null;
+            $loyaltyDiscount = null;
+
+            $rewardVersion = isset($data['loyalty_reward_version']) ? (int) $data['loyalty_reward_version'] : null;
+            $reward = $rewardVersion !== null && $player !== null
+                ? collect($this->loyalty->balance($venue, $player)['rewards'])
+                    ->first(fn (array $item): bool => $item['version'] === $rewardVersion && $item['rewards_available'] > 0)
+                : null;
+
+            if ($rewardVersion !== null) {
+                if ($player === null
+                    || $data['source'] !== BookingSource::Marketplace->value
+                    || $paymentMode !== PaymentMode::HostedCheckout
+                    || $reward === null) {
+                    throw ValidationException::withMessages([
+                        'loyalty' => 'That loyalty reward is no longer available for this booking. Review the price and try again.',
+                    ]);
+                }
+
+                $quote = $this->loyalty->discountedQuote(
+                    $price, $window->durationMinutes, $reward['discount_percent'], $reward['discount_cap'],
+                );
+                if ($quote['discount'] === '0.00') {
+                    throw ValidationException::withMessages([
+                        'loyalty' => 'This reward would not reduce the court price. Save it for another booking.',
+                    ]);
+                }
+                if ($this->serviceFees->quote($quote['price']['total_amount'], $price['currency'])['player_total_amount'] === '0.00') {
+                    throw ValidationException::withMessages([
+                        'loyalty' => 'This reward would leave nothing payable at online checkout. Save it for another booking.',
+                    ]);
+                }
+                $price = $quote['price'];
+                $loyaltyDiscount = $quote['discount'];
+            }
+
             $serviceFee = $paymentMode === PaymentMode::HostedCheckout
                 ? $this->serviceFees->quote($price['total_amount'], $price['currency'])
                 : $this->serviceFees->emptyQuoteFromAmount($price['total_amount']);
@@ -82,6 +123,12 @@ class CreateBooking
             if ($holdExpiresAt->greaterThan($window->utcStart)) {
                 $holdExpiresAt = $window->utcStart;
             }
+
+            $loyaltyEligible = $venue->loyalty_active
+                && $player !== null
+                && $data['source'] === BookingSource::Marketplace->value
+                && $paymentMode === PaymentMode::HostedCheckout
+                && $window->durationMinutes >= 60;
 
             $booking = Booking::query()->create([
                 'organization_id' => $organizationId,
@@ -108,8 +155,25 @@ class CreateBooking
                 ...$serviceFee,
                 'payment_mode' => $paymentMode,
                 'payment_status' => $paymentMode !== null ? PaymentStatus::Pending : null,
+                'loyalty_eligible' => $loyaltyEligible,
+                'loyalty_terms_version' => $loyaltyEligible ? $venue->loyalty_terms_version : null,
+                'loyalty_stamps_required' => $loyaltyEligible ? $venue->loyalty_stamps_required : null,
+                'loyalty_discount_percent' => $loyaltyEligible ? $venue->loyalty_discount_percent : null,
+                'loyalty_discount_cap' => $loyaltyEligible ? $venue->loyalty_discount_cap : null,
                 'created_by_user_id' => $creator->getKey(),
             ]);
+
+            if ($loyaltyDiscount !== null) {
+                DB::table('loyalty_redemptions')->insert([
+                    'venue_id' => $venue->getKey(),
+                    'player_user_id' => $player->getKey(),
+                    'booking_id' => $booking->getKey(),
+                    'terms_version' => $rewardVersion,
+                    'court_discount_amount' => $loyaltyDiscount,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
 
             $this->attribution->record(
                 $booking,

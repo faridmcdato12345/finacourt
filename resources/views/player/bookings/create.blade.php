@@ -12,7 +12,8 @@
             $selectedPaymentOption = 'pay_at_venue';
         }
 
-        $selectedPrice = $selectedPaymentOption === 'online' ? $onlinePrice : $payAtVenuePrice;
+        $redeemSelected = $loyaltyReward && (int) old('loyalty_reward_version', 0) === $loyaltyReward['version'] && $selectedPaymentOption === 'online';
+        $selectedPrice = $redeemSelected ? $loyaltyReward['online_price'] : ($selectedPaymentOption === 'online' ? $onlinePrice : $payAtVenuePrice);
     @endphp
 
     <section class="border-b border-slate-200 bg-white"><div class="page-shell max-w-6xl py-8 sm:py-10"><a href="{{ route('marketplace.venues.show', array_filter(['venueSlug' => $venue->slug, 'resource' => $resource->id, 'date' => $date, 'duration' => $duration, 'campaign' => $campaign])) }}#availability" class="text-sm font-semibold text-court-700">← Change time</a><div class="mt-6 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div><p class="eyebrow">Booking details</p><h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Review before we hold your court</h1><p class="mt-2 text-sm text-slate-500">The server will validate availability and price again when you continue.</p></div><ol class="flex items-center gap-2 text-xs font-semibold"><li class="flex items-center gap-2 text-court-700"><span class="grid size-7 place-items-center rounded-full bg-court-700 text-white">1</span>Details</li><li class="h-px w-7 bg-slate-200"></li><li class="flex items-center gap-2 text-slate-400"><span class="grid size-7 place-items-center rounded-full border border-slate-300">2</span>Confirm</li></ol></div></div></section>
@@ -20,7 +21,9 @@
     <section
         data-booking-payment-pricing
         data-online-total="₱{{ number_format((float) $onlinePrice['player_total_amount'], 2) }}"
+        data-online-fee="₱{{ number_format((float) $onlinePrice['platform_service_fee_amount'], 2) }}"
         data-pay-at-venue-total="₱{{ number_format((float) $payAtVenuePrice['player_total_amount'], 2) }}"
+        @if ($loyaltyReward) data-loyalty-total="₱{{ number_format((float) $loyaltyReward['online_price']['player_total_amount'], 2) }}" data-loyalty-fee="₱{{ number_format((float) $loyaltyReward['online_price']['platform_service_fee_amount'], 2) }}" @endif
         class="page-shell grid max-w-6xl items-start gap-7 py-8 sm:py-10 lg:grid-cols-[minmax(0,1fr)_23rem]"
     >
         <div class="space-y-6">
@@ -59,6 +62,9 @@
                         @csrf
                         <input type="hidden" name="resource_id" value="{{ $resource->id }}"><input type="hidden" name="booking_date" value="{{ $date }}"><input type="hidden" name="start_time" value="{{ $startTime }}"><input type="hidden" name="duration_minutes" value="{{ $duration }}">@if ($campaign)<input type="hidden" name="campaign" value="{{ $campaign }}">@endif
                         <p class="eyebrow">Player details</p><h2 class="mt-2 text-xl font-semibold">Who is this booking for?</h2><p class="mt-2 text-sm text-slate-500">Reservation updates will be associated with {{ auth()->user()->email }}.</p>
+                        @if ($venue->loyalty_active || ($loyaltyBalance['stamps'] ?? 0) > 0)
+                            <div class="mt-4 rounded-xl border border-court-200 bg-court-50 p-4 text-sm text-court-900"><strong>Venue loyalty: {{ $loyaltyBalance['stamps'] ?? 0 }} stamps</strong><p class="mt-1">{{ $venue->loyalty_active ? 'Earn one stamp after an online-paid game of at least 60 minutes, up to one per day.' : 'New bookings do not earn stamps while this venue has paused loyalty.' }} Current terms: {{ $venue->loyalty_stamps_required }} stamps unlock {{ number_format((float) $venue->loyalty_discount_percent, 2) }}% off the court price, capped at ₱{{ number_format((float) $venue->loyalty_discount_cap, 2) }}. {{ $loyaltyBalance['rewards_available'] ?? 0 }} {{ Str::plural('reward', $loyaltyBalance['rewards_available'] ?? 0) }} ready. You choose when to use one.</p>@foreach ($loyaltyBalance['rewards'] as $card)@if ($card['rewards_available'] > 0 || $card['stamps'] % $card['stamps_required'] !== 0)<p class="mt-2 text-xs">{{ $card['stamps'] % $card['stamps_required'] }}/{{ $card['stamps_required'] }} toward {{ number_format((float) $card['discount_percent'], 2) }}% off · {{ $card['rewards_available'] }} ready under these terms</p>@endif @endforeach</div>
+                        @endif
                         @if ($errors->any())<div class="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ $errors->first() }}</div>@endif
                         <div class="mt-6 grid gap-5 sm:grid-cols-2"><label class="block"><span class="text-sm font-medium">Booking name</span><input name="customer_name" value="{{ old('customer_name', auth()->user()->name) }}" autocomplete="name" required class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label><label class="block"><span class="text-sm font-medium">Phone <span class="font-normal text-slate-400">optional</span></span><input name="customer_phone" value="{{ old('customer_phone') }}" autocomplete="tel" class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label></div>
                         <fieldset class="mt-7">
@@ -114,6 +120,12 @@
                                 </label>
                             </div>
                         </fieldset>
+                        @if ($loyaltyReward)
+                            <label class="mt-5 flex items-start gap-3 rounded-xl border border-court-200 bg-court-50 p-4 text-sm text-court-900">
+                                <input data-loyalty-reward-choice name="loyalty_reward_version" type="checkbox" value="{{ $loyaltyReward['version'] }}" @checked($redeemSelected) @disabled($selectedPaymentOption !== 'online') class="mt-1 rounded border-court-400">
+                                <span><strong>Use one loyalty reward on this booking</strong><span class="mt-1 block">{{ number_format((float) $loyaltyReward['discount_percent'], 2) }}% off the court price after any deal, up to ₱{{ number_format((float) $loyaltyReward['discount_cap'], 2) }}. Save ₱{{ number_format((float) $loyaltyReward['discount'], 2) }} here, or leave this unchecked and save the reward for another booking. The oldest available reward is offered first. Online payment required; your deal and loyalty reward both apply.</span></span>
+                            </label>
+                        @endif
                         <label class="mt-6 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><input name="terms" type="checkbox" value="1" required class="mt-1 rounded border-slate-300"><span>I understand this creates a {{ config('booking.hold_minutes') }}-minute hold. FinACourt will check the court and payment status again before confirming.</span></label>
                         <p class="mt-3 text-xs leading-5 text-slate-500">By continuing, you agree to the <a href="{{ route('marketplace.terms', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</p>
                         <button data-loading-label="Securing your hold…" class="mt-6 min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Hold this time for {{ config('booking.hold_minutes') }} minutes</button>
@@ -154,16 +166,25 @@
                     <p class="mt-1 text-sm font-semibold">{{ $promotion->title }}</p>
                 </div>
             @endif
+            @if ($loyaltyReward)
+                <div class="mx-5 mt-3 rounded-xl border border-court-200 bg-court-50 p-4 text-sm text-court-900"><strong>Loyalty reward ready</strong><p class="mt-1">Choose “Use one loyalty reward” to redeem it on this booking, or save it for later. It is never spent automatically.</p></div>
+            @endif
             <div class="mt-5 bg-court-950 p-5 text-white">
                 <div class="space-y-3 text-sm">
                     <div class="flex justify-between gap-4 text-court-100/75">
                         <span>{{ $price['pricing_rule_snapshot'] ? 'Scheduled court price' : 'Court price' }}</span>
-                        <span>@if ((float) $price['discount_amount'] > 0)<span class="mr-2 text-court-100/45 line-through">₱{{ number_format((float) $price['original_total_amount'], 2) }}</span>@endif ₱{{ number_format((float) $price['total_amount'], 2) }}</span>
+                        <span>
+                            <span data-online-court-price @if ($selectedPaymentOption !== 'online') hidden @endif>@if ((float) $price['discount_amount'] > 0)<span class="mr-2 text-court-100/45 line-through">₱{{ number_format((float) $price['original_total_amount'], 2) }}</span>@endif ₱{{ number_format((float) $price['total_amount'], 2) }}</span>
+                            <span data-pay-at-venue-court-price @if ($selectedPaymentOption === 'online') hidden @endif>@if ((float) $payAtVenueCourtPrice['discount_amount'] > 0)<span class="mr-2 text-court-100/45 line-through">₱{{ number_format((float) $payAtVenueCourtPrice['original_total_amount'], 2) }}</span>@endif ₱{{ number_format((float) $payAtVenueCourtPrice['total_amount'], 2) }}</span>
+                        </span>
                     </div>
-                    @if ((float) $onlinePrice['platform_service_fee_amount'] > 0)
+                    @if ($loyaltyReward)
+                        <div data-loyalty-discount @if (! $redeemSelected) hidden @endif class="flex justify-between gap-4 text-court-200"><span>Venue loyalty reward</span><span>−₱{{ number_format((float) $loyaltyReward['discount'], 2) }}</span></div>
+                    @endif
+                    @if ((float) $onlinePrice['platform_service_fee_amount'] > 0 || ($loyaltyReward && (float) $loyaltyReward['online_price']['platform_service_fee_amount'] > 0))
                         <div data-online-service-fee @if ($selectedPaymentOption !== 'online') hidden @endif class="flex justify-between gap-4 text-court-100/75">
                             <span>{{ $onlinePrice['platform_service_fee_name'] ?: 'FinACourt service fee' }}</span>
-                            <span>₱{{ number_format((float) $onlinePrice['platform_service_fee_amount'], 2) }}</span>
+                            <span data-online-service-fee-amount>₱{{ number_format((float) ($redeemSelected ? $loyaltyReward['online_price'] : $onlinePrice)['platform_service_fee_amount'], 2) }}</span>
                         </div>
                     @endif
                     <div class="flex items-end justify-between gap-4 border-t border-white/10 pt-4">
@@ -182,8 +203,9 @@
                     </div>
                 @endif
                 <p class="mt-3 text-xs leading-5 text-court-100/60">
-                    @if ($price['pricing_rule_snapshot']) Calculated from the court’s prices for your selected date and time. @else Calculated by the server from ₱{{ number_format((float) $price['unit_price'], 2) }}/hour. @endif
-                    @if ((float) $price['discount_amount'] > 0) You save ₱{{ number_format((float) $price['discount_amount'], 2) }}.@endif
+                    Calculated by the server for your selected date and time.
+                    @if ((float) $price['discount_amount'] > 0)<span data-online-deal-saving @if ($selectedPaymentOption !== 'online') hidden @endif> You save ₱{{ number_format((float) $price['discount_amount'], 2) }} with this deal.</span>@endif
+                    @if ((float) $payAtVenueCourtPrice['discount_amount'] > 0)<span data-pay-at-venue-deal-saving @if ($selectedPaymentOption === 'online') hidden @endif> You save ₱{{ number_format((float) $payAtVenueCourtPrice['discount_amount'], 2) }} with this deal.</span>@endif
                     @if ((float) $onlinePrice['platform_service_fee_amount'] > 0)
                         <span data-online-fee-note @if ($selectedPaymentOption !== 'online') hidden @endif>The FinACourt fee applies only to online payment and stays separate from the venue’s court price.</span>
                     @endif

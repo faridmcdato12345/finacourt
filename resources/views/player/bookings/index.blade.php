@@ -43,6 +43,92 @@
     </section>
 
     <section class="mx-auto max-w-5xl px-5 py-8 sm:px-8 sm:py-12">
+        @if ($loyaltyPrograms->isNotEmpty())
+            <section class="mb-8" aria-labelledby="loyalty-heading">
+                <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-bold uppercase tracking-[0.2em] text-court-700">Venue loyalty</p>
+                        <h2 id="loyalty-heading" class="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Your reward cards</h2>
+                    </div>
+                    @if ($loyaltyPrograms->count() > 1)
+                        <p class="text-xs font-semibold text-court-700 lg:hidden">Swipe for more venues →</p>
+                        <div data-loyalty-carousel-controls class="hidden items-center gap-2 lg:flex">
+                            <span class="mr-2 text-sm text-slate-500">Scroll for more venues</span>
+                            <button type="button" data-loyalty-direction="previous" aria-controls="loyalty-cards" aria-label="Previous reward card" class="grid size-11 place-items-center rounded-full border border-slate-200 bg-white text-court-800 hover:bg-court-50 disabled:cursor-not-allowed disabled:opacity-40">@include('marketplace.partials.icon', ['name' => 'chevron-left', 'class' => 'size-5'])</button>
+                            <button type="button" data-loyalty-direction="next" aria-controls="loyalty-cards" aria-label="Next reward card" class="grid size-11 place-items-center rounded-full border border-slate-200 bg-white text-court-800 hover:bg-court-50 disabled:cursor-not-allowed disabled:opacity-40">@include('marketplace.partials.icon', ['name' => 'chevron-right', 'class' => 'size-5'])</button>
+                        </div>
+                    @endif
+                </div>
+                <div id="loyalty-cards" data-loyalty-carousel role="region" aria-label="Venue reward cards" tabindex="0" class="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-smooth pb-4 lg:gap-5">
+                    @foreach ($loyaltyPrograms as $program)
+                        @php
+                            $readyCard = collect($program['rewards'])->first(fn (array $card) => $card['rewards_available'] > 0);
+                            $nextCard = collect($program['rewards'])->first(fn (array $card) => $card['stamps'] % $card['stamps_required'] !== 0);
+                            $discountCard = $readyCard ?? $nextCard;
+                            $stampsRequired = max(1, (int) ($nextCard['stamps_required'] ?? $program['venue']->loyalty_stamps_required));
+                            $stampsProgress = (int) (($nextCard['stamps'] ?? 0) % $stampsRequired);
+                            $discountPercent = $discountCard['discount_percent'] ?? $program['venue']->loyalty_discount_percent;
+                            $discountCap = $discountCard['discount_cap'] ?? $program['venue']->loyalty_discount_cap;
+                        @endphp
+                        <article data-loyalty-card class="min-w-0 shrink-0 snap-start overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)] {{ $loyaltyPrograms->count() > 1 ? 'w-[calc(100%-2.5rem)] max-w-sm' : 'w-full' }} lg:w-[42rem] lg:max-w-[calc(100%-2rem)]">
+                            <div class="grid lg:h-full lg:grid-cols-[12rem_minmax(0,1fr)]">
+                                <div data-loyalty-illustration class="flex h-40 items-center justify-center overflow-hidden bg-[#f7f8fd] px-4 py-2 dark:bg-court-950 lg:h-auto lg:min-h-64 lg:p-4">
+                                    <div class="w-48 max-w-full lg:w-full">@include('player.bookings.partials.loyalty-gift-card')</div>
+                                </div>
+                                <div class="min-w-0 p-5 sm:p-6">
+                                    <div class="flex items-start gap-3">
+                                        <div class="min-w-0 flex-1">
+                                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-court-700">Play more. Get more.</p>
+                                            <h3 class="mt-1 break-words text-lg font-semibold leading-6 text-slate-950 sm:text-xl">{{ $program['venue']->name }}</h3>
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 flex flex-wrap items-center gap-2">
+                                        <span class="rounded-full px-3 py-1 text-xs font-bold {{ $program['rewards_available'] > 0 ? 'bg-amber-100 text-amber-950' : 'bg-court-50 text-court-800' }}">{{ $program['rewards_available'] > 0 ? $program['rewards_available'].' '.Str::plural('reward', $program['rewards_available']).' ready' : $program['stamps_needed'].' '.Str::plural('game', $program['stamps_needed']).' to go' }}</span>
+                                        <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $program['venue']->loyalty_active ? 'bg-court-50 text-court-800' : 'bg-slate-100 text-slate-600' }}">{{ $program['venue']->loyalty_active ? 'Stamps on' : 'Earning paused' }}</span>
+                                    </div>
+                                    <p class="mt-3 text-sm font-semibold text-slate-950">{{ $program['rewards_available'] > 0 ? 'Reward unlocked!' : ($program['venue']->loyalty_active ? 'Keep your streak going!' : 'Your progress is saved') }}</p>
+                                    <p class="mt-1 text-sm text-slate-600">{{ $program['stamps'] }} {{ Str::plural('stamp', $program['stamps']) }} earned{{ $program['rewards_available'] > 0 ? '. Use a reward on a future booking.' : '.' }}</p>
+
+                                    <div class="mt-4 rounded-2xl bg-court-50 p-4">
+                                        <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-court-700">{{ $readyCard ? 'Available reward' : 'Next reward' }}</p>
+                                        <strong class="text-xl font-semibold text-court-950">{{ number_format((float) $discountPercent, 2) }}% off</strong>
+                                        <span class="ml-1 text-sm text-court-900">court price · up to ₱{{ number_format((float) $discountCap, 2) }}</span>
+                                        <p class="mt-1 text-xs font-semibold text-court-800">Stacks with deals</p>
+                                    </div>
+
+                                    @if ($program['reward_debt'] > 0)
+                                        <p class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">A refunded game removed a stamp. {{ $program['stamps_needed'] }} more qualifying {{ Str::plural('game', $program['stamps_needed']) }} needed before another reward unlocks.</p>
+                                    @else
+                                        <div class="mt-4" role="group" aria-label="{{ $stampsProgress }} of {{ $stampsRequired }} stamps toward the next reward">
+                                            <p class="text-xs font-semibold text-slate-700">Next reward: {{ $stampsProgress }}/{{ $stampsRequired }} {{ Str::plural('stamp', $stampsRequired) }}</p>
+                                            @if ($stampsRequired <= 8)
+                                                <div aria-hidden="true" class="mt-2 flex flex-wrap gap-1.5">
+                                                    @for ($stamp = 1; $stamp <= $stampsRequired; $stamp++)
+                                                        <span class="grid size-8 place-items-center rounded-full border-2 text-xs font-bold {{ $stamp <= $stampsProgress ? 'border-amber-400 bg-amber-300 text-amber-950' : 'border-slate-200 bg-white text-slate-400' }}">{{ $stamp <= $stampsProgress ? '★' : $stamp }}</span>
+                                                    @endfor
+                                                </div>
+                                            @else
+                                                <progress value="{{ $stampsProgress }}" max="{{ $stampsRequired }}" class="loyalty-progress mt-2">{{ $stampsProgress }} of {{ $stampsRequired }}</progress>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    <a href="{{ route('marketplace.venues.show', $program['venue']->slug) }}" class="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-court-700 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-court-800 sm:w-auto">{{ $program['rewards_available'] > 0 ? 'Find a game to use a reward' : ($program['venue']->loyalty_active ? 'Find a game to earn stamps' : 'View venue') }} @include('marketplace.partials.icon', ['name' => 'arrow-right', 'class' => 'size-4'])</a>
+
+                                    @if (! $program['venue']->loyalty_active)
+                                        <p class="mt-4 text-xs leading-5 text-slate-600">This venue has paused new stamps, but rewards you already earned remain usable.</p>
+                                    @endif
+                                    <details class="mt-4 border-t border-slate-100 pt-3 text-xs text-slate-600">
+                                        <summary class="cursor-pointer font-semibold text-court-800">How rewards work</summary>
+                                        <p class="mt-2 leading-5">Stamps arrive after an online-paid game ends, at most once per venue-local day. Refunds remove the associated stamp. You can choose when to redeem an available reward on an eligible online booking, including one with a deal.</p>
+                                    </details>
+                                </div>
+                            </div>
+                        </article>
+                    @endforeach
+                </div>
+            </section>
+        @endif
         @if (session('status'))
             <p role="status" aria-live="polite" class="mb-6 rounded-2xl border border-court-200 bg-court-50 px-5 py-4 text-sm font-medium text-court-800">{{ session('status') }}</p>
         @endif
