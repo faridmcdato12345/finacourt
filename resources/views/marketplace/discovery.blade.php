@@ -30,8 +30,33 @@
         <div class="grid items-start gap-7 lg:grid-cols-[17rem_minmax(0,1fr)]">
             <aside data-scrollable-filters class="app-card overflow-hidden lg:sticky lg:top-24 lg:flex lg:max-h-[calc(100dvh-7.5rem)] lg:flex-col">
                 <div class="shrink-0 border-b border-slate-100 px-5 py-4"><div class="flex items-center justify-between"><h2 class="font-semibold">Filters</h2><a href="{{ route('marketplace.courts.index') }}" class="text-xs font-semibold text-court-700">Clear all</a></div></div>
-                <form action="{{ route('marketplace.courts.index') }}" method="get" class="flex min-h-0 flex-1 flex-col">
+                <form action="{{ route('marketplace.courts.index') }}" method="get" class="flex min-h-0 flex-1 flex-col" data-court-filters>
                     <div data-filter-scroll-region class="filter-scrollbar space-y-5 p-5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
+                    <div data-nearby-courts class="rounded-2xl border border-court-200 bg-court-50/70 p-4">
+                        <div class="flex items-start gap-3">
+                            <span class="grid size-10 shrink-0 place-items-center rounded-xl bg-white text-court-700 shadow-sm">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-5'])</span>
+                            <div class="min-w-0">
+                                <p class="text-xs font-semibold uppercase tracking-wider text-court-700">Nearby location</p>
+                                <p class="mt-1 text-xs leading-5 text-slate-600">Find the closest courts using your device location.</p>
+                            </div>
+                        </div>
+                        <input data-nearby-latitude type="hidden" name="latitude" value="{{ $filters['latitude'] ?? '' }}">
+                        <input data-nearby-longitude type="hidden" name="longitude" value="{{ $filters['longitude'] ?? '' }}">
+                        <label class="mt-3 block text-xs font-semibold text-slate-700" for="nearby-radius">Search radius</label>
+                        <select data-nearby-radius id="nearby-radius" name="radius_km" class="app-select mt-1.5 h-10 bg-white text-sm" @disabled(! isset($filters['latitude'], $filters['longitude']))>
+                            @foreach ([5, 10, 25, 50] as $radius)
+                                <option value="{{ $radius }}" @selected((int) ($filters['radius_km'] ?? 25) === $radius)>Within {{ $radius }} km</option>
+                            @endforeach
+                        </select>
+                        <button data-use-current-location type="button" class="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-court-300 bg-white px-3 py-2 text-sm font-semibold text-court-800 shadow-sm hover:border-court-500 hover:bg-court-100 disabled:cursor-wait disabled:opacity-60">
+                            @include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-4'])
+                            {{ isset($filters['latitude'], $filters['longitude']) ? 'Update my location' : 'Use my location' }}
+                        </button>
+                        @if (isset($filters['latitude'], $filters['longitude']))
+                            <button data-clear-current-location type="button" class="mt-2 min-h-9 w-full text-xs font-semibold text-slate-600 hover:text-court-800">Remove nearby filter</button>
+                        @endif
+                        <p data-nearby-status role="status" aria-live="polite" class="mt-2 text-xs leading-5 text-slate-500">@if (isset($filters['latitude'], $filters['longitude']))Showing courts within {{ $filters['radius_km'] }} km, nearest first.@else Allow location once to automatically search nearby on future visits.@endif</p>
+                    </div>
                     <div class="block"><span class="text-xs font-semibold uppercase tracking-wider text-slate-400">City</span>@include('marketplace.partials.public-select', ['name' => 'city', 'value' => $filters['city'] ?? '', 'options' => [['value' => '', 'label' => 'Any city'], ...$cities->map(fn ($city) => ['value' => $city->city_slug, 'label' => $city->publicCityName()])->all()], 'placeholder' => 'Any city', 'ariaLabel' => 'City', 'disabled' => $lockedCity, 'fallbackClass' => 'app-select mt-2', 'wrapperClass' => 'mt-2'])@if ($lockedCity)<input type="hidden" name="city" value="{{ $filters['city'] }}">@endif</div>
                     <div class="block"><span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Sport</span>@include('marketplace.partials.public-select', ['name' => 'sport', 'value' => $filters['sport'] ?? '', 'options' => [['value' => '', 'label' => 'Any sport'], ...$sports->map(fn ($sport) => ['value' => $sport->slug, 'label' => $sport->name])->all()], 'placeholder' => 'Any sport', 'ariaLabel' => 'Sport', 'disabled' => $lockedSport, 'fallbackClass' => 'app-select mt-2', 'wrapperClass' => 'mt-2'])@if ($lockedSport)<input type="hidden" name="sport" value="{{ $filters['sport'] }}">@endif</div>
                     <fieldset><legend class="text-xs font-semibold uppercase tracking-wider text-slate-400">Court setting</legend><div class="mt-3 grid grid-cols-2 gap-2"><label class="cursor-pointer"><input type="radio" name="setting" value="" class="peer sr-only" @checked(empty($filters['setting']))><span class="block rounded-lg border border-slate-200 px-3 py-2 text-center text-xs font-semibold peer-checked:border-court-600 peer-checked:bg-court-50 peer-checked:text-court-800">Any</span></label>@foreach ($settings as $setting)<label class="cursor-pointer"><input type="radio" name="setting" value="{{ $setting->value }}" class="peer sr-only" @checked(($filters['setting'] ?? '') === $setting->value)><span class="block rounded-lg border border-slate-200 px-3 py-2 text-center text-xs font-semibold peer-checked:border-court-600 peer-checked:bg-court-50 peer-checked:text-court-800">{{ $setting->label() }}</span></label>@endforeach</div></fieldset>
@@ -46,7 +71,7 @@
             </aside>
 
             <div>
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm text-slate-500">Verified public inventory</p><h2 class="mt-1 text-2xl font-semibold tracking-tight">{{ $venues->count() }} {{ Str::plural('venue', $venues->count()) }} found</h2></div>@if (($filters['date'] ?? null) && ($filters['start_time'] ?? null))<span class="w-fit rounded-full bg-court-50 px-3 py-1.5 text-xs font-semibold text-court-800">Matching availability only</span>@endif</div>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm text-slate-500">Verified public inventory</p><h2 class="mt-1 text-2xl font-semibold tracking-tight">{{ $venues->count() }} {{ Str::plural('venue', $venues->count()) }} found</h2></div><div class="flex flex-wrap gap-2">@if (isset($filters['latitude'], $filters['longitude']))<span class="w-fit rounded-full bg-court-100 px-3 py-1.5 text-xs font-semibold text-court-900">Nearby first · within {{ $filters['radius_km'] }} km</span>@endif @if (($filters['date'] ?? null) && ($filters['start_time'] ?? null))<span class="w-fit rounded-full bg-court-50 px-3 py-1.5 text-xs font-semibold text-court-800">Matching availability only</span>@endif</div></div>
 
                 @if ($venues->isNotEmpty())
                     <div class="mt-6 grid gap-5 xl:grid-cols-2">@foreach ($venues as $venue)@include('marketplace.partials.venue-card', ['venue' => $venue])@endforeach</div>

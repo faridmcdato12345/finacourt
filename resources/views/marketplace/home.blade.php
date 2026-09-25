@@ -75,30 +75,6 @@
         </section>
     @endif
 
-    <section id="google-data-use" class="border-b border-slate-200 bg-court-950 text-white">
-        <div class="page-shell py-12 sm:py-16">
-            <div class="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Your choice, your Google account</p>
-                    <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">When you choose to connect Google</h2>
-                    <p class="mt-4 max-w-xl text-sm leading-7 text-emerald-50/80">Google is optional on FinACourt. You can browse and book courts, or list and manage a venue, without connecting a Google account.</p>
-                </div>
-
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <article class="rounded-2xl border border-white/15 bg-white/10 p-5">
-                        <h3 class="text-lg font-semibold">Sign in with Google</h3>
-                        <p class="mt-3 text-sm leading-6 text-emerald-50/80">If you choose Google when signing in, FinACourt uses your name, email address, and Google account identifier to create or find your FinACourt account. Google access tokens are not kept for ordinary sign-in.</p>
-                    </article>
-                    <article class="rounded-2xl border border-white/15 bg-white/10 p-5">
-                        <h3 class="text-lg font-semibold">Connect a venue profile</h3>
-                        <p class="mt-3 text-sm leading-6 text-emerald-50/80">A court owner may separately allow FinACourt to read Google Business Profiles that the account already manages. We use names, addresses, public phone numbers, hours, map positions, and profile identifiers only to find and connect the correct venue. This version does not create, edit, verify, or publish a Google profile.</p>
-                    </article>
-                    <p class="text-sm leading-6 text-emerald-50/80 sm:col-span-2">See exactly how access is stored, used, and removed in our <a href="{{ route('marketplace.privacy', [], false) }}#google-data" class="font-semibold text-white underline decoration-emerald-300 underline-offset-4 hover:text-emerald-200">Privacy Policy</a>.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <section class="page-shell py-14 sm:py-18">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div><p class="eyebrow">Popular courts</p><h2 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Courts ready to explore</h2><p class="mt-3 text-sm text-slate-500">Published venues with active, priced inventory.</p></div>
@@ -195,4 +171,28 @@
     @if ($cities->isNotEmpty())
         <section class="border-t border-slate-200 bg-white"><div class="page-shell py-14"><h2 class="text-2xl font-semibold tracking-tight">Explore courts by city</h2><div class="mt-6 flex flex-wrap gap-3">@foreach ($cities as $city)<a href="{{ route('marketplace.courts.city', $city->city_slug) }}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-court-300 hover:text-court-800">@include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-4 text-court-600']) {{ $city->publicCityName() }} <span class="font-normal text-slate-400">{{ $city->province }}</span></a>@endforeach</div></div></section>
     @endif
+
+    <section id="google-data-use" class="border-t border-slate-200 bg-court-950 text-white">
+        <div class="page-shell py-12 sm:py-16">
+            <div class="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Your choice, your Google account</p>
+                    <h2 class="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">When you choose to connect Google</h2>
+                    <p class="mt-4 max-w-xl text-sm leading-7 text-emerald-50/80">Google is optional on FinACourt. You can browse and book courts, or list and manage a venue, without connecting a Google account.</p>
+                </div>
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    <article class="rounded-2xl border border-white/15 bg-white/10 p-5">
+                        <h3 class="text-lg font-semibold">Sign in with Google</h3>
+                        <p class="mt-3 text-sm leading-6 text-emerald-50/80">If you choose Google when signing in, FinACourt uses your name, email address, and Google account identifier to create or find your FinACourt account. Google access tokens are not kept for ordinary sign-in.</p>
+                    </article>
+                    <article class="rounded-2xl border border-white/15 bg-white/10 p-5">
+                        <h3 class="text-lg font-semibold">Connect a venue profile</h3>
+                        <p class="mt-3 text-sm leading-6 text-emerald-50/80">A court owner may separately allow FinACourt to read Google Business Profiles that the account already manages. We use names, addresses, public phone numbers, hours, map positions, and profile identifiers only to find and connect the correct venue. This version does not create, edit, verify, or publish a Google profile.</p>
+                    </article>
+                    <p class="text-sm leading-6 text-emerald-50/80 sm:col-span-2">See exactly how access is stored, used, and removed in our <a href="{{ route('marketplace.privacy', [], false) }}#google-data" class="font-semibold text-white underline decoration-emerald-300 underline-offset-4 hover:text-emerald-200">Privacy Policy</a>.</p>
+                </div>
+            </div>
+        </div>
+    </section>
 @endsection

@@ -330,7 +330,9 @@ class VenueLoyaltyTest extends TestCase
         $this->get(route('player.bookings.index'))->assertOk()
             ->assertSee('Reward unlocked!')
             ->assertSee('1 reward ready')
-            ->assertSee('Next reward: 0/3 stamps')
+            ->assertSee('Reward earned: 3/3 stamps')
+            ->assertSee('Next card starts at 0/3 stamps')
+            ->assertSee('data-loyalty-stamp-state="earned"', false)
             ->assertSee('Find a game to use a reward');
 
         $venue->update(['loyalty_active' => false]);
@@ -354,6 +356,34 @@ class VenueLoyaltyTest extends TestCase
             ->assertSee('data-loyalty-direction="previous"', false)
             ->assertSee('data-loyalty-direction="next"', false);
         $this->assertSame(2, substr_count($response->getContent(), 'data-loyalty-card'));
+    }
+
+    public function test_completed_reward_card_stays_visually_complete_after_terms_change(): void
+    {
+        [, $venue, $resource, $owner] = $this->inventory([
+            'loyalty_active' => true,
+            'loyalty_stamps_required' => 2,
+        ]);
+        $player = User::factory()->create();
+
+        $this->pastPaidGame($resource, $player, 2);
+        $this->pastPaidGame($resource, $player, 1);
+        $this->artisan('loyalty:sync-stamps')->assertSuccessful();
+
+        $this->actingAs($owner)->patch(route('owner.venues.loyalty.terms', $venue), [
+            'stamps_required' => 5,
+            'discount_percent' => '10.00',
+            'discount_cap' => '100.00',
+        ])->assertRedirect();
+
+        $response = $this->actingAs($player)->get(route('player.bookings.index'))->assertOk()
+            ->assertSee('2 stamps earned')
+            ->assertSee('1 reward ready')
+            ->assertSee('Reward earned: 2/2 stamps')
+            ->assertSee('Next card starts at 0/5 stamps')
+            ->assertDontSee('Next reward: 0/5 stamps');
+
+        $this->assertSame(2, substr_count($response->getContent(), 'data-loyalty-stamp-state="earned"'));
     }
 
     public function test_pending_refund_delays_stamp_until_declined(): void

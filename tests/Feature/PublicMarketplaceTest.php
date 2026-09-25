@@ -44,6 +44,7 @@ class PublicMarketplaceTest extends TestCase
             ->assertSee('Google access tokens are not kept for ordinary sign-in')
             ->assertSee('This version does not create, edit, verify, or publish a Google profile')
             ->assertSee('href="/privacy#google-data"', false)
+            ->assertSeeInOrder(['Courts ready to explore', 'id="google-data-use"', '</main>'], false)
             ->assertSee('data-icon="location"', false)
             ->assertSee('data-icon="calendar"', false)
             ->assertSee('data-icon="sport-badminton"', false)
@@ -65,6 +66,10 @@ class PublicMarketplaceTest extends TestCase
             ->assertSee('Find a court that fits your game')
             ->assertSee('data-scrollable-filters', false)
             ->assertSee('data-filter-scroll-region', false)
+            ->assertSee('data-nearby-courts', false)
+            ->assertSee('data-use-current-location', false)
+            ->assertSee('Use my location')
+            ->assertSee('Allow location once to automatically search nearby on future visits.')
             ->assertSee('data-public-number', false)
             ->assertSee('data-public-number-config', false)
             ->assertSee('<input id="maximum-hourly-price" type="number" name="max_price"', false)
@@ -83,6 +88,48 @@ class PublicMarketplaceTest extends TestCase
             ->assertSee('"submitOnChange":true', false)
             ->assertSee('Live schedule')
             ->assertSee('Check availability');
+    }
+
+    public function test_nearby_filter_orders_venues_by_distance_and_applies_the_radius(): void
+    {
+        [$closest] = $this->publicVenue([
+            'name' => 'Closest Courts',
+            'slug' => 'closest-courts',
+            'latitude' => '14.5557000',
+            'longitude' => '121.0244000',
+        ]);
+        [$nearby] = $this->publicVenue([
+            'name' => 'Nearby Courts',
+            'slug' => 'nearby-courts',
+            'latitude' => '14.5900000',
+            'longitude' => '121.0244000',
+        ]);
+        [$outsideRadius] = $this->publicVenue([
+            'name' => 'Distant Courts',
+            'slug' => 'distant-courts',
+            'latitude' => '14.8000000',
+            'longitude' => '121.0244000',
+        ]);
+        [$missingPin] = $this->publicVenue([
+            'name' => 'No Map Pin Courts',
+            'slug' => 'no-map-pin-courts',
+            'latitude' => null,
+            'longitude' => null,
+        ]);
+
+        $response = $this->get(route('marketplace.courts.index', [
+            'latitude' => '14.5547123',
+            'longitude' => '121.0244567',
+            'radius_km' => 10,
+        ]))->assertOk()
+            ->assertSee('Nearby first · within 10 km')
+            ->assertSee('Showing courts within 10 km, nearest first.')
+            ->assertSee('data-distance-km=', false)
+            ->assertSeeInOrder([$closest->name, $nearby->name])
+            ->assertDontSee($outsideRadius->name)
+            ->assertDontSee($missingPin->name);
+
+        $this->assertSame(2, substr_count($response->getContent(), 'data-distance-km='));
     }
 
     public function test_homepage_social_proof_uses_distinct_confirmed_players_only(): void

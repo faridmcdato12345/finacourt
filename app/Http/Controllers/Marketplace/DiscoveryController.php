@@ -202,10 +202,25 @@ class DiscoveryController extends Controller
             'sport' => ['nullable', 'string', 'max:255', 'alpha_dash:ascii'],
             'setting' => ['nullable', Rule::enum(ResourceSetting::class)],
             'max_price' => ['nullable', 'numeric', 'between:0,999999.99'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90', 'required_with:longitude'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180', 'required_with:latitude'],
+            'radius_km' => ['nullable', 'integer', Rule::in([5, 10, 25, 50])],
             'date' => ['nullable', 'date_format:Y-m-d', 'required_with:start_time'],
             'start_time' => ['nullable', 'date_format:H:i', 'required_with:date'],
             'duration_minutes' => ['nullable', 'integer', Rule::in([30, 60, 90, 120])],
         ]);
+
+        if (isset($validated['latitude'], $validated['longitude'])) {
+            // Nearby search needs neighborhood-level accuracy, not a player's
+            // precise GPS point. Rounding also avoids retaining needless detail
+            // in analytics and request logs.
+            $validated['latitude'] = round((float) $validated['latitude'], 4);
+            $validated['longitude'] = round((float) $validated['longitude'], 4);
+            $validated['radius_km'] ??= 25;
+        } else {
+            unset($validated['radius_km']);
+        }
+
         $validated['duration_minutes'] ??= 60;
 
         return $validated;
