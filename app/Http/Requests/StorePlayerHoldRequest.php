@@ -27,6 +27,7 @@ class StorePlayerHoldRequest extends FormRequest
             ],
             'payment_option' => ['nullable', Rule::enum(PlayerPaymentOption::class)],
             'campaign' => ['nullable', 'string', 'max:40'],
+            'loyalty_reward_version' => ['nullable', 'integer', 'min:1'],
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:40'],
             'terms' => ['accepted'],

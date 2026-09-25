@@ -12,7 +12,7 @@
         </div>
         <div>
             <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Date</span>
-            @include('marketplace.partials.public-date', ['name' => 'date', 'value' => $availabilityDate, 'min' => now($venue->timezone)->toDateString(), 'placeholder' => 'Select date', 'ariaLabel' => 'Availability date', 'wrapperClass' => 'mt-2'])
+            @include('marketplace.partials.public-date', ['name' => 'date', 'value' => $availabilityDate, 'min' => now($venue->organization->timezone)->toDateString(), 'placeholder' => 'Select date', 'ariaLabel' => 'Availability date', 'wrapperClass' => 'mt-2'])
         </div>
         <input type="hidden" name="duration" value="{{ $selectedResource->booking_increment_minutes }}">
         <button data-loading-label="Checking…" class="min-h-11 rounded-xl bg-court-700 px-4 text-sm font-semibold text-white">Check times</button>

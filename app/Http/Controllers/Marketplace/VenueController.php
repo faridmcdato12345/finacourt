@@ -70,7 +70,7 @@ class VenueController extends Controller
         $resource->setRelation('venue', $venue);
         $date = $validated['date']
             ?? $campaignSlot?->slot_date->toDateString()
-            ?? CarbonImmutable::now($venue->organization->timezone)->addDay()->toDateString();
+            ?? CarbonImmutable::now($venue->organization->timezone)->toDateString();
         // Public availability is rendered in the resource's smallest booking
         // increment. The player may combine consecutive available increments in
         // the UI; the resulting full window is revalidated when the hold is made.

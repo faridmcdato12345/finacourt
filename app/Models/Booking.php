@@ -61,6 +61,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'owner_confirmation_notified_at',
     'payment_notified_at',
     'reminder_notified_at',
+    'loyalty_eligible',
+    'loyalty_processed_at',
+    'loyalty_terms_version',
+    'loyalty_stamps_required',
+    'loyalty_discount_percent',
+    'loyalty_discount_cap',
 ])]
 class Booking extends Model
 {
@@ -212,6 +218,12 @@ class Booking extends Model
             'owner_confirmation_notified_at' => 'immutable_datetime',
             'payment_notified_at' => 'immutable_datetime',
             'reminder_notified_at' => 'immutable_datetime',
+            'loyalty_eligible' => 'boolean',
+            'loyalty_processed_at' => 'immutable_datetime',
+            'loyalty_terms_version' => 'integer',
+            'loyalty_stamps_required' => 'integer',
+            'loyalty_discount_percent' => 'decimal:2',
+            'loyalty_discount_cap' => 'decimal:2',
         ];
     }
 }

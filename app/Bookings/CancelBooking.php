@@ -4,6 +4,7 @@ namespace App\Bookings;
 
 use App\Enums\BookingStatus;
 use App\Enums\PaymentStatus;
+use App\Loyalty\VenueLoyalty;
 use App\Models\Booking;
 use App\Models\CourtResource;
 use App\Models\User;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class CancelBooking
 {
+    public function __construct(private readonly VenueLoyalty $loyalty) {}
+
     public function handle(
         int $bookingId,
         int $organizationId,
@@ -52,6 +55,7 @@ class CancelBooking
                 'cancelled_by_user_id' => $user->getKey(),
                 'cancellation_reason' => $reason,
             ]);
+            $this->loyalty->reverse($booking);
 
             $pendingPayments = $booking->payments()
                 ->where('status', PaymentStatus::Pending)

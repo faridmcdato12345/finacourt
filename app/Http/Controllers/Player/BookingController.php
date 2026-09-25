@@ -17,8 +17,10 @@ use App\Enums\PaymentStatus;
 use App\Enums\PlayerPaymentOption;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePlayerHoldRequest;
+use App\Loyalty\VenueLoyalty;
 use App\Marketplace\MarketplaceQuery;
 use App\Models\Booking;
+use App\Models\Venue;
 use App\Models\VenueReview;
 use App\Payments\ApplyVerifiedPaymentEvent;
 use App\Payments\Contracts\ReconcilesHostedCheckout;
@@ -32,6 +34,7 @@ use App\Refunds\PlayerRefundEligibility;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\ValidationException;
@@ -51,6 +54,7 @@ class BookingController extends Controller
         TrafficAttribution $attribution,
         PaymentProviderRegistry $payments,
         PlatformServiceFeeCalculator $serviceFees,
+        VenueLoyalty $loyalty,
     ): View {
         $validated = $request->validate($this->selectionRules());
         $attribution->current($request);
@@ -62,6 +66,7 @@ class BookingController extends Controller
         $endTime = $this->endTime($validated['start'], $duration);
         $availabilityError = null;
         $promotion = null;
+        $window = null;
         $price = $prices->quote($resource, $duration);
 
         try {
@@ -72,7 +77,6 @@ class BookingController extends Controller
                 $endTime,
             );
             $availability->ensureBookable($resource, $window);
-
             $promotion = filled($validated['campaign'] ?? null)
                 ? $promotionApplicability->resolve($resource, $window, $validated['campaign'])
                 : $promotionApplicability->bestDiscount(
@@ -81,10 +85,6 @@ class BookingController extends Controller
                     $window,
                 );
             $price = $prices->quote($resource, $duration, $promotion, $window);
-
-            if ($promotion !== null) {
-                $promotionTracker->recordClick($request, $promotion);
-            }
 
             if ($availability->hasConflict($resource->getKey(), $window->utcStart, $window->utcEnd)) {
                 $availabilityError = 'That time is no longer available. Choose another available slot.';
@@ -101,6 +101,33 @@ class BookingController extends Controller
             && $defaultPaymentProvider->mode() === PaymentMode::HostedCheckout
                 ? PlayerPaymentOption::Online
                 : PlayerPaymentOption::PayAtVenue;
+        $loyaltyBalance = $request->user() !== null
+            ? $loyalty->balance($venue, $request->user())
+            : null;
+        $loyaltyReward = $availabilityError === null
+            && $window !== null
+            && $onlinePaymentAvailable
+            && $request->user() !== null
+            ? collect($loyaltyBalance['rewards'])->first(fn (array $reward): bool => $reward['rewards_available'] > 0)
+            : null;
+
+        if ($loyaltyReward !== null) {
+            $quote = $loyalty->discountedQuote(
+                $price, $duration, $loyaltyReward['discount_percent'], $loyaltyReward['discount_cap'],
+            );
+            $rewardOnlinePrice = $serviceFees->quote($quote['price']['total_amount'], $price['currency']);
+            if ($quote['discount'] === '0.00' || $rewardOnlinePrice['player_total_amount'] === '0.00') {
+                $loyaltyReward = null;
+            } else {
+                $loyaltyReward['price'] = $quote['price'];
+                $loyaltyReward['discount'] = $quote['discount'];
+                $loyaltyReward['online_price'] = $rewardOnlinePrice;
+            }
+        }
+
+        if ($promotion !== null) {
+            $promotionTracker->recordClick($request, $promotion);
+        }
 
         return view('player.bookings.create', [
             'venue' => $venue,
@@ -110,9 +137,13 @@ class BookingController extends Controller
             'endTime' => $endTime,
             'duration' => $duration,
             'price' => $price,
+            'payAtVenueCourtPrice' => $price,
             'onlinePrice' => $serviceFees->quote($price['total_amount'], $price['currency']),
             'payAtVenuePrice' => $serviceFees->emptyQuoteFromAmount($price['total_amount']),
+            'loyaltyReward' => $loyaltyReward,
+            'loyaltyBalance' => $loyaltyBalance,
             'promotion' => $promotion,
+            'payAtVenuePromotion' => $promotion,
             'campaign' => $promotion?->campaign_token,
             'availabilityError' => $availabilityError,
             'returnUrl' => $returnUrl,
@@ -149,6 +180,9 @@ class BookingController extends Controller
         }
 
         $resource->setRelation('venue', $venue);
+        $rewardVersion = ($validated['payment_option'] ?? null) === PlayerPaymentOption::Online->value
+            ? ($validated['loyalty_reward_version'] ?? null)
+            : null;
         $campaign = $validated['campaign'] ?? null;
 
         if (! filled($campaign)) {
@@ -209,6 +243,7 @@ class BookingController extends Controller
                 'create_payment' => true,
                 'payment_provider' => $paymentProvider->key(),
                 'campaign' => $campaign,
+                'loyalty_reward_version' => $rewardVersion,
             ],
             $request->user(),
         );
@@ -223,7 +258,7 @@ class BookingController extends Controller
             ->with('status', $status);
     }
 
-    public function index(Request $request): View
+    public function index(Request $request, VenueLoyalty $loyalty): View
     {
         $bookings = $request->user()->playerBookings()
             ->with([
@@ -252,6 +287,18 @@ class BookingController extends Controller
         return view('player.bookings.index', [
             'bookings' => $bookings,
             'notifications' => $notifications,
+            'loyaltyPrograms' => Venue::query()
+                ->whereHas('bookings', fn ($query) => $query->where('player_user_id', $request->user()->getKey()))
+                ->orderBy('name')
+                ->limit(30)
+                ->get(['id', 'name', 'slug', 'loyalty_active', 'loyalty_terms_version', 'loyalty_stamps_required', 'loyalty_discount_percent', 'loyalty_discount_cap'])
+                ->map(fn (Venue $venue): array => [
+                    'venue' => $venue,
+                    ...$loyalty->balance($venue, $request->user()),
+                ])
+                ->filter(fn (array $entry): bool => $entry['venue']->loyalty_active || $entry['stamps'] > 0 || $entry['rewards_available'] > 0)
+                ->sortByDesc('rewards_available')
+                ->values(),
             ...$this->seo('My bookings', route('player.bookings.index')),
         ]);
     }
@@ -261,14 +308,23 @@ class BookingController extends Controller
         string $reference,
         PaymentProviderRegistry $providers,
         PlayerRefundEligibility $refundEligibility,
+        VenueLoyalty $loyalty,
     ): View {
         $booking = $this->playerBooking($request, $reference);
         Gate::authorize('viewAsPlayer', $booking);
         $provider = $booking->payment ? $providers->find($booking->payment->provider) : null;
         $refundDeadline = $refundEligibility->deadline($booking, $booking->payment);
+        $loyaltyRefundBlocked = $loyalty->hasBlockingRefund($booking);
 
         return view('player.bookings.show', [
             'booking' => $booking,
+            'loyaltyBalance' => $loyalty->balance($booking->venue, $request->user()),
+            'loyaltyRefundBlocked' => $loyaltyRefundBlocked,
+            'loyaltyStampEarned' => ! $loyaltyRefundBlocked
+                && $booking->status === BookingStatus::Confirmed
+                && $booking->payment_status === PaymentStatus::Paid
+                && DB::table('loyalty_stamps')->where('booking_id', $booking->getKey())->whereNull('reversed_at')->exists(),
+            'loyaltyRewardDiscount' => DB::table('loyalty_redemptions')->where('booking_id', $booking->getKey())->value('court_discount_amount'),
             'canReview' => $request->user()->can('create', [VenueReview::class, $booking]),
             'shareUrl' => URL::signedRoute('bookings.share', $booking->reference),
             'hostedCheckoutAvailable' => $provider?->supportsHostedCheckout() ?? false,
@@ -438,7 +494,7 @@ class BookingController extends Controller
             ->where('reference', $reference)
             ->where('player_user_id', $request->user()->getKey())
             ->with([
-                'venue:id,name,slug,city,province,address',
+                'venue:id,name,slug,city,province,address,loyalty_active,loyalty_terms_version,loyalty_stamps_required,loyalty_discount_percent,loyalty_discount_cap',
                 'venue.photos:id,venue_id,storage_path,alt_text,is_primary,sort_order',
                 'resource:id,name,sport_id',
                 'resource.sport:id,name,slug',

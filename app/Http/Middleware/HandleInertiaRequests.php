@@ -49,6 +49,7 @@ class HandleInertiaRequests extends Middleware
             'abilities' => fn () => $request->routeIs('owner.*') && $context->hasOrganization() ? [
                 'manage_inventory' => $user?->can('manageInventory', $context->organization()) ?? false,
                 'manage_bookings' => $user?->can('manageBookings', $context->organization()) ?? false,
+                'manage_loyalty' => $user?->can('update', $context->organization()) ?? false,
             ] : [],
             'ownerClaimOnboarding' => fn () => $request->routeIs('owner.*') && $context->hasOrganization()
                 ? app(OwnerClaimWorkspaceAccess::class)->status($context->organization())

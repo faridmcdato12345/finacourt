@@ -638,6 +638,38 @@ class PublicMarketplaceTest extends TestCase
             ->assertSee('<meta name="robots" content="noindex,follow">', false);
     }
 
+    public function test_venue_availability_defaults_to_today_in_the_venue_timezone(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-21 16:30:00', 'UTC'));
+        [$venue] = $this->publicVenue();
+
+        $this->get(route('marketplace.venues.show', $venue->slug))
+            ->assertOk()
+            ->assertSee('name="date" type="date" value="2026-09-22"', false)
+            ->assertSee('min="2026-09-22"', false)
+            ->assertSee('data-date="2026-09-22"', false);
+
+        $this->get(route('marketplace.venues.show', [
+            'venueSlug' => $venue->slug,
+            'date' => '2026-09-23',
+        ]))
+            ->assertOk()
+            ->assertSee('name="date" type="date" value="2026-09-23"', false)
+            ->assertSee('min="2026-09-22"', false);
+    }
+
+    public function test_venue_availability_today_does_not_offer_past_slots(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-09-22 01:30:00', 'UTC'));
+        [$venue] = $this->publicVenue();
+
+        $this->get(route('marketplace.venues.show', $venue->slug))
+            ->assertOk()
+            ->assertSee('data-unavailable-slot data-start="08:00"', false)
+            ->assertSee('data-unavailable-slot data-start="09:00"', false)
+            ->assertSee('data-start="10:00"', false);
+    }
+
     public function test_venue_availability_conflicts_are_isolated_to_the_booked_court(): void
     {
         [$venue, $firstResource] = $this->publicVenue();

@@ -6,6 +6,7 @@ use App\Analytics\AnalyticsRecorder;
 use App\Enums\BookingStatus;
 use App\Enums\CourtClosureBookingStatus;
 use App\Enums\PaymentStatus;
+use App\Loyalty\VenueLoyalty;
 use App\Models\Booking;
 use App\Models\Payment;
 use App\Models\User;
@@ -19,6 +20,7 @@ class ApplyPaymentTransition
         private readonly AnalyticsRecorder $analytics,
         private readonly BookingNotifier $notifications,
         private readonly OwnerSettlementLedger $settlements,
+        private readonly VenueLoyalty $loyalty,
     ) {}
 
     /**
@@ -93,6 +95,7 @@ class ApplyPaymentTransition
         if ($target === PaymentStatus::Paid) {
             $this->settlements->recordPaidPayment($payment);
         } elseif ($target === PaymentStatus::Refunded) {
+            $this->loyalty->reverse($booking);
             $this->settlements->recordRefund($payment, $actor);
             $payment->courtClosureBooking()
                 ->where('refund_required', false)
