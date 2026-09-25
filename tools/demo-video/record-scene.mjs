@@ -6,6 +6,8 @@ const scenes = new Set([
     'discovery',
     'venue',
     'booking',
+    'player-bookings',
+    'player-refund',
     'owner',
     'analytics',
     'links',
@@ -13,10 +15,15 @@ const scenes = new Set([
     'owner-intro',
     'owner-dashboard',
     'owner-bookings',
+    'owner-venues',
+    'owner-emergency',
+    'owner-team',
     'owner-earnings',
     'owner-analytics',
     'owner-links',
     'owner-promotions',
+    'owner-loyalty',
+    'owner-growth',
     'owner-visibility',
     'owner-outro',
 ]);
@@ -291,9 +298,13 @@ async function jumpToText(text, block = 'center') {
 
 async function login(kind) {
     await navigate(kind === 'owner' ? '/login' : '/player/login');
-    await type(kind === 'owner' ? '#email' : 'input[name="email"]', kind === 'owner' ? manifest.owner_email : manifest.player_email);
+    await type(kind === 'owner' ? '#email' : 'form:has(#player-password) input[name="email"]', kind === 'owner' ? manifest.owner_email : manifest.player_email);
     await type(kind === 'owner' ? '#password' : '#player-password', password);
-    await click('button[type="submit"], form button:not([type])');
+    if (kind === 'owner') {
+        await click('button[type="submit"], form button:not([type])');
+    } else {
+        await clickByText('button', 'Sign in');
+    }
     await waitUntil(async () => {
         const url = await currentUrl();
         return !url.includes('/login');
@@ -312,11 +323,11 @@ async function injectCaption(title, detail, { demo = false } = {}) {
             style.textContent = [
                 'html { scroll-behavior: smooth !important; }',
                 '#finacourt-video-caption { position: fixed; z-index: 2147483646; left: 50%; bottom: 40px; width: min(980px, calc(100vw - 96px)); transform: translateX(-50%); display: flex; align-items: center; gap: 18px; padding: 18px 24px; border: 1px solid rgba(255,255,255,.16); border-radius: 20px; color: white; background: rgba(8,42,33,.94); box-shadow: 0 22px 60px rgba(0,0,0,.24); backdrop-filter: blur(16px); font-family: Inter,ui-sans-serif,system-ui,sans-serif; }',
-                '#finacourt-video-caption .cap-mark { width: 10px; height: 48px; flex: 0 0 auto; border-radius: 999px; background: #7ee0ae; }',
+                '#finacourt-video-caption .cap-mark { width: 10px; height: 48px; flex: 0 0 auto; border-radius: 999px; background: linear-gradient(180deg,#38bdf8,#f59e0b); }',
                 '#finacourt-video-caption .cap-copy { min-width: 0; flex: 1 1 auto; }',
                 '#finacourt-video-caption strong { display: block; font-size: 24px; line-height: 1.2; letter-spacing: -.02em; }',
                 '#finacourt-video-caption span { display: block; margin-top: 5px; color: #c9ded6; font-size: 15px; line-height: 1.4; }',
-                '#finacourt-video-demo-badge { flex: 0 0 auto; margin-left: auto; padding: 9px 13px; border-radius: 999px; color: #0b3b2d; background: #d8f5e7; font: 800 12px/1 Inter,ui-sans-serif,system-ui,sans-serif; letter-spacing: .12em; text-transform: uppercase; }',
+                '#finacourt-video-demo-badge { flex: 0 0 auto; margin-left: auto; padding: 9px 13px; border-radius: 999px; color: #082f49; background: #e0f2fe; font: 800 12px/1 Inter,ui-sans-serif,system-ui,sans-serif; letter-spacing: .12em; text-transform: uppercase; }',
             ].join('');
             document.head.appendChild(style);
         }
@@ -348,12 +359,12 @@ async function injectTitleCard(outro = false, ownerFocused = false) {
         document.querySelector('#finacourt-video-title')?.remove();
         const card = document.createElement('div');
         card.id = 'finacourt-video-title';
-        card.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483647;display:flex;align-items:center;justify-content:center;color:white;background:radial-gradient(circle at 68% 22%,#287b5c 0,#124d3a 28%,#062d23 70%);font-family:Inter,ui-sans-serif,system-ui,sans-serif;';
+        card.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:2147483647;display:flex;align-items:center;justify-content:center;color:white;background:radial-gradient(circle at 70% 18%,#0284c7 0,#075985 30%,#082f49 72%);font-family:Inter,ui-sans-serif,system-ui,sans-serif;';
         const content = document.createElement('div');
         content.dataset.finacourtTitleContent = '';
         content.style.cssText = 'width:min(1120px,calc(100vw - 120px));margin:0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;';
         const logo = document.createElement('img');
-        logo.src = '/icons/finacourt-logo.png';
+        logo.src = '/icons/app-logo.png';
         logo.alt = '';
         logo.style.cssText = 'display:block;width:112px;height:112px;margin:0 auto;object-fit:contain;border-radius:28px;background:white;box-shadow:0 25px 70px rgba(0,0,0,.25);';
         const brand = document.createElement('div');
@@ -424,6 +435,20 @@ async function prepare() {
             await waitForSelector('[data-booking-payment-pricing]');
             await injectCaption('Reserve without surprises', 'Review the court, time, and total before creating a safe hold.');
             break;
+        case 'player-bookings':
+            await login('player');
+            await navigate('/player/bookings');
+            await waitForText('Your reward cards');
+            await jumpToText('Your reward cards', 'start');
+            await injectCaption('Everything stays with the player', 'Bookings, game-day updates, and venue loyalty are available in one place.', { demo: true });
+            break;
+        case 'player-refund':
+            await login('player');
+            await navigate(`/player/bookings/${manifest.refund_booking_reference}`);
+            await waitForText('Online payment refund');
+            await jumpToText('Online payment refund', 'center');
+            await injectCaption('Refund requests stay transparent', 'Players can see the reason, status, and booking record while the venue reviews the request.', { demo: true });
+            break;
         case 'owner':
             await login('owner');
             await navigate('/owner/dashboard');
@@ -459,6 +484,25 @@ async function prepare() {
             await waitForSelector('input[type="date"]');
             await injectCaption('See bookings and schedules', 'Court, time, player, status and booking value at a glance.', { demo: true });
             break;
+        case 'owner-venues':
+            await login('owner');
+            await navigate(`/owner/venues/${manifest.venue_id}`);
+            await waitForText('Courts players can book');
+            await jumpToSelector('#resources', 'center');
+            await injectCaption('Control every court and schedule', 'Manage courts, hourly rates, opening hours, sports, facilities, photos, and public visibility.', { demo: true });
+            break;
+        case 'owner-emergency':
+            await login('owner');
+            await navigate('/owner/court-closures/create');
+            await waitForText('Close courts and protect affected players');
+            await injectCaption('Handle sudden court closures safely', 'Preview affected bookings before blocking courts, notifying players, and preparing online refunds.', { demo: true });
+            break;
+        case 'owner-team':
+            await login('owner');
+            await navigate('/owner/team');
+            await waitForText('Team and staff');
+            await injectCaption('Give staff only the access they need', 'Owners control booking and inventory permissions while earnings and team administration stay private.', { demo: true });
+            break;
         case 'owner-earnings':
             await login('owner');
             await navigate('/owner/earnings');
@@ -486,6 +530,19 @@ async function prepare() {
             await waitForText('Turn an open court time into a promotion');
             await jumpToText('Your promotions', 'center');
             await injectCaption('Fill empty court hours', 'Use real openings to promote slower times.', { demo: true });
+            break;
+        case 'owner-loyalty':
+            await login('owner');
+            await navigate(`/owner/loyalty?venue=${manifest.venue_id}`);
+            await waitForText('What happened at this venue');
+            await jumpToText('What happened at this venue', 'center');
+            await injectCaption('Bring players back with venue loyalty', 'Set the stamps, discount, and cap—then follow ready rewards, repeat players, and actual discount cost.', { demo: true });
+            break;
+        case 'owner-growth':
+            await login('owner');
+            await navigate('/owner/growth');
+            await waitForText('Your next steps to get more bookings');
+            await injectCaption('Turn real activity into next steps', 'FinACourt highlights useful actions from availability, searches, bookings, and past customers.', { demo: true });
             break;
         case 'owner-visibility':
             await login('owner');
@@ -545,6 +602,15 @@ async function perform() {
             await injectCaption('Booking confirmed', 'The player and court owner now share one clear reservation record.');
             await sleep(3000);
             break;
+        case 'player-bookings':
+            await sleep(3100);
+            await scrollToText('Your bookings', 'center');
+            await injectCaption('Game passes and updates are easy to revisit', 'Players can open any reservation, share a safe game pass, or manage a change.', { demo: true });
+            await sleep(3900);
+            break;
+        case 'player-refund':
+            await sleep(7000);
+            break;
         case 'owner':
             await sleep(2500);
             await scrollToText('Today’s schedule', 'center');
@@ -584,6 +650,27 @@ async function perform() {
             await injectCaption('Court schedules stay easy to scan', 'Confirmed reservations and open court time are organized by court.', { demo: true });
             await sleep(3700);
             break;
+        case 'owner-venues':
+            await sleep(3200);
+            await scrollToText('Opening hours', 'center');
+            await injectCaption('Availability starts with accurate venue details', 'Overnight hours, court settings, and pricing feed the player booking experience.', { demo: true });
+            await sleep(3800);
+            break;
+        case 'owner-emergency':
+            await sleep(1900);
+            await type('textarea', 'Heavy rain caused flooding and the court is unsafe to use.');
+            await clickByText('button', 'Preview affected bookings');
+            await waitForText('Confirm the impact', 20000);
+            await scrollToText('Confirm the impact', 'center');
+            await injectCaption('No closure proceeds without an impact preview', 'The owner sees affected players and refund amounts before confirming.', { demo: true });
+            await sleep(5100);
+            break;
+        case 'owner-team':
+            await sleep(3000);
+            await scrollToText('Current staff', 'center');
+            await injectCaption('Permissions remain visible and reversible', 'Access can be changed, suspended, restored, or removed by the owner.', { demo: true });
+            await sleep(4000);
+            break;
         case 'owner-earnings':
             await sleep(6500);
             break;
@@ -605,6 +692,15 @@ async function perform() {
             await sleep(3100);
             await injectCaption('Promote slow time slots', 'Publish an offer while keeping court availability accurate.', { demo: true });
             await sleep(3900);
+            break;
+        case 'owner-loyalty':
+            await sleep(4200);
+            await scrollToText('Set the reward players earn', 'center');
+            await injectCaption('The owner chooses the economics', 'Rewards can stack with deals, never expire, and remain protected from refund abuse.', { demo: true });
+            await sleep(3800);
+            break;
+        case 'owner-growth':
+            await sleep(7000);
             break;
         case 'owner-visibility':
             await sleep(3200);

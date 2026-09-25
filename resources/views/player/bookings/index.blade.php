@@ -65,8 +65,12 @@
                             $readyCard = collect($program['rewards'])->first(fn (array $card) => $card['rewards_available'] > 0);
                             $nextCard = collect($program['rewards'])->first(fn (array $card) => $card['stamps'] % $card['stamps_required'] !== 0);
                             $discountCard = $readyCard ?? $nextCard;
-                            $stampsRequired = max(1, (int) ($nextCard['stamps_required'] ?? $program['venue']->loyalty_stamps_required));
-                            $stampsProgress = (int) (($nextCard['stamps'] ?? 0) % $stampsRequired);
+                            $completedCard = $readyCard && ! $nextCard ? $readyCard : null;
+                            $progressCard = $nextCard ?? $completedCard;
+                            $stampsRequired = max(1, (int) ($progressCard['stamps_required'] ?? $program['venue']->loyalty_stamps_required));
+                            $stampsProgress = $completedCard
+                                ? $stampsRequired
+                                : (int) (($progressCard['stamps'] ?? 0) % $stampsRequired);
                             $discountPercent = $discountCard['discount_percent'] ?? $program['venue']->loyalty_discount_percent;
                             $discountCap = $discountCard['discount_cap'] ?? $program['venue']->loyalty_discount_cap;
                         @endphp
@@ -99,16 +103,19 @@
                                     @if ($program['reward_debt'] > 0)
                                         <p class="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-950">A refunded game removed a stamp. {{ $program['stamps_needed'] }} more qualifying {{ Str::plural('game', $program['stamps_needed']) }} needed before another reward unlocks.</p>
                                     @else
-                                        <div class="mt-4" role="group" aria-label="{{ $stampsProgress }} of {{ $stampsRequired }} stamps toward the next reward">
-                                            <p class="text-xs font-semibold text-slate-700">Next reward: {{ $stampsProgress }}/{{ $stampsRequired }} {{ Str::plural('stamp', $stampsRequired) }}</p>
+                                        <div class="mt-4" role="group" aria-label="{{ $completedCard ? 'Completed reward card' : 'Progress toward the next reward' }}: {{ $stampsProgress }} of {{ $stampsRequired }} stamps">
+                                            <p class="text-xs font-semibold text-slate-700">{{ $completedCard ? 'Reward earned' : 'Next reward' }}: {{ $stampsProgress }}/{{ $stampsRequired }} {{ Str::plural('stamp', $stampsRequired) }}</p>
                                             @if ($stampsRequired <= 8)
                                                 <div aria-hidden="true" class="mt-2 flex flex-wrap gap-1.5">
                                                     @for ($stamp = 1; $stamp <= $stampsRequired; $stamp++)
-                                                        <span class="grid size-8 place-items-center rounded-full border-2 text-xs font-bold {{ $stamp <= $stampsProgress ? 'border-amber-400 bg-amber-300 text-amber-950' : 'border-slate-200 bg-white text-slate-400' }}">{{ $stamp <= $stampsProgress ? '★' : $stamp }}</span>
+                                                        <span data-loyalty-stamp-state="{{ $stamp <= $stampsProgress ? 'earned' : 'empty' }}" class="grid size-8 place-items-center rounded-full border-2 text-xs font-bold {{ $stamp <= $stampsProgress ? 'border-amber-400 bg-amber-300 text-amber-950' : 'border-slate-200 bg-white text-slate-400' }}">{{ $stamp <= $stampsProgress ? '★' : $stamp }}</span>
                                                     @endfor
                                                 </div>
                                             @else
                                                 <progress value="{{ $stampsProgress }}" max="{{ $stampsRequired }}" class="loyalty-progress mt-2">{{ $stampsProgress }} of {{ $stampsRequired }}</progress>
+                                            @endif
+                                            @if ($completedCard && $program['venue']->loyalty_active)
+                                                <p class="mt-2 text-xs leading-5 text-slate-500">These {{ $stampsRequired }} {{ Str::plural('stamp', $stampsRequired) }} completed this reward. Next card starts at 0/{{ $program['venue']->loyalty_stamps_required }} stamps under the current offer.</p>
                                             @endif
                                         </div>
                                     @endif

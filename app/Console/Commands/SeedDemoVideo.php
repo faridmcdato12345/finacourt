@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Enums\AcquisitionSource;
+use App\Models\Booking;
 use App\Models\Venue;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DemoVideoSeeder;
@@ -33,6 +34,10 @@ class SeedDemoVideo extends Command
             ->firstOrFail();
         $resource = $venue->resources->first()
             ?? throw new RuntimeException('The demo-video venue has no court resource.');
+        $refundBooking = Booking::query()
+            ->where('venue_id', $venue->getKey())
+            ->where('reference', 'BK-VIDEO-REFUND-DEMO')
+            ->firstOrFail();
         $bookingDate = CarbonImmutable::now($venue->organization->timezone)->addDay()->toDateString();
         $outputDirectory = base_path('output/demo-video');
 
@@ -48,6 +53,7 @@ class SeedDemoVideo extends Command
             'booking_date' => $bookingDate,
             'booking_start' => '14:00',
             'booking_duration' => 60,
+            'refund_booking_reference' => $refundBooking->reference,
             'owner_email' => config('demo-video.owner_email'),
             'player_email' => config('demo-video.player_email'),
             'external_link_token' => $link->token,

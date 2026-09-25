@@ -109,6 +109,7 @@ class MarketplaceQuery
     public function searchWithDemand(array $filters): MarketplaceSearchResult
     {
         $resourceConstraint = $this->resourceConstraint($filters);
+        $nearby = isset($filters['latitude'], $filters['longitude']);
         $query = $this->venueQuery()
             ->when($filters['city'] ?? null, fn (Builder $query, string $city) => $query->where('city_slug', $city))
             ->whereHas('resources', $resourceConstraint)
@@ -144,12 +145,40 @@ class MarketplaceQuery
                         ]);
                     }
                 },
-            ])
-            ->orderByDesc('verified_at')
-            ->orderBy('name')
-            ->limit(60);
+            ]);
+
+        if ($nearby) {
+            $latitude = (float) $filters['latitude'];
+            $longitude = (float) $filters['longitude'];
+            $query
+                ->whereNotNull('venues.latitude')
+                ->whereNotNull('venues.longitude')
+                ->select('venues.*')
+                ->selectRaw(
+                    '(6371 * 2 * ASIN(SQRT('
+                    .'POWER(SIN(RADIANS(venues.latitude - ?) / 2), 2) + '
+                    .'COS(RADIANS(?)) * COS(RADIANS(venues.latitude)) * '
+                    .'POWER(SIN(RADIANS(venues.longitude - ?) / 2), 2)'
+                    .'))) AS distance_km',
+                    [$latitude, $latitude, $longitude],
+                )
+                ->orderBy('distance_km')
+                ->orderByDesc('verified_at')
+                ->orderBy('name');
+        } else {
+            $query->orderByDesc('verified_at')->orderBy('name');
+        }
+
+        $query->limit(60);
 
         $venues = $this->applyMarketplacePrices($query->get(), $filters);
+
+        if ($nearby) {
+            $radius = (float) ($filters['radius_km'] ?? 25);
+            $venues = $venues
+                ->filter(fn (Venue $venue): bool => (float) $venue->getAttribute('distance_km') <= $radius)
+                ->values();
+        }
 
         $matchingVenueCount = $venues->count();
 

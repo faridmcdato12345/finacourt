@@ -6,14 +6,17 @@ use App\Enums\AnalyticsEventType;
 use App\Models\AnalyticsEvent;
 use App\Models\Booking;
 use App\Models\ExternalBookingDestination;
+use App\Models\Membership;
 use App\Models\OperatingHour;
 use App\Models\Promotion;
+use App\Models\RefundRequest;
 use App\Models\User;
 use App\Models\Venue;
 use App\Models\VisibilityLink;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DemoVideoSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -30,10 +33,13 @@ class DemoVideoSeederTest extends TestCase
 
         $venue = Venue::query()->where('slug', DemoVideoSeeder::VENUE_SLUG)->firstOrFail();
         $videoPlayer = User::query()->where('email', config('demo-video.player_email'))->firstOrFail();
+        $videoStaff = User::query()->where('email', 'demo.video.staff@finacourt.test')->firstOrFail();
 
         $this->assertSame('FinACourt Demo Courts Makati', $venue->name);
         $this->assertTrue($venue->is_published);
         $this->assertCount(3, $venue->resources);
+        $this->assertTrue($venue->loyalty_active);
+        $this->assertSame(5, $venue->loyalty_stamps_required);
         $this->assertSame(7, OperatingHour::query()->where('venue_id', $venue->getKey())->count());
         $this->assertSame(12, Booking::query()
             ->where('venue_id', $venue->getKey())
@@ -45,9 +51,19 @@ class DemoVideoSeederTest extends TestCase
         $this->assertSame('Weekday Afternoon Court Deal', $promotion->title);
         $this->assertTrue($promotion->is_active);
         $this->assertSame(2, $promotion->bookings()->count());
-        $this->assertSame(0, Booking::query()
+        $this->assertSame(4, Booking::query()
             ->where('venue_id', $venue->getKey())
             ->where('player_user_id', $videoPlayer->getKey())
+            ->count());
+        $this->assertSame(3, DB::table('loyalty_stamps')
+            ->where('venue_id', $venue->getKey())
+            ->where('player_user_id', $videoPlayer->getKey())
+            ->count());
+        $this->assertSame(1, RefundRequest::query()->where('reference', 'RFD-VIDEO-PENDING')->count());
+        $this->assertSame(1, Membership::query()
+            ->where('organization_id', $venue->organization_id)
+            ->where('user_id', $videoStaff->getKey())
+            ->whereNull('suspended_at')
             ->count());
         $this->assertSame(5, VisibilityLink::query()->where('venue_id', $venue->getKey())->count());
         $this->assertSame(1, ExternalBookingDestination::query()->where('venue_id', $venue->getKey())->count());

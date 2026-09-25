@@ -3,6 +3,7 @@ import PublicDateIsland from './Components/PublicDateIsland.vue';
 import PublicNumberIsland from './Components/PublicNumberIsland.vue';
 import PublicSelectIsland from './Components/PublicSelectIsland.vue';
 import './loyalty-carousel';
+import './nearby-courts';
 
 document.querySelectorAll('[data-public-select]').forEach((element) => {
     const configElement = element.querySelector('[data-public-select-config]');

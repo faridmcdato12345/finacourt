@@ -8,6 +8,7 @@ use App\Enums\AnalyticsEventType;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
 use App\Enums\MembershipRole;
+use App\Enums\OrganizationPermission;
 use App\Enums\OwnerPayoutMethod;
 use App\Enums\OwnerSettlementEntryType;
 use App\Enums\PaymentMode;
@@ -16,6 +17,7 @@ use App\Enums\PromotionDiscountType;
 use App\Enums\PromotionGoal;
 use App\Enums\PromotionStatus;
 use App\Enums\PromotionType;
+use App\Enums\RefundRequestStatus;
 use App\Enums\ResourceSetting;
 use App\Enums\ResourceType;
 use App\Enums\Weekday;
@@ -32,6 +34,7 @@ use App\Models\OwnerPayoutProfile;
 use App\Models\OwnerSettlementEntry;
 use App\Models\Payment;
 use App\Models\Promotion;
+use App\Models\RefundRequest;
 use App\Models\Sport;
 use App\Models\User;
 use App\Models\Venue;
@@ -86,6 +89,25 @@ class DemoVideoSeeder extends Seeder
                     'joined_at' => now(),
                 ],
             );
+            $staff = $this->user('demo.video.staff@finacourt.test', 'Jamie Court Staff');
+            Membership::query()->updateOrCreate(
+                [
+                    'organization_id' => $organization->getKey(),
+                    'user_id' => $staff->getKey(),
+                ],
+                [
+                    'role' => MembershipRole::Staff,
+                    'permissions' => [
+                        OrganizationPermission::ManageBookings->value,
+                        OrganizationPermission::ManageInventory->value,
+                    ],
+                    'joined_at' => now()->subDays(18),
+                    'suspended_at' => null,
+                    'suspended_by_user_id' => null,
+                    'removed_at' => null,
+                    'removed_by_user_id' => null,
+                ],
+            );
 
             $venue = Venue::query()->updateOrCreate(
                 ['slug' => self::VENUE_SLUG],
@@ -107,6 +129,11 @@ class DemoVideoSeeder extends Seeder
                     'is_published' => true,
                     'claimed_at' => now(),
                     'verified_at' => now(),
+                    'loyalty_active' => true,
+                    'loyalty_terms_version' => 1,
+                    'loyalty_stamps_required' => 5,
+                    'loyalty_discount_percent' => '10.00',
+                    'loyalty_discount_cap' => '100.00',
                 ],
             );
 
@@ -154,6 +181,7 @@ class DemoVideoSeeder extends Seeder
             $this->clearPreviousRecordedBooking($venue, $player);
             $promotion = $this->seedPromotion($venue);
             $this->seedAnalytics($venue, $resources, $promotion);
+            $this->seedPlayerWorkflow($venue, $resources->firstOrFail(), $player, $owner);
             $this->seedOwnerEarnings($organization, $owner);
             $this->seedExternalBookingLinks($venue, $owner);
         });
@@ -199,12 +227,169 @@ class DemoVideoSeeder extends Seeder
 
         DB::table('analytics_events')->whereIn('booking_id', $bookingIds)->delete();
         DB::table('booking_attributions')->whereIn('booking_id', $bookingIds)->delete();
+        DB::table('loyalty_stamps')->whereIn('booking_id', $bookingIds)->delete();
+        DB::table('loyalty_redemptions')->whereIn('booking_id', $bookingIds)->delete();
+        DB::table('refund_requests')->whereIn('booking_id', $bookingIds)->delete();
         DB::table('payment_transitions')->whereIn(
             'payment_id',
             DB::table('payments')->whereIn('booking_id', $bookingIds)->select('id'),
         )->delete();
         DB::table('payments')->whereIn('booking_id', $bookingIds)->delete();
         DB::table('bookings')->whereIn('id', $bookingIds)->delete();
+    }
+
+    private function seedPlayerWorkflow(Venue $venue, CourtResource $resource, User $player, User $owner): void
+    {
+        $now = CarbonImmutable::now($venue->organization->timezone);
+
+        foreach ([8, 5, 2] as $index => $daysAgo) {
+            $startAt = $now->subDays($daysAgo)->setTime(18, 0);
+            $reference = sprintf('BK-VIDEO-LOYALTY-%02d', $index + 1);
+            $booking = Booking::query()->updateOrCreate(
+                ['reference' => $reference],
+                [
+                    'organization_id' => $venue->organization_id,
+                    'venue_id' => $venue->getKey(),
+                    'resource_id' => $resource->getKey(),
+                    'player_user_id' => $player->getKey(),
+                    'status' => BookingStatus::Confirmed,
+                    'source' => BookingSource::Marketplace,
+                    'customer_name' => $player->name,
+                    'customer_email' => $player->email,
+                    'notes' => 'Synthetic completed game for the full product demo.',
+                    'start_at' => $startAt->utc(),
+                    'end_at' => $startAt->addHour()->utc(),
+                    'timezone' => $venue->organization->timezone,
+                    'unit_price' => $resource->base_hourly_rate,
+                    'original_unit_price' => $resource->base_hourly_rate,
+                    'total_amount' => $resource->base_hourly_rate,
+                    'original_total_amount' => $resource->base_hourly_rate,
+                    'discount_amount' => '0.00',
+                    'platform_service_fee_amount' => '25.00',
+                    'player_total_amount' => number_format((float) $resource->base_hourly_rate + 25, 2, '.', ''),
+                    'currency' => 'PHP',
+                    'payment_mode' => PaymentMode::HostedCheckout,
+                    'payment_status' => PaymentStatus::Paid,
+                    'created_by_user_id' => $player->getKey(),
+                    'loyalty_eligible' => true,
+                    'loyalty_processed_at' => $startAt->addHours(2)->utc(),
+                    'loyalty_terms_version' => $venue->loyalty_terms_version,
+                    'loyalty_stamps_required' => $venue->loyalty_stamps_required,
+                    'loyalty_discount_percent' => $venue->loyalty_discount_percent,
+                    'loyalty_discount_cap' => $venue->loyalty_discount_cap,
+                ],
+            );
+            Payment::query()->updateOrCreate(
+                ['reference' => sprintf('PAY-VIDEO-LOYALTY-%02d', $index + 1)],
+                [
+                    'organization_id' => $venue->organization_id,
+                    'booking_id' => $booking->getKey(),
+                    'provider' => 'demo_video',
+                    'mode' => PaymentMode::HostedCheckout,
+                    'status' => PaymentStatus::Paid,
+                    'amount' => $booking->player_total_amount,
+                    'venue_amount' => $booking->total_amount,
+                    'platform_service_fee_amount' => $booking->platform_service_fee_amount,
+                    'refunded_amount' => '0.00',
+                    'currency' => 'PHP',
+                    'provider_reference' => sprintf('demo-loyalty-session-%02d', $index + 1),
+                    'provider_payment_reference' => sprintf('pay_demo_loyalty_%02d', $index + 1),
+                    'requires_review' => false,
+                    'paid_at' => $startAt->subDay()->utc(),
+                    'created_by_user_id' => $player->getKey(),
+                    'verified_by_user_id' => $owner->getKey(),
+                ],
+            );
+            DB::table('loyalty_stamps')->updateOrInsert(
+                ['booking_id' => $booking->getKey()],
+                [
+                    'venue_id' => $venue->getKey(),
+                    'player_user_id' => $player->getKey(),
+                    'local_play_date' => $startAt->toDateString(),
+                    'terms_version' => $venue->loyalty_terms_version,
+                    'stamps_required' => $venue->loyalty_stamps_required,
+                    'discount_percent' => $venue->loyalty_discount_percent,
+                    'discount_cap' => $venue->loyalty_discount_cap,
+                    'reversed_at' => null,
+                    'created_at' => $startAt->addHours(2)->utc(),
+                    'updated_at' => $startAt->addHours(2)->utc(),
+                ],
+            );
+        }
+
+        $startAt = $now->addDays(4)->setTime(19, 0);
+        $booking = Booking::query()->updateOrCreate(
+            ['reference' => 'BK-VIDEO-REFUND-DEMO'],
+            [
+                'organization_id' => $venue->organization_id,
+                'venue_id' => $venue->getKey(),
+                'resource_id' => $resource->getKey(),
+                'player_user_id' => $player->getKey(),
+                'status' => BookingStatus::Confirmed,
+                'source' => BookingSource::Marketplace,
+                'customer_name' => $player->name,
+                'customer_email' => $player->email,
+                'notes' => 'Synthetic paid booking with a pending refund request for the full product demo.',
+                'start_at' => $startAt->utc(),
+                'end_at' => $startAt->addHour()->utc(),
+                'timezone' => $venue->organization->timezone,
+                'unit_price' => $resource->base_hourly_rate,
+                'original_unit_price' => $resource->base_hourly_rate,
+                'total_amount' => $resource->base_hourly_rate,
+                'original_total_amount' => $resource->base_hourly_rate,
+                'discount_amount' => '0.00',
+                'platform_service_fee_amount' => '25.00',
+                'player_total_amount' => number_format((float) $resource->base_hourly_rate + 25, 2, '.', ''),
+                'currency' => 'PHP',
+                'payment_mode' => PaymentMode::HostedCheckout,
+                'payment_status' => PaymentStatus::Paid,
+                'created_by_user_id' => $player->getKey(),
+                'loyalty_eligible' => true,
+                'loyalty_terms_version' => $venue->loyalty_terms_version,
+                'loyalty_stamps_required' => $venue->loyalty_stamps_required,
+                'loyalty_discount_percent' => $venue->loyalty_discount_percent,
+                'loyalty_discount_cap' => $venue->loyalty_discount_cap,
+            ],
+        );
+        $payment = Payment::query()->updateOrCreate(
+            ['reference' => 'PAY-VIDEO-REFUND-DEMO'],
+            [
+                'organization_id' => $venue->organization_id,
+                'booking_id' => $booking->getKey(),
+                'provider' => 'demo_video',
+                'mode' => PaymentMode::HostedCheckout,
+                'status' => PaymentStatus::Paid,
+                'amount' => $booking->player_total_amount,
+                'venue_amount' => $booking->total_amount,
+                'platform_service_fee_amount' => $booking->platform_service_fee_amount,
+                'refunded_amount' => '0.00',
+                'currency' => 'PHP',
+                'provider_reference' => 'demo-refund-session',
+                'provider_payment_reference' => 'pay_demo_refund',
+                'requires_review' => false,
+                'paid_at' => $now->subHour()->utc(),
+                'created_by_user_id' => $player->getKey(),
+                'verified_by_user_id' => $owner->getKey(),
+            ],
+        );
+        RefundRequest::query()->updateOrCreate(
+            ['reference' => 'RFD-VIDEO-PENDING'],
+            [
+                'organization_id' => $venue->organization_id,
+                'booking_id' => $booking->getKey(),
+                'payment_id' => $payment->getKey(),
+                'status' => RefundRequestStatus::Requested,
+                'amount' => $payment->amount,
+                'currency' => 'PHP',
+                'reason' => 'My schedule changed and I can no longer attend this game.',
+                'requested_by_user_id' => $player->getKey(),
+                'provider' => 'demo_video',
+                'provider_payment_reference' => $payment->provider_payment_reference,
+                'attempts' => 0,
+                'requires_review' => false,
+                'requested_at' => $now->subMinutes(20)->utc(),
+            ],
+        );
     }
 
     private function seedOwnerEarnings(Organization $organization, User $owner): void

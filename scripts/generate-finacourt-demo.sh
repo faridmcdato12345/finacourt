@@ -9,6 +9,7 @@ browser_name="finacourt-demo-browser"
 browser_image="${DEMO_VIDEO_BROWSER_IMAGE:-selenium/standalone-chromium:latest}"
 account_password="${DEMO_VIDEO_ACCOUNT_PASSWORD:-finacourt-demo-only}"
 reuse_scenes="${DEMO_VIDEO_REUSE_SCENES:-0}"
+start_at_scene="${DEMO_VIDEO_START_AT:-}"
 variant="${DEMO_VIDEO_VARIANT:-standard}"
 
 case "${variant}" in
@@ -33,8 +34,15 @@ case "${variant}" in
         minimum_duration=5.5
         maximum_duration=7.5
         ;;
+    full)
+        scenes=(intro discovery venue booking player-bookings player-refund owner-intro owner-dashboard owner-venues owner-bookings owner-emergency owner-team owner-promotions owner-loyalty owner-growth owner-analytics owner-links owner-visibility owner-earnings owner-outro)
+        scene_durations=(4.5 7.5 7.0 8.9 7.0 7.0 4.0 7.0 7.0 7.0 7.0 7.0 7.0 8.0 7.0 8.0 10.0 6.0 6.5 5.0)
+        final_filename="finacourt-full-demo.mp4"
+        minimum_duration=135
+        maximum_duration=145
+        ;;
     *)
-        echo "Unknown DEMO_VIDEO_VARIANT: ${variant}. Use standard, owner, or owner-earnings." >&2
+        echo "Unknown DEMO_VIDEO_VARIANT: ${variant}. Use standard, owner, owner-earnings, or full." >&2
         exit 1
         ;;
 esac
@@ -72,7 +80,16 @@ docker compose exec -T \
     -e DEMO_VIDEO_ACCOUNT_PASSWORD="${account_password}" \
     app php artisan finacourt:demo-video-seed
 
+resume_reached=0
+if [[ -z "${start_at_scene}" ]]; then
+    resume_reached=1
+fi
+
 for scene in "${scenes[@]}"; do
+    if [[ "${scene}" == "${start_at_scene}" ]]; then
+        resume_reached=1
+    fi
+
     rm -f \
         "${control_directory}/${scene}.ready" \
         "${control_directory}/${scene}.start" \
@@ -80,7 +97,7 @@ for scene in "${scenes[@]}"; do
         "${control_directory}/${scene}.error" \
         "${control_directory}/${scene}.captured"
 
-    if [[ "${reuse_scenes}" != "1" ]]; then
+    if [[ "${reuse_scenes}" != "1" && ${resume_reached} -eq 1 ]]; then
         rm -f \
             "${output_directory}/scene-${scene}.mp4" \
             "${output_directory}/scene-${scene}.automation.log" \
@@ -88,6 +105,11 @@ for scene in "${scenes[@]}"; do
             "${output_directory}/debug-${scene}.png"
     fi
 done
+
+if [[ -n "${start_at_scene}" && ${resume_reached} -eq 0 ]]; then
+    echo "DEMO_VIDEO_START_AT scene '${start_at_scene}' is not part of the ${variant} variant." >&2
+    exit 1
+fi
 
 echo "Starting the deterministic 1920x1080 browser..."
 docker run -d \
@@ -235,7 +257,22 @@ if [[ "${reuse_scenes}" == "1" ]]; then
         fi
     done
 else
+    resume_reached=0
+    if [[ -z "${start_at_scene}" ]]; then
+        resume_reached=1
+    fi
     for scene in "${scenes[@]}"; do
+        if [[ "${scene}" == "${start_at_scene}" ]]; then
+            resume_reached=1
+        fi
+        if [[ ${resume_reached} -eq 0 ]]; then
+            if [[ ! -s "${output_directory}/scene-${scene}.mp4" ]]; then
+                echo "Cannot resume at ${start_at_scene}: scene-${scene}.mp4 is missing." >&2
+                exit 1
+            fi
+            echo "Keeping previously recorded ${scene} scene..."
+            continue
+        fi
         record_scene "${scene}"
     done
 fi
