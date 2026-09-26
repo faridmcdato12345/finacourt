@@ -29,6 +29,9 @@ x-app-runtime: &app-runtime
   restart: unless-stopped
   volumes:
     - public_uploads:/var/www/html/storage/app/public
+    # Service-account credentials remain host-managed and read-only. They are
+    # never copied into the application image or a public filesystem.
+    - ./storage/app/google:/var/www/html/storage/app/google:ro
   depends_on:
     db:
       condition: service_healthy
