@@ -47,11 +47,23 @@ jobs:
               -f docker-compose.staging.yml \
               build
 
-            docker compose \
+            if ! docker compose \
               --env-file .env.staging \
               -p finacourt-staging \
               -f docker-compose.staging.yml \
-              up -d --remove-orphans
+              up -d --remove-orphans; then
+              docker compose \
+                --env-file .env.staging \
+                -p finacourt-staging \
+                -f docker-compose.staging.yml \
+                ps
+              docker compose \
+                --env-file .env.staging \
+                -p finacourt-staging \
+                -f docker-compose.staging.yml \
+                logs --no-color --tail=200 app queue scheduler
+              exit 1
+            fi
 
             docker exec finacourt-staging-app-1 \
               php artisan migrate --force
