@@ -5,6 +5,8 @@ namespace App\Outreach;
 use App\Enums\OutreachLeadStatus;
 use App\Models\OutreachLead;
 use App\Outreach\Contracts\GoogleSheetReader;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -84,7 +86,18 @@ class SyncGoogleSheetLeads
 
             $seenEmails[$email] = true;
             $linked = $this->claimLinks->resolve($privateLink);
-            $lead = OutreachLead::query()->where('email', $email)->first();
+            [$lead, $identityError] = $this->findExistingLead($email, $privateLink, $linked);
+
+            if ($identityError !== null) {
+                $counts['invalid']++;
+                Log::warning('Conflicting Google Sheet outreach identity skipped', [
+                    'row' => $rowNumber,
+                    'reason' => $identityError,
+                    'email_hash' => hash('sha256', $email),
+                ]);
+
+                continue;
+            }
 
             if ($lead === null) {
                 $counts['created']++;
@@ -110,6 +123,7 @@ class SyncGoogleSheetLeads
 
             $safeUpdates = [
                 'venue_name' => $venueName,
+                'email' => $email,
                 'private_link' => $privateLink,
                 'venue_directory_listing_id' => $linked['listing_id'],
                 'venue_claim_invitation_id' => $linked['invitation_id'],
@@ -145,6 +159,53 @@ class SyncGoogleSheetLeads
             invalid: $counts['invalid'],
             duplicates: $counts['duplicates'],
         );
+    }
+
+    /**
+     * Match mutable email addresses against the stable claim identity without ever
+     * merging two different leads. Exact private links also support legacy links
+     * that cannot be resolved to a claim invitation.
+     *
+     * @param  array{
+     *   invitation_id: int|null,
+     *   listing_id: int|null,
+     *   venue_id: int|null,
+     *   claimed_at: Carbon|null
+     * }  $linked
+     * @return array{0: OutreachLead|null, 1: string|null}
+     */
+    private function findExistingLead(string $email, string $privateLink, array $linked): array
+    {
+        $emailLead = OutreachLead::query()->where('email', $email)->first();
+        $identityLeads = OutreachLead::query()
+            ->where(function (Builder $query) use ($privateLink, $linked): void {
+                $query->where('private_link', $privateLink);
+
+                if ($linked['invitation_id'] !== null) {
+                    $query->orWhere('venue_claim_invitation_id', $linked['invitation_id']);
+                }
+
+                if ($linked['listing_id'] !== null) {
+                    $query->orWhere('venue_directory_listing_id', $linked['listing_id']);
+                }
+            })
+            ->get()
+            ->unique(fn (OutreachLead $lead): int => $lead->getKey())
+            ->values();
+
+        if ($identityLeads->count() > 1) {
+            return [null, 'The private link resolves to multiple existing outreach leads.'];
+        }
+
+        $identityLead = $identityLeads->first();
+
+        if ($emailLead !== null
+            && $identityLead !== null
+            && ! $emailLead->is($identityLead)) {
+            return [null, 'The email and private link belong to different existing outreach leads.'];
+        }
+
+        return [$emailLead ?? $identityLead, null];
     }
 
     private function validationError(string $venueName, string $email, string $privateLink): ?string
