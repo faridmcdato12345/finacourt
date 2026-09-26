@@ -7,6 +7,7 @@ vendor
 public/build
 public/hot
 storage/app/public
+storage/app/google
 storage/framework
 storage/logs
 .phpunit.cache
