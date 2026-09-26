@@ -15,7 +15,10 @@ use Illuminate\Support\Facades\Log;
 
 class OutreachProcessor
 {
-    public function __construct(private readonly OutreachSuppression $suppression) {}
+    public function __construct(
+        private readonly OutreachSuppression $suppression,
+        private readonly OutreachSendingWindow $sendingWindow,
+    ) {}
 
     public function run(bool $dryRun = false): OutreachProcessReport
     {
@@ -25,7 +28,7 @@ class OutreachProcessor
 
         $at = now('UTC');
         $quotaDate = $at->copy()->setTimezone((string) config('outreach.timezone'))->toDateString();
-        $limit = max(1, (int) config('outreach.daily_limit', 20));
+        $limit = max(1, (int) config('outreach.daily_limit', 5));
         $due = [
             OutreachMessageType::Initial->value => $this->dueQuery(OutreachMessageType::Initial, $at)->count(),
             OutreachMessageType::Followup1->value => $this->dueQuery(OutreachMessageType::Followup1, $at)->count(),
@@ -43,9 +46,20 @@ class OutreachProcessor
         $used = (int) (OutreachDailyQuota::query()
             ->whereDate('quota_date', $quotaDate)
             ->value('reserved_count') ?? 0);
+        $slots = $this->sendingWindow->slots($at, max(0, $limit - $used));
 
         if ($dryRun) {
-            return $this->report($due, $suppressed, $used, $limit);
+            return $this->report($due, $suppressed, $used, $limit, count($slots));
+        }
+
+        if ($slots === []) {
+            Log::info('Outreach processing skipped because no paced business-hour slots are available', [
+                'quota_date' => $quotaDate,
+                'daily_limit' => $limit,
+                'daily_quota_used' => $used,
+            ]);
+
+            return $this->report($due, $suppressed, $used, $limit, 0);
         }
 
         OutreachDailyQuota::query()->insertOrIgnore([
@@ -59,17 +73,25 @@ class OutreachProcessor
 
         // Existing conversations receive quota before brand-new introductions.
         foreach ([OutreachMessageType::Followup2, OutreachMessageType::Followup1, OutreachMessageType::Initial] as $type) {
-            if ($used + $queued >= $limit) {
+            if ($used + $queued >= $limit || $queued >= count($slots)) {
                 break;
             }
 
             $candidateIds = $this->dueQuery($type, $at)
                 ->oldest($type === OutreachMessageType::Initial ? 'created_at' : 'next_send_at')
-                ->limit($limit - $used - $queued)
+                ->limit(min($limit - $used - $queued, count($slots) - $queued))
                 ->pluck('id');
 
             foreach ($candidateIds as $leadId) {
-                $message = $this->reserveMessage((int) $leadId, $type, $at, $quotaDate, $limit);
+                $scheduledFor = $slots[$queued];
+                $message = $this->reserveMessage(
+                    (int) $leadId,
+                    $type,
+                    $at,
+                    $scheduledFor,
+                    $quotaDate,
+                    $limit,
+                );
 
                 if ($message === null) {
                     continue;
@@ -78,6 +100,7 @@ class OutreachProcessor
                 $queued++;
                 SendOutreachMessage::dispatch($message->getKey())
                     ->onQueue('emails')
+                    ->delay($scheduledFor)
                     ->afterCommit();
             }
         }
@@ -86,9 +109,10 @@ class OutreachProcessor
             'queued' => $queued,
             'quota_date' => $quotaDate,
             'daily_limit' => $limit,
+            'interval_minutes' => $this->sendingWindow->intervalMinutes(),
         ]);
 
-        return $this->report($due, $suppressed, $used + $queued, $limit, $queued);
+        return $this->report($due, $suppressed, $used + $queued, $limit, count($slots), $queued);
     }
 
     /** @return Builder<OutreachLead> */
@@ -118,10 +142,11 @@ class OutreachProcessor
         int $leadId,
         OutreachMessageType $type,
         Carbon $at,
+        \DateTimeInterface $scheduledFor,
         string $quotaDate,
         int $limit,
     ): ?OutreachMessage {
-        return DB::transaction(function () use ($leadId, $type, $at, $quotaDate, $limit): ?OutreachMessage {
+        return DB::transaction(function () use ($leadId, $type, $at, $scheduledFor, $quotaDate, $limit): ?OutreachMessage {
             $quota = OutreachDailyQuota::query()
                 ->whereDate('quota_date', $quotaDate)
                 ->lockForUpdate()
@@ -143,6 +168,7 @@ class OutreachProcessor
                 'message_type' => $type,
                 'status' => OutreachMessageStatus::Queued,
                 'queued_at' => $at,
+                'scheduled_for' => $scheduledFor,
             ]);
             $quota->increment('reserved_count');
 
@@ -156,6 +182,7 @@ class OutreachProcessor
         int $suppressed,
         int $used,
         int $limit,
+        int $pacedSlotsAvailable,
         int $queued = 0,
     ): OutreachProcessReport {
         return new OutreachProcessReport(
@@ -165,6 +192,7 @@ class OutreachProcessor
             suppressed: $suppressed,
             dailyQuotaUsed: $used,
             dailyQuotaRemaining: max(0, $limit - $used),
+            pacedSlotsAvailable: $pacedSlotsAvailable,
             queued: $queued,
         );
     }

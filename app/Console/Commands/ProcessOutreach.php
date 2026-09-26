@@ -40,6 +40,7 @@ class ProcessOutreach extends Command
             ['Suppressed leads', $report->suppressed],
             ['Daily quota used', $report->dailyQuotaUsed],
             ['Daily quota remaining', $report->dailyQuotaRemaining],
+            ['Paced slots available now', $report->pacedSlotsAvailable],
             ['Messages queued', $report->queued],
         ]);
 

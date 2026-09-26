@@ -2,9 +2,15 @@
 
 return [
     'enabled' => (bool) env('OUTREACH_ENABLED', false),
-    'daily_limit' => max(1, (int) env('OUTREACH_DAILY_LIMIT', 20)),
+    'daily_limit' => max(1, (int) env('OUTREACH_DAILY_LIMIT', 5)),
     'followup_1_days' => max(1, (int) env('OUTREACH_FOLLOWUP_1_DAYS', 4)),
     'followup_2_days' => max(1, (int) env('OUTREACH_FOLLOWUP_2_DAYS', 5)),
+    'sending' => [
+        'interval_minutes' => max(1, (int) env('OUTREACH_SEND_INTERVAL_MINUTES', 15)),
+        'window_start' => env('OUTREACH_SEND_WINDOW_START', '09:00'),
+        'window_end' => env('OUTREACH_SEND_WINDOW_END', '17:00'),
+        'weekdays_only' => (bool) env('OUTREACH_SEND_WEEKDAYS_ONLY', true),
+    ],
     'from' => [
         'address' => env('OUTREACH_FROM_ADDRESS', 'support@finacourt.asia'),
         'name' => env('OUTREACH_FROM_NAME', 'Farid - FinACourt'),

@@ -11,6 +11,7 @@ final readonly class OutreachProcessReport
         public int $suppressed,
         public int $dailyQuotaUsed,
         public int $dailyQuotaRemaining,
+        public int $pacedSlotsAvailable,
         public int $queued = 0,
     ) {}
 }

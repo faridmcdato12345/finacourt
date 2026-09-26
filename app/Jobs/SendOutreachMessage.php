@@ -8,11 +8,13 @@ use App\Enums\OutreachMessageType;
 use App\Mail\OutreachMail;
 use App\Models\OutreachLead;
 use App\Models\OutreachMessage;
+use App\Outreach\OutreachSendingWindow;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +27,9 @@ class SendOutreachMessage implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    public int $tries = 100;
+
+    public int $maxExceptions = 3;
 
     public int $timeout = 60;
 
@@ -44,10 +48,29 @@ class SendOutreachMessage implements ShouldBeUnique, ShouldQueue
         return (string) $this->outreachMessageId;
     }
 
+    /** @return array<int, RateLimited> */
+    public function middleware(): array
+    {
+        if (! (bool) config('outreach.enabled', false)
+            || ! app(OutreachSendingWindow::class)->isOpen(now('UTC'))) {
+            return [];
+        }
+
+        return [new RateLimited('outreach-delivery')];
+    }
+
     public function handle(): void
     {
         if (! (bool) config('outreach.enabled', false)) {
             throw new RuntimeException('Outreach delivery is disabled by OUTREACH_ENABLED=false.');
+        }
+
+        $sendingWindow = app(OutreachSendingWindow::class);
+
+        if (! $sendingWindow->isOpen(now('UTC'))) {
+            $this->release($sendingWindow->secondsUntilNextOpening(now('UTC')));
+
+            return;
         }
 
         $message = DB::transaction(function (): ?OutreachMessage {
