@@ -132,6 +132,14 @@ class AppServiceProvider extends ServiceProvider
             ->by($request->ip()));
         RateLimiter::for('google-business-profile', fn (Request $request) => Limit::perHour(12)
             ->by(($request->user()?->getKey() ?? 'guest').'|'.$request->ip()));
+        RateLimiter::for('outreach-delivery', fn () => [
+            Limit::perMinutes(
+                max(1, (int) config('outreach.sending.interval_minutes', 15)),
+                1,
+            )->by('outreach-global'),
+            Limit::perDay(max(1, (int) config('outreach.daily_limit', 5)))
+                ->by('outreach-daily|'.now((string) config('outreach.timezone', 'Asia/Manila'))->toDateString()),
+        ]);
 
         RateLimiter::for('player-booking', fn (Request $request) => Limit::perMinute(10)
             ->by(($request->user()?->getKey() ?? 'guest').'|'.$request->ip()));

@@ -13,8 +13,10 @@ use App\Models\VenueClaimInvitation;
 use App\Models\VenueDirectoryListing;
 use App\Outreach\Contracts\GoogleSheetReader;
 use App\Outreach\GoogleSheetsLeadSource;
+use Illuminate\Cache\RateLimiter as CacheRateLimiter;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use RuntimeException;
@@ -33,6 +35,10 @@ class OutreachAutomationTest extends TestCase
             'outreach.daily_limit' => 20,
             'outreach.followup_1_days' => 4,
             'outreach.followup_2_days' => 5,
+            'outreach.sending.interval_minutes' => 15,
+            'outreach.sending.window_start' => '00:00',
+            'outreach.sending.window_end' => '23:59',
+            'outreach.sending.weekdays_only' => false,
             'outreach.from.address' => 'support@finacourt.asia',
             'outreach.from.name' => 'Farid - FinACourt',
             'outreach.reply_to' => 'support@finacourt.asia',
@@ -283,6 +289,100 @@ class OutreachAutomationTest extends TestCase
             'status' => OutreachMessageStatus::Queued->value,
         ]);
         Queue::assertPushed(SendOutreachMessage::class, 1);
+    }
+
+    public function test_outreach_messages_are_scheduled_one_interval_apart_during_business_hours(): void
+    {
+        Queue::fake();
+        config()->set([
+            'outreach.daily_limit' => 3,
+            'outreach.sending.interval_minutes' => 15,
+            'outreach.sending.window_start' => '09:00',
+            'outreach.sending.window_end' => '17:00',
+            'outreach.sending.weekdays_only' => true,
+        ]);
+        $this->travelTo(Carbon::parse('2026-09-28 09:00:00', 'Asia/Manila')->utc());
+
+        foreach (range(1, 3) as $index) {
+            $this->lead(['email' => "paced{$index}@example.com"]);
+        }
+
+        $this->artisan('outreach:process')
+            ->expectsOutputToContain('Paced slots available now')
+            ->assertSuccessful();
+
+        $scheduledTimes = OutreachMessage::query()
+            ->oldest('scheduled_for')
+            ->get()
+            ->map(fn (OutreachMessage $message): string => $message->scheduled_for
+                ->setTimezone('Asia/Manila')
+                ->format('Y-m-d H:i'))
+            ->all();
+
+        $this->assertSame([
+            '2026-09-28 09:00',
+            '2026-09-28 09:15',
+            '2026-09-28 09:30',
+        ], $scheduledTimes);
+        Queue::assertPushed(SendOutreachMessage::class, 3);
+    }
+
+    public function test_outreach_processing_does_not_queue_messages_on_weekends(): void
+    {
+        Queue::fake();
+        config()->set([
+            'outreach.sending.window_start' => '09:00',
+            'outreach.sending.window_end' => '17:00',
+            'outreach.sending.weekdays_only' => true,
+        ]);
+        $this->travelTo(Carbon::parse('2026-09-27 10:00:00', 'Asia/Manila')->utc());
+        $this->lead();
+
+        $this->artisan('outreach:process')->assertSuccessful();
+
+        $this->assertDatabaseCount('outreach_messages', 0);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_outreach_delivery_has_a_global_interval_rate_limit(): void
+    {
+        config()->set([
+            'outreach.daily_limit' => 5,
+            'outreach.sending.interval_minutes' => 15,
+        ]);
+        $limiter = app(CacheRateLimiter::class)->limiter('outreach-delivery');
+        [$intervalLimit, $dailyLimit] = $limiter(new SendOutreachMessage(1));
+
+        $this->assertSame(1, $intervalLimit->maxAttempts);
+        $this->assertSame(900, $intervalLimit->decaySeconds);
+        $this->assertSame('outreach-global', $intervalLimit->key);
+        $this->assertSame(5, $dailyLimit->maxAttempts);
+        $this->assertSame(86400, $dailyLimit->decaySeconds);
+        $this->assertStringStartsWith('outreach-daily|', $dailyLimit->key);
+    }
+
+    public function test_overdue_outreach_job_does_not_send_outside_business_hours(): void
+    {
+        Mail::fake();
+        config()->set([
+            'outreach.sending.window_start' => '09:00',
+            'outreach.sending.window_end' => '17:00',
+            'outreach.sending.weekdays_only' => true,
+        ]);
+        $this->travelTo(Carbon::parse('2026-09-27 18:00:00', 'Asia/Manila')->utc());
+        $lead = $this->lead();
+        $message = $lead->messages()->create([
+            'message_type' => OutreachMessageType::Initial,
+            'status' => OutreachMessageStatus::Queued,
+            'queued_at' => now()->subHour(),
+            'scheduled_for' => now()->subMinutes(45),
+        ]);
+
+        (new SendOutreachMessage($message->getKey()))->handle();
+
+        Mail::assertNothingSent();
+        $this->assertSame(OutreachMessageStatus::Queued, $message->refresh()->status);
+        $this->assertSame(0, $message->attempts);
     }
 
     public function test_database_unique_constraint_and_job_state_make_initial_delivery_retry_safe(): void
