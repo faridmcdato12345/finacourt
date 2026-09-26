@@ -8,12 +8,14 @@ use App\Enums\AnalyticsEventType;
 use App\Enums\DirectoryClaimStatus;
 use App\Enums\DirectoryListingStatus;
 use App\Enums\MembershipRole;
+use App\Enums\OutreachLeadStatus;
 use App\Enums\VenueClaimProofMethod;
 use App\Enums\VenueClaimProofStatus;
 use App\Models\AnalyticsEvent;
 use App\Models\CourtResource;
 use App\Models\Membership;
 use App\Models\Organization;
+use App\Models\OutreachLead;
 use App\Models\PsgcLocation;
 use App\Models\Sport;
 use App\Models\User;
@@ -681,6 +683,17 @@ class UnclaimedVenueDirectoryTest extends TestCase
             'coordinates_verified_at' => now(),
         ]);
         $invitationToken = $this->claimInvitationToken($listing);
+        $invitation = VenueClaimInvitation::query()->sole();
+        $outreachLead = OutreachLead::query()->create([
+            'venue_directory_listing_id' => $listing->getKey(),
+            'venue_claim_invitation_id' => $invitation->getKey(),
+            'venue_name' => $listing->name,
+            'email' => 'directory-owner@example.com',
+            'private_link' => route('owner.directory-claims.invitations.create', $invitationToken),
+            'status' => OutreachLeadStatus::Active,
+            'initial_sent_at' => now()->subDays(4),
+            'next_send_at' => now(),
+        ]);
         [$owner, $organization] = $this->ownerWithOrganization();
         $admin = User::factory()->platformAdmin()->create();
 
@@ -725,6 +738,10 @@ class UnclaimedVenueDirectoryTest extends TestCase
         $this->assertSame($venue->getKey(), $claim->approved_venue_id);
         $this->assertSame(DirectoryListingStatus::Claimed, $listing->status);
         $this->assertSame($venue->getKey(), $listing->claimed_venue_id);
+        $this->assertSame(OutreachLeadStatus::Claimed, $outreachLead->refresh()->status);
+        $this->assertNotNull($outreachLead->claimed_at);
+        $this->assertNull($outreachLead->next_send_at);
+        $this->assertSame($venue->getKey(), $outreachLead->venue_id);
 
         $event = AnalyticsEvent::query()->where('venue_directory_listing_id', $listing->getKey())->sole();
         $this->assertSame($organization->getKey(), $event->organization_id);

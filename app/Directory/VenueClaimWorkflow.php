@@ -13,6 +13,7 @@ use App\Models\Venue;
 use App\Models\VenueClaimInvitation;
 use App\Models\VenueClaimRequest;
 use App\Models\VenueDirectoryListing;
+use App\Outreach\OutreachSuppression;
 use App\Support\VenueSlug;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -25,6 +26,7 @@ class VenueClaimWorkflow
         private readonly VenueSlug $venueSlug,
         private readonly OwnerClaimWorkspaceAccess $workspaceAccess,
         private readonly VenueClaimNotifier $notifier,
+        private readonly OutreachSuppression $outreachSuppression,
     ) {}
 
     /** @param array{relationship_to_venue: string, verification_contact: string, evidence_details: string} $data */
@@ -203,6 +205,7 @@ class VenueClaimWorkflow
                 'claimed_venue_id' => $venue->getKey(),
                 'claimed_at' => now('UTC'),
             ]);
+            $this->outreachSuppression->markClaimedForListing($listing->getKey(), $venue->getKey());
 
             // The approved owner may see legitimate pre-claim profile views.
             // No visitor identity or raw browsing history is exposed; the

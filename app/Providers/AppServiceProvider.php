@@ -14,6 +14,8 @@ use App\Models\Venue;
 use App\Models\VenueReview;
 use App\Notifications\Contracts\WebPushGateway;
 use App\Notifications\NullWebPushGateway;
+use App\Outreach\Contracts\GoogleSheetReader;
+use App\Outreach\GoogleSheetsLeadSource;
 use App\Payments\Contracts\PaymentProvider;
 use App\Payments\PaymentProviderRegistry;
 use App\Payments\Providers\ManualPaymentProvider;
@@ -50,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->scoped(TenantContext::class, fn () => new TenantContext);
         $this->app->singleton(WebPushGateway::class, NullWebPushGateway::class);
+        $this->app->bind(GoogleSheetReader::class, GoogleSheetsLeadSource::class);
         // Google remains optional. Venue onboarding and booking never depend
         // on either provider boundary being configured or reachable.
         $this->app->singleton(PlacesProvider::class, NullPlacesProvider::class);
