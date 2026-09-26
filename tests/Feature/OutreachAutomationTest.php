@@ -106,6 +106,104 @@ class OutreachAutomationTest extends TestCase
         $this->assertDatabaseCount('outreach_leads', 1);
     }
 
+    public function test_reimport_updates_a_corrected_email_by_stable_claim_identity(): void
+    {
+        $listing = VenueDirectoryListing::factory()->published()->create();
+        $token = str_repeat('b', 64);
+        $invitation = VenueClaimInvitation::query()->create([
+            'venue_directory_listing_id' => $listing->getKey(),
+            'token_hash' => VenueClaimInvitation::hashToken($token),
+            'expires_at' => now()->addDays(14),
+        ]);
+        $privateLink = route('owner.directory-claims.invitations.create', $token);
+        $lead = OutreachLead::query()->create([
+            'venue_directory_listing_id' => $listing->getKey(),
+            'venue_claim_invitation_id' => $invitation->getKey(),
+            'venue_name' => $listing->name,
+            'email' => 'owner@gmil.com',
+            'private_link' => $privateLink,
+            'status' => OutreachLeadStatus::Unsubscribed,
+            'initial_sent_at' => now()->subDays(2),
+            'unsubscribed_at' => now()->subDay(),
+        ]);
+        $this->fakeSheet([
+            ['venue_name', 'email', 'private_link'],
+            [$listing->name, 'owner@gmail.com', $privateLink],
+        ]);
+
+        $this->artisan('outreach:sync-google-sheet')
+            ->expectsOutputToContain('Updated')
+            ->assertSuccessful();
+
+        $lead->refresh();
+        $this->assertSame('owner@gmail.com', $lead->email);
+        $this->assertSame(OutreachLeadStatus::Unsubscribed, $lead->status);
+        $this->assertNotNull($lead->initial_sent_at);
+        $this->assertNotNull($lead->unsubscribed_at);
+        $this->assertDatabaseCount('outreach_leads', 1);
+    }
+
+    public function test_reimport_rejects_conflicting_email_and_claim_identities(): void
+    {
+        $listing = VenueDirectoryListing::factory()->published()->create();
+        $token = str_repeat('c', 64);
+        $invitation = VenueClaimInvitation::query()->create([
+            'venue_directory_listing_id' => $listing->getKey(),
+            'token_hash' => VenueClaimInvitation::hashToken($token),
+            'expires_at' => now()->addDays(14),
+        ]);
+        $privateLink = route('owner.directory-claims.invitations.create', $token);
+        $linkedLead = OutreachLead::query()->create([
+            'venue_directory_listing_id' => $listing->getKey(),
+            'venue_claim_invitation_id' => $invitation->getKey(),
+            'venue_name' => $listing->name,
+            'email' => 'linked@example.com',
+            'private_link' => $privateLink,
+            'status' => OutreachLeadStatus::New,
+        ]);
+        $emailLead = $this->lead(['email' => 'other@example.com']);
+        $this->fakeSheet([
+            ['venue_name', 'email', 'private_link'],
+            [$listing->name, $emailLead->email, $privateLink],
+        ]);
+
+        $this->artisan('outreach:sync-google-sheet')
+            ->expectsTable(
+                ['Result', 'Count'],
+                [
+                    ['Rows read', 1],
+                    ['Created', 0],
+                    ['Updated', 0],
+                    ['Skipped', 0],
+                    ['Invalid', 1],
+                    ['Duplicates', 0],
+                ],
+            )
+            ->assertSuccessful();
+
+        $this->assertSame('linked@example.com', $linkedLead->refresh()->email);
+        $this->assertSame($emailLead->private_link, $emailLead->refresh()->private_link);
+        $this->assertDatabaseCount('outreach_leads', 2);
+    }
+
+    public function test_reimport_updates_a_corrected_email_by_exact_legacy_private_link(): void
+    {
+        $privateLink = 'https://finacourt.asia/private-preview/legacy-court';
+        $lead = $this->lead([
+            'email' => 'legacy@gmil.com',
+            'private_link' => $privateLink,
+        ]);
+        $this->fakeSheet([
+            ['venue_name', 'email', 'private_link'],
+            [$lead->venue_name, 'legacy@gmail.com', $privateLink],
+        ]);
+
+        $this->artisan('outreach:sync-google-sheet')->assertSuccessful();
+
+        $this->assertSame('legacy@gmail.com', $lead->refresh()->email);
+        $this->assertDatabaseCount('outreach_leads', 1);
+    }
+
     public function test_google_sheet_dry_run_reads_and_validates_without_mutating_the_database(): void
     {
         $this->fakeSheet([
