@@ -143,6 +143,12 @@ Route::get('/go/{visibilityLink:token}', MarketplaceVisibilityLinkController::cl
 Route::get('/venues/{venueSlug}/reserve', [PlayerBookingController::class, 'create'])
     ->middleware('throttle:marketplace')
     ->name('player.bookings.create');
+Route::get('/venues/{venueSlug}/reserve/multi', [PlayerBookingController::class, 'createMulti'])
+    ->middleware('throttle:marketplace')
+    ->name('player.bookings.create.multi');
+Route::post('/venues/{venueSlug}/reserve/multi', [PlayerBookingController::class, 'storeMulti'])
+    ->middleware('throttle:marketplace')
+    ->name('player.bookings.store.multi');
 Route::get('/player/magic-login/{token}', [PasswordlessLoginController::class, 'consume'])
     ->middleware(['signed', 'throttle:passwordless-consume'])
     ->name('player.magic-login.consume');

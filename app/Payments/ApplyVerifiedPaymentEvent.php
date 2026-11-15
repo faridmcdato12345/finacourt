@@ -94,6 +94,10 @@ class ApplyVerifiedPaymentEvent
                 return $payment->requires_review ? 'review' : 'duplicate';
             }
 
+            if ($payment->reservation_group_id !== null) {
+                return $this->applyGroupedPayment($payment, $event, $source, $externalEventId, $metadata);
+            }
+
             $payment = $this->transitions->handleLocked(
                 $payment,
                 $booking,
@@ -105,6 +109,45 @@ class ApplyVerifiedPaymentEvent
 
             return $payment->requires_review ? 'review' : 'processed';
         }, 5);
+    }
+
+    /** Apply one provider event to every child hold of a grouped reservation. */
+    private function applyGroupedPayment(Payment $payment, VerifiedPaymentEvent $event, string $source, string $externalEventId, array $metadata): string
+    {
+        $group = $payment->reservationGroup()->lockForUpdate()->firstOrFail();
+        $bookings = Booking::query()->where('reservation_group_id', $group->getKey())->lockForUpdate()->get();
+        if ($bookings->isEmpty()) {
+            $payment->update(['requires_review' => true, 'review_reason' => 'Grouped payment has no child bookings.']);
+            return 'review';
+        }
+        CourtResource::query()
+            ->whereIn('id', $bookings->pluck('resource_id'))
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+        $now = now();
+        if ($event->status === \App\Enums\PaymentStatus::Paid) {
+            foreach ($bookings as $booking) {
+                if ($booking->effectiveStatus() !== \App\Enums\BookingStatus::Hold) {
+                    $payment->update(['requires_review' => true, 'review_reason' => 'A grouped court hold was no longer active when payment arrived.']);
+                    return 'review';
+                }
+                $booking->update(['status' => \App\Enums\BookingStatus::Confirmed, 'expires_at' => null, 'payment_status' => $event->status]);
+            }
+            $group->update(['status' => \App\Enums\BookingStatus::Confirmed->value, 'expires_at' => null]);
+            $payment->update(['status' => $event->status, 'paid_at' => $now, 'provider_reference' => $payment->provider_reference ?? $event->providerReference, 'provider_payment_reference' => $payment->provider_payment_reference ?? $event->providerPaymentReference]);
+            $payment->transitions()->create(['from_status' => \App\Enums\PaymentStatus::Pending, 'to_status' => $event->status, 'source' => $source, 'external_event_id' => $externalEventId, 'note' => 'Payment confirmed every court in reservation group '.$group->reference.'.', 'metadata' => $metadata]);
+            return 'processed';
+        }
+        foreach ($bookings as $booking) {
+            if ($booking->effectiveStatus() === \App\Enums\BookingStatus::Hold) {
+                $booking->update(['status' => \App\Enums\BookingStatus::Cancelled, 'cancelled_at' => $now, 'cancellation_reason' => 'Grouped payment was not completed.', 'payment_status' => $event->status]);
+            }
+        }
+        $group->update(['status' => \App\Enums\BookingStatus::Cancelled->value]);
+        $payment->update(['status' => $event->status, $event->status === \App\Enums\PaymentStatus::Failed ? 'failed_at' : 'cancelled_at' => $now]);
+        $payment->transitions()->create(['from_status' => \App\Enums\PaymentStatus::Pending, 'to_status' => $event->status, 'source' => $source, 'external_event_id' => $externalEventId, 'note' => 'Grouped payment was not completed.', 'metadata' => $metadata]);
+        return 'processed';
     }
 
     private function eventExists(string $externalEventId): bool

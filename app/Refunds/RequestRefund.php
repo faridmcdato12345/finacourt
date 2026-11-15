@@ -33,6 +33,12 @@ class RequestRefund
                 abort(403);
             }
 
+            if ($booking->reservation_group_id !== null) {
+                throw ValidationException::withMessages([
+                    'refund' => 'This reservation contains multiple courts and has one combined payment. Group refunds are not available until the grouped-refund review flow is enabled.',
+                ]);
+            }
+
             $payment = Payment::query()
                 ->where('booking_id', $booking->getKey())
                 ->latest('id')

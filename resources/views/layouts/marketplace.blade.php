@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="light">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="dark">
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -71,9 +71,22 @@
                         @endif
                     @else
                         <a href="{{ route('marketplace.for-owners') }}" class="hidden whitespace-nowrap rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-court-800 xl:block">For owners</a>
-                        <a href="{{ route('player.login') }}" class="whitespace-nowrap rounded-lg px-2.5 py-2 text-slate-700 hover:bg-slate-100 hover:text-court-800 sm:px-3"><span class="sm:hidden">Player</span><span class="hidden sm:inline">Player log in</span></a>
-                        <a href="{{ route('login') }}" class="whitespace-nowrap rounded-xl border border-court-200 bg-court-50 px-2.5 py-2.5 font-semibold text-court-800 shadow-sm hover:border-court-400 hover:bg-court-100 sm:px-4"><span class="sm:hidden">Owner</span><span class="hidden sm:inline">Owner log in</span></a>
+                        <a href="{{ route('player.login') }}" class="hidden whitespace-nowrap rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-100 hover:text-court-800 sm:inline-flex">Player log in</a>
+                        <a href="{{ route('login') }}" class="hidden whitespace-nowrap rounded-xl border border-court-200 bg-court-50 px-4 py-2.5 font-semibold text-court-800 shadow-sm hover:border-court-400 hover:bg-court-100 sm:inline-flex">Owner log in</a>
                         <a data-owner-registration-link href="{{ route('register') }}" class="hidden whitespace-nowrap rounded-xl bg-court-700 px-4 py-2.5 font-semibold text-white shadow-sm hover:bg-court-800 lg:block">List your courts</a>
+                        <details class="relative sm:hidden">
+                            <summary aria-label="Open navigation menu" class="grid size-10 cursor-pointer list-none place-items-center rounded-xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-court-300 hover:bg-court-50 hover:text-court-800 [&::-webkit-details-marker]:hidden">
+                                @include('marketplace.partials.icon', ['name' => 'menu', 'class' => 'size-5'])
+                            </summary>
+                            <div class="absolute right-0 top-[calc(100%+0.6rem)] z-50 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-900/15">
+                                <a href="{{ route('marketplace.for-owners') }}" @if (request()->routeIs('marketplace.for-owners', 'marketplace.pricing')) aria-current="page" @endif class="block rounded-xl px-4 py-3 hover:bg-court-50"><span class="block text-sm font-semibold text-slate-900">For court owners</span><span class="mt-0.5 block text-xs leading-5 text-slate-500">See how FinACourt helps your venue grow.</span></a>
+                                <a href="{{ route('register') }}" class="mt-1 block rounded-xl bg-court-700 px-4 py-3 text-sm font-semibold text-white">List your courts</a>
+                                <div class="my-2 border-t border-slate-100"></div>
+                                <a href="{{ route('player.login') }}" class="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Player log in</a>
+                                <a href="{{ route('login') }}" class="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Owner log in</a>
+                                <a href="{{ route('marketplace.directory.index') }}" class="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">Venue guide</a>
+                            </div>
+                        </details>
                     @endauth
                 </nav>
             </div>
@@ -111,14 +124,19 @@
                 @include('marketplace.partials.icon', ['name' => 'tag', 'class' => 'size-5'])
                 <span>Deals</span>
             </a>
-            <a href="{{ route('player.bookings.index') }}" @if (request()->routeIs('player.bookings.*', 'player.preferences.*')) aria-current="page" @endif>
-                @include('marketplace.partials.icon', ['name' => 'calendar', 'class' => 'size-5'])
-                <span>Bookings</span>
-            </a>
             @auth
+                <a href="{{ route('player.bookings.index') }}" @if (request()->routeIs('player.bookings.*', 'player.preferences.*')) aria-current="page" @endif>
+                    @include('marketplace.partials.icon', ['name' => 'calendar', 'class' => 'size-5'])
+                    <span>Bookings</span>
+                </a>
                 <a href="{{ route('player.account.edit') }}" @if (request()->routeIs('player.account.*')) aria-current="page" @endif>
                     @include('marketplace.partials.icon', ['name' => 'user', 'class' => 'size-5'])
                     <span>Account</span>
+                </a>
+            @else
+                <a href="{{ route('player.login') }}" @if (request()->routeIs('player.login', 'player.login.*')) aria-current="page" @endif>
+                    @include('marketplace.partials.icon', ['name' => 'user', 'class' => 'size-5'])
+                    <span>Sign in</span>
                 </a>
             @endauth
         </nav>

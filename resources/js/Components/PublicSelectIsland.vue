@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import AppSelect from './AppSelect.vue';
 
 const props = defineProps({
@@ -8,6 +8,8 @@ const props = defineProps({
 
 const selectedValue = ref(props.config.value ?? '');
 const islandRoot = ref(null);
+const isDisabled = ref(Boolean(props.config.disabled));
+let disableListener;
 const triggerClass = computed(() => {
     if (props.config.variant === 'hero-slim') {
         return 'rounded-xl border-0 bg-transparent px-0 py-0 text-sm font-semibold shadow-none hover:border-transparent hover:bg-court-50 focus-visible:border-transparent focus-visible:ring-0 lg:text-xs';
@@ -24,7 +26,30 @@ const triggerClass = computed(() => {
     return 'h-12 rounded-2xl border-slate-200 bg-gradient-to-b from-white to-slate-50/80 px-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] hover:border-court-300 hover:bg-white';
 });
 
-async function selectionChanged() {
+function publishValue(value = selectedValue.value) {
+    if (!islandRoot.value) return;
+
+    islandRoot.value.dataset.publicSelectValue = String(value ?? '');
+    islandRoot.value.dispatchEvent(new CustomEvent('public-select:change', {
+        bubbles: true,
+        detail: { name: props.config.name, value },
+    }));
+}
+
+onMounted(() => {
+    publishValue();
+    disableListener = (event) => {
+        isDisabled.value = Boolean(event.detail?.disabled);
+    };
+    islandRoot.value?.addEventListener('public-select:set-disabled', disableListener);
+});
+
+onBeforeUnmount(() => {
+    islandRoot.value?.removeEventListener('public-select:set-disabled', disableListener);
+});
+
+async function selectionChanged(value) {
+    publishValue(value);
     if (!props.config.submitOnChange) return;
 
     await nextTick();
@@ -48,8 +73,8 @@ async function selectionChanged() {
         <AppSelect
             v-model="selectedValue"
             :options="config.options"
-            :name="config.disabled ? undefined : config.name"
-            :disabled="config.disabled"
+            :name="isDisabled ? undefined : config.name"
+            :disabled="isDisabled"
             :placeholder="config.placeholder"
             :aria-label="config.ariaLabel"
             :size="config.variant === 'hero-slim' ? 'sm' : 'default'"

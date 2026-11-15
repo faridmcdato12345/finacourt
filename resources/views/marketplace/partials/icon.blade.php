@@ -15,6 +15,10 @@
     aria-hidden="true"
 >
     @switch($iconName)
+        @case('menu')
+            <path d="M4 7h16M4 12h16M4 17h16" />
+            @break
+
         @case('search')
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-4-4" />

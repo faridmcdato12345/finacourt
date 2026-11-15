@@ -8,7 +8,7 @@ function updateNetworkStatus() {
     element.hidden = navigator.onLine;
     element.textContent = navigator.onLine
         ? ''
-        : 'You’re offline. Live availability, reservations, and payments require a connection.';
+        : "You're offline. Live availability, reservations, and payments require a connection.";
 }
 
 async function registerServiceWorker() {
@@ -36,7 +36,7 @@ function bindOnlineForms() {
             if (button) {
                 button.disabled = true;
                 button.setAttribute('aria-busy', 'true');
-                button.textContent = button.dataset.loadingLabel || 'Working…';
+                button.textContent = button.dataset.loadingLabel || 'Working...';
             }
         });
     });
@@ -55,170 +55,89 @@ function bindInstallPrompt() {
 
     button.addEventListener('click', async () => {
         if (!prompt) return;
+        button.hidden = true;
         await prompt.prompt();
         prompt = null;
-        button.hidden = true;
-    });
-}
-
-function bindPageSharing() {
-    document.querySelectorAll('[data-share-page]').forEach((button) => {
-        button.addEventListener('click', async () => {
-            const title = button.dataset.shareTitle || document.title;
-            const url = button.dataset.shareUrl || window.location.href;
-            const label = button.querySelector('[data-share-label]');
-
-            try {
-                if (navigator.share) {
-                    await navigator.share({ title, url });
-                    return;
-                }
-
-                await navigator.clipboard.writeText(url);
-                if (label) label.textContent = 'Link copied';
-                window.setTimeout(() => {
-                    if (label) label.textContent = 'Share';
-                }, 2000);
-            } catch (error) {
-                if (error.name !== 'AbortError') console.warn('Page sharing failed.', error);
-            }
-        });
-    });
-}
-
-function bindCourtCarousels() {
-    document.querySelectorAll('[data-court-carousel]').forEach((carousel) => {
-        const scroller = carousel.querySelector('[data-popular-courts-carousel]');
-        const previous = carousel.querySelector('[data-carousel-previous]');
-        const next = carousel.querySelector('[data-carousel-next]');
-
-        if (!scroller || !previous || !next) return;
-
-        const updateControls = () => {
-            if (!window.matchMedia('(min-width: 640px)').matches) {
-                previous.hidden = true;
-                next.hidden = true;
-                return;
-            }
-
-            const maximumScroll = Math.max(0, scroller.scrollWidth - scroller.clientWidth);
-            previous.hidden = scroller.scrollLeft <= 4;
-            next.hidden = maximumScroll <= 4 || scroller.scrollLeft >= maximumScroll - 4;
-        };
-        const scroll = (direction) => {
-            const card = scroller.firstElementChild;
-            const gap = Number.parseFloat(window.getComputedStyle(scroller).columnGap) || 0;
-            const distance = card ? card.getBoundingClientRect().width + gap : scroller.clientWidth * 0.8;
-            scroller.scrollBy({ left: direction * distance, behavior: 'smooth' });
-        };
-
-        previous.addEventListener('click', () => scroll(-1));
-        next.addEventListener('click', () => scroll(1));
-        scroller.addEventListener('scroll', updateControls, { passive: true });
-        window.addEventListener('resize', updateControls, { passive: true });
-        updateControls();
     });
 }
 
 function bindDirectoryInfiniteScroll() {
-    const root = document.querySelector('[data-directory-infinite-scroll]');
-    if (!root) return;
+    const roots = document.querySelectorAll('[data-directory-infinite-scroll]');
 
-    const results = root.querySelector('[data-directory-results]');
-    const sentinel = root.querySelector('[data-directory-scroll-sentinel]');
-    const status = root.querySelector('[data-directory-scroll-status]');
-    const loadingIndicator = root.querySelector('[data-directory-loading-indicator]');
-    const fallbackLink = root.querySelector('[data-directory-load-more]');
-    const retryButton = root.querySelector('[data-directory-retry]');
-    let nextUrl = root.dataset.nextUrl || '';
-    let shown = Number(root.dataset.shown || results?.children.length || 0);
-    const total = Number(root.dataset.total || shown);
-    let loading = false;
-    let observer;
+    for (const root of roots) {
+        const sentinel = root.querySelector('[data-directory-sentinel]');
+        const loadingIndicator = root.querySelector('[data-directory-loading]');
+        const fallbackLink = root.querySelector('[data-directory-fallback]');
+        const retryButton = root.querySelector('[data-directory-retry]');
+        let loading = false;
+        let observer;
 
-    if (!results || !sentinel || !status || !nextUrl) return;
+        const loadNextPage = async () => {
+            if (loading) return;
+            loading = true;
+            sentinel.setAttribute('aria-busy', 'true');
+            if (loadingIndicator) loadingIndicator.hidden = false;
+            if (retryButton) retryButton.hidden = true;
 
-    const finish = () => {
-        nextUrl = '';
-        root.dataset.nextUrl = '';
-        observer?.disconnect();
-        if (fallbackLink) fallbackLink.hidden = true;
-        if (retryButton) retryButton.hidden = true;
-        status.textContent = `All ${total} ${total === 1 ? 'venue is' : 'venues are'} shown.`;
-    };
-
-    const loadNextPage = async () => {
-        if (loading || !nextUrl) return;
-
-        loading = true;
-        sentinel.setAttribute('aria-busy', 'true');
-        status.textContent = 'Loading more venues…';
-        if (loadingIndicator) loadingIndicator.hidden = false;
-        if (retryButton) retryButton.hidden = true;
-
-        try {
-            const response = await fetch(nextUrl, {
-                credentials: 'same-origin',
-                headers: { Accept: 'text/html' },
-            });
-
-            if (!response.ok) throw new Error(`Directory page returned ${response.status}.`);
-
-            const page = new DOMParser().parseFromString(await response.text(), 'text/html');
-            const nextResults = page.querySelector('[data-directory-results]');
-            const nextSentinel = page.querySelector('[data-directory-infinite-scroll]');
-            const existingKeys = new Set(
-                [...results.querySelectorAll('[data-directory-card]')]
-                    .map((card) => card.dataset.listingKey),
-            );
-            const cards = nextResults
-                ? [...nextResults.querySelectorAll('[data-directory-card]')]
-                : [];
-
-            if (!cards.length) throw new Error('The next directory page did not contain venues.');
-
-            let added = 0;
-            cards.forEach((card) => {
-                if (existingKeys.has(card.dataset.listingKey)) return;
-
-                const importedCard = document.importNode(card, true);
-                importedCard.classList.add('player-card-motion', 'player-reveal', 'is-visible');
-                results.append(importedCard);
-                existingKeys.add(card.dataset.listingKey);
-                added += 1;
-            });
-
-            shown = Math.min(total, shown + added);
-            nextUrl = nextSentinel?.dataset.nextUrl || '';
-            root.dataset.nextUrl = nextUrl;
-
-            if (!nextUrl || shown >= total) {
-                finish();
-            } else {
-                status.textContent = `Showing ${shown} of ${total} venues. Keep scrolling for more.`;
-                if (fallbackLink) fallbackLink.href = nextUrl;
+            const nextUrl = sentinel.dataset.nextUrl;
+            if (!nextUrl) {
+                loading = false;
+                sentinel.setAttribute('aria-busy', 'false');
+                if (loadingIndicator) loadingIndicator.hidden = true;
+                return;
             }
-        } catch (error) {
-            console.warn('Loading more directory venues failed.', error);
-            status.textContent = 'More venues could not be loaded. Check your connection and try again.';
-            if (retryButton) retryButton.hidden = false;
-        } finally {
-            loading = false;
-            sentinel.setAttribute('aria-busy', 'false');
-            if (loadingIndicator) loadingIndicator.hidden = true;
-        }
-    };
 
-    retryButton?.addEventListener('click', loadNextPage);
+            try {
+                const response = await fetch(nextUrl, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
 
-    if (!('IntersectionObserver' in window)) return;
+                if (!response.ok) throw new Error('Network response was not ok');
 
-    root.dataset.infiniteScroll = 'ready';
-    if (fallbackLink) fallbackLink.hidden = true;
-    observer = new IntersectionObserver((entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) loadNextPage();
-    }, { rootMargin: '600px 0px', threshold: 0 });
-    observer.observe(sentinel);
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                const newItems = doc.querySelectorAll('[data-directory-item]');
+                const container = root.querySelector('[data-directory-container]');
+                if (container) {
+                    for (const item of newItems) container.appendChild(item);
+                }
+
+                const newSentinel = doc.querySelector('[data-directory-sentinel]');
+                if (newSentinel) {
+                    sentinel.dataset.nextUrl = newSentinel.dataset.nextUrl;
+                    if (!sentinel.dataset.nextUrl) {
+                        observer.disconnect();
+                        sentinel.hidden = true;
+                        if (fallbackLink) fallbackLink.hidden = false;
+                    }
+                } else {
+                    observer.disconnect();
+                    sentinel.hidden = true;
+                    if (fallbackLink) fallbackLink.hidden = false;
+                }
+            } catch (error) {
+                console.warn('Loading more directory venues failed.', error);
+                if (retryButton) retryButton.hidden = false;
+            } finally {
+                loading = false;
+                sentinel.setAttribute('aria-busy', 'false');
+                if (loadingIndicator) loadingIndicator.hidden = true;
+            }
+        };
+
+        retryButton?.addEventListener('click', loadNextPage);
+
+        if (!('IntersectionObserver' in window)) return;
+
+        root.dataset.infiniteScroll = 'ready';
+        if (fallbackLink) fallbackLink.hidden = true;
+        observer = new IntersectionObserver((entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) loadNextPage();
+        }, { rootMargin: '600px 0px', threshold: 0 });
+        observer.observe(sentinel);
+    }
 }
 
 function bindPlayerExperience() {
@@ -262,6 +181,7 @@ function bindPlayerExperience() {
 
 function bindConsecutiveSlotPickers() {
     document.querySelectorAll('[data-slot-picker]').forEach((picker) => {
+        if (picker.dataset.enhanced === 'true') return;
         const slots = Array.from(picker.querySelectorAll('[data-slot]'));
         const summary = picker.querySelector('[data-slot-summary]');
         const summaryTime = picker.querySelector('[data-slot-summary-time]');
@@ -274,6 +194,34 @@ function bindConsecutiveSlotPickers() {
 
         picker.dataset.enhanced = 'true';
 
+        // Group selected slots by resource
+        const getSelectionsByResource = () => {
+            const groups = new Map();
+            for (const slot of selected) {
+                const resourceId = slot.dataset.resource;
+                if (!groups.has(resourceId)) {
+                    groups.set(resourceId, []);
+                }
+                groups.get(resourceId).push(slot);
+            }
+            return groups;
+        };
+
+        // Sort slots within each resource by startOffset
+        const sortSlotsByTime = (slots) => [...slots].sort((a, b) => Number(a.dataset.startOffset) - Number(b.dataset.startOffset));
+
+        // Validate that slots in a group are consecutive
+        const areConsecutive = (slots) => {
+            const sorted = sortSlotsByTime(slots);
+            for (let i = 1; i < sorted.length; i++) {
+                const prev = sorted[i - 1];
+                const curr = sorted[i];
+                if (Number(curr.dataset.slotIndex) !== Number(prev.dataset.slotIndex) + 1) return false;
+                if (Number(curr.dataset.startOffset) !== Number(prev.dataset.endOffset)) return false;
+            }
+            return true;
+        };
+
         const update = () => {
             slots.forEach((slot) => slot.setAttribute('aria-pressed', selected.includes(slot) ? 'true' : 'false'));
             summary.hidden = selected.length === 0;
@@ -284,28 +232,37 @@ function bindConsecutiveSlotPickers() {
                 return;
             }
 
-            const first = selected[0];
-            const last = selected[selected.length - 1];
-            const duration = Number(last.dataset.endOffset) - Number(first.dataset.startOffset);
+            const groups = getSelectionsByResource();
+            const selections = Array.from(groups.entries()).map(([resourceId, resourceSlots]) => {
+                const sorted = sortSlotsByTime(resourceSlots);
+                const first = sorted[0];
+                const last = sorted[sorted.length - 1];
+                return { resourceId, sorted, first, last, duration: Number(last.dataset.endOffset) - Number(first.dataset.startOffset) };
+            });
+            const selectedPrice = selected.reduce((total, slot) => total + Number(slot.dataset.price || 0), 0);
             const url = new URL(picker.dataset.reviewUrl, window.location.origin);
-            url.searchParams.set('resource', picker.dataset.resource);
-            url.searchParams.set('date', first.dataset.date || picker.dataset.date);
-            url.searchParams.set('start', first.dataset.start);
-            url.searchParams.set('duration', String(duration));
-
-            const campaigns = [...new Set(selected.map((slot) => slot.dataset.campaign).filter(Boolean))];
-            if (campaigns.length === 1 && selected.every((slot) => slot.dataset.campaign === campaigns[0])) {
-                url.searchParams.set('campaign', campaigns[0]);
+            if (selections.length === 1) {
+                const item = selections[0];
+                url.searchParams.set('resource', item.resourceId);
+                url.searchParams.set('date', item.first.dataset.date || picker.dataset.date);
+                url.searchParams.set('start', item.first.dataset.start);
+                url.searchParams.set('duration', String(item.duration));
+                if (item.first.dataset.campaign && item.sorted.every((slot) => slot.dataset.campaign === item.first.dataset.campaign)) url.searchParams.set('campaign', item.first.dataset.campaign);
+                summaryTime.textContent = `${item.first.dataset.startLabel}–${item.last.dataset.endLabel}`;
+                summaryDetail.textContent = `${item.sorted.length} ${item.sorted.length === 1 ? 'slot' : 'consecutive slots'} · ${item.duration} minutes · ${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(selectedPrice)}`;
+            } else {
+                url.pathname = `${url.pathname.replace(/\/$/, '')}/multi`;
+                selections.forEach((item, index) => {
+                    url.searchParams.set(`resources[${index}][resource_id]`, item.resourceId);
+                    url.searchParams.set(`resources[${index}][date]`, item.first.dataset.date || picker.dataset.date);
+                    url.searchParams.set(`resources[${index}][start_time]`, item.first.dataset.start);
+                    url.searchParams.set(`resources[${index}][duration_minutes]`, String(item.duration));
+                    if (item.first.dataset.campaign && item.sorted.every((slot) => slot.dataset.campaign === item.first.dataset.campaign)) url.searchParams.set(`resources[${index}][campaign]`, item.first.dataset.campaign);
+                });
+                summaryTime.textContent = `${selections.length} courts selected`;
+                summaryDetail.textContent = `${selected.length} slots across ${selections.length} courts · ${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(selectedPrice)}`;
             }
 
-            summaryTime.textContent = `${first.dataset.startLabel}–${last.dataset.endLabel}`;
-            const hasOnePriceContext = campaigns.length === 0
-                || (campaigns.length === 1 && selected.every((slot) => slot.dataset.campaign === campaigns[0]));
-            const selectedPrice = selected.reduce((total, slot) => total + Number(slot.dataset.price || 0), 0);
-            const priceLabel = hasOnePriceContext
-                ? ` · ${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(selectedPrice)}`
-                : ' · final price shown next';
-            summaryDetail.textContent = `${selected.length} ${selected.length === 1 ? 'slot' : 'consecutive slots'} · ${duration} minutes${priceLabel}`;
             continueLink.href = url.toString();
             continueLink.setAttribute('aria-disabled', 'false');
         };
@@ -316,43 +273,155 @@ function bindConsecutiveSlotPickers() {
                 const selectedIndex = selected.indexOf(slot);
 
                 if (selectedIndex !== -1) {
-                    if (selected.length === 1) {
-                        selected = [];
-                    } else if (selectedIndex === 0) {
-                        selected.shift();
-                    } else if (selectedIndex === selected.length - 1) {
-                        selected.pop();
-                    } else {
-                        selected = [slot];
-                    }
+                    // Remove slot from selection
+                    selected.splice(selectedIndex, 1);
 
                     update();
                     return;
                 }
 
+                // Adding a new slot
                 if (!selected.length) {
                     selected = [slot];
                     update();
                     return;
                 }
 
-                const first = selected[0];
-                const last = selected[selected.length - 1];
-                const extendsAfter = Number(slot.dataset.slotIndex) === Number(last.dataset.slotIndex) + 1
-                    && Number(slot.dataset.startOffset) === Number(last.dataset.endOffset);
-                const extendsBefore = Number(slot.dataset.slotIndex) === Number(first.dataset.slotIndex) - 1
-                    && Number(slot.dataset.endOffset) === Number(first.dataset.startOffset);
-                const candidate = extendsAfter ? [...selected, slot] : extendsBefore ? [slot, ...selected] : [slot];
-                const duration = Number(candidate[candidate.length - 1].dataset.endOffset)
-                    - Number(candidate[0].dataset.startOffset);
+                const groups = getSelectionsByResource();
+                const resourceId = slot.dataset.resource;
+                const resourceSlots = groups.get(resourceId) || [];
 
-                selected = duration <= maximumDuration ? candidate : [slot];
+                if (resourceSlots.length === 0) {
+                    // A second court is allowed; each court retains its own consecutive range.
+                    selected = [...selected, slot];
+                    update();
+                    return;
+                }
+
+                // Same resource - check if it extends the selection consecutively
+                const sorted = sortSlotsByTime([...resourceSlots, slot]);
+                if (areConsecutive(sorted)) {
+                    selected = [...selected, slot];
+                    update();
+                    return;
+                }
+
+                // Not consecutive - replace this resource's selection with the new slot
+                selected = selected.filter(s => s.dataset.resource !== resourceId);
+                selected = [...selected, slot];
                 update();
             });
         });
 
         continueLink.addEventListener('click', (event) => {
             if (continueLink.getAttribute('aria-disabled') === 'true') event.preventDefault();
+        });
+    });
+}
+
+function bindMobileCourtPickers() {
+    document.querySelectorAll('[data-mobile-court-picker]').forEach((picker) => {
+        if (picker.dataset.mobileCourtsEnhanced === 'true') return;
+        picker.dataset.mobileCourtsEnhanced = 'true';
+
+        const tabs = [...picker.querySelectorAll('[data-mobile-court-tab]')];
+        const panels = [...picker.querySelectorAll('[data-mobile-court-panel]')];
+
+        const showCourt = (resourceId) => {
+            tabs.forEach((tab) => {
+                const active = tab.dataset.resourceId === resourceId;
+                tab.setAttribute('aria-selected', String(active));
+                tab.classList.toggle('border-court-600', active);
+                tab.classList.toggle('bg-court-700', active);
+                tab.classList.toggle('text-white', active);
+                tab.classList.toggle('shadow-sm', active);
+                tab.classList.toggle('border-slate-200', !active);
+                tab.classList.toggle('bg-white', !active);
+                tab.classList.toggle('text-slate-700', !active);
+
+                tab.querySelectorAll('span').forEach((label, index) => {
+                    if (index !== 1) return;
+                    label.classList.toggle('text-court-100', active);
+                    label.classList.toggle('text-slate-400', !active);
+                });
+            });
+
+            panels.forEach((panel) => {
+                panel.hidden = panel.dataset.resourceId !== resourceId;
+            });
+        };
+
+        tabs.forEach((tab) => {
+            tab.addEventListener('click', () => showCourt(tab.dataset.resourceId));
+        });
+    });
+}
+
+function bindPageSharing() {
+    document.querySelectorAll('[data-share-page]').forEach((button) => {
+        if (button.dataset.enhanced === 'true') return;
+        button.dataset.enhanced = 'true';
+
+        button.addEventListener('click', async () => {
+            const url = button.dataset.shareUrl || window.location.href;
+            const title = button.dataset.shareTitle || document.title;
+            const label = button.querySelector('[data-share-label]');
+            const originalLabel = label?.textContent || 'Share';
+
+            try {
+                if (navigator.share) {
+                    await navigator.share({ title, url });
+                    return;
+                }
+
+                if (!navigator.clipboard?.writeText) {
+                    throw new Error('Clipboard sharing is unavailable.');
+                }
+
+                await navigator.clipboard.writeText(url);
+                if (label) label.textContent = 'Link copied';
+                window.setTimeout(() => {
+                    if (label) label.textContent = originalLabel;
+                }, 2000);
+            } catch (error) {
+                // Closing the native share sheet is an expected choice, not an application error.
+                if (error?.name === 'AbortError') return;
+
+                if (label) label.textContent = 'Could not share';
+                window.setTimeout(() => {
+                    if (label) label.textContent = originalLabel;
+                }, 2500);
+            }
+        });
+    });
+}
+
+function bindLiveScheduleNavigation() {
+    document.querySelectorAll('[data-live-schedule-date]').forEach((link) => {
+        if (link.dataset.enhanced === 'true') return;
+        link.dataset.enhanced = 'true';
+        link.addEventListener('click', async (event) => {
+            if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            const panel = link.closest('[data-live-availability]');
+            if (!panel) return;
+            panel.classList.add('pointer-events-none', 'opacity-60');
+            try {
+                const response = await fetch(link.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!response.ok) throw new Error(`Schedule request failed (${response.status})`);
+                const documentResponse = new DOMParser().parseFromString(await response.text(), 'text/html');
+                const replacement = documentResponse.querySelector('[data-live-availability]');
+                if (!replacement) throw new Error('Schedule panel was not found in the response.');
+                panel.replaceWith(replacement);
+                window.history.pushState({}, '', link.href);
+                document.dispatchEvent(new CustomEvent('marketplace:availability-replaced', { detail: { root: replacement } }));
+                bindLiveScheduleNavigation();
+                bindMobileCourtPickers();
+                bindConsecutiveSlotPickers();
+            } catch (error) {
+                console.error(error);
+                window.location.assign(link.href);
+            }
         });
     });
 }
@@ -392,12 +461,25 @@ window.addEventListener('offline', updateNetworkStatus);
 document.addEventListener('DOMContentLoaded', async () => {
     updateNetworkStatus();
     bindOnlineForms();
-    bindConsecutiveSlotPickers();
-    bindPageSharing();
-    bindCourtCarousels();
+    bindInstallPrompt();
     bindDirectoryInfiniteScroll();
     bindPlayerExperience();
-    bindInstallPrompt();
-    const registration = await registerServiceWorker();
-    await bindNotificationPermission(registration);
+    bindMobileCourtPickers();
+    bindConsecutiveSlotPickers();
+    bindLiveScheduleNavigation();
+    bindPageSharing();
+    bindCourtCarousels();
+
+    try {
+        const registration = await navigator.serviceWorker.ready;
+        await bindNotificationPermission(registration);
+    } catch (error) {
+        console.error('Service worker not ready:', error);
+    }
 });
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(registerServiceWorker).catch(console.error);
+    });
+}

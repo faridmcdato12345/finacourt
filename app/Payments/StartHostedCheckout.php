@@ -16,10 +16,15 @@ class StartHostedCheckout
     public function handle(string $bookingReference, User $player): HostedCheckout
     {
         $payment = Payment::query()
-            ->whereHas('booking', fn ($query) => $query
-                ->where('reference', $bookingReference)
-                ->where('player_user_id', $player->getKey()))
-            ->with('booking')
+            ->where(function ($query) use ($bookingReference, $player): void {
+                $query->whereHas('booking', fn ($bookingQuery) => $bookingQuery
+                    ->where('reference', $bookingReference)
+                    ->where('player_user_id', $player->getKey()))
+                    ->orWhereHas('reservationGroup.bookings', fn ($bookingQuery) => $bookingQuery
+                        ->where('reference', $bookingReference)
+                        ->where('player_user_id', $player->getKey()));
+            })
+            ->with(['booking', 'reservationGroup.bookings'])
             ->latest('id')
             ->first();
 
@@ -27,8 +32,9 @@ class StartHostedCheckout
             throw (new ModelNotFoundException)->setModel(Payment::class, [$bookingReference]);
         }
 
+        $groupBookings = $payment->reservationGroup?->bookings ?? collect([$payment->booking]);
         if (
-            $payment->booking->effectiveStatus() !== BookingStatus::Hold
+            $groupBookings->contains(fn ($booking) => $booking->effectiveStatus() !== BookingStatus::Hold)
             || $payment->status !== PaymentStatus::Pending
         ) {
             throw ValidationException::withMessages([
@@ -36,7 +42,10 @@ class StartHostedCheckout
             ]);
         }
 
-        if ($payment->amount !== $payment->booking->player_total_amount || $payment->currency !== $payment->booking->currency) {
+        $groupAmountCentavos = $groupBookings->sum(fn ($booking) => (int) round((float) $booking->player_total_amount * 100));
+        $paymentAmountCentavos = (int) round((float) $payment->amount * 100);
+        if ($paymentAmountCentavos !== $groupAmountCentavos
+            || $groupBookings->contains(fn ($booking) => $booking->currency !== $payment->currency)) {
             throw ValidationException::withMessages([
                 'payment' => 'Payment amount or currency does not match the booking snapshot.',
             ]);

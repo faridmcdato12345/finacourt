@@ -600,6 +600,44 @@ class OutreachAutomationTest extends TestCase
         $this->assertNull($lead->refresh()->initial_sent_at);
     }
 
+    public function test_explicit_recovery_resend_keeps_original_delivery_history_and_uses_pacing(): void
+    {
+        Queue::fake();
+        Mail::fake();
+        $initialSentAt = now()->subDays(2);
+        $lead = $this->lead([
+            'initial_sent_at' => $initialSentAt,
+            'next_send_at' => now()->addDays(2),
+            'status' => OutreachLeadStatus::Active,
+        ]);
+
+        $this->artisan('outreach:resend', ['lead' => [$lead->getKey()], '--dry-run' => true])
+            ->expectsOutputToContain('Eligible recovery resends')
+            ->assertSuccessful();
+        $this->assertDatabaseCount('outreach_messages', 0);
+
+        $this->artisan('outreach:resend', ['lead' => [$lead->getKey()]])
+            ->expectsOutputToContain('Recovery resends were queued')
+            ->assertSuccessful();
+
+        $message = $lead->messages()->where('message_type', OutreachMessageType::Resend)->sole();
+        $this->assertSame(OutreachMessageStatus::Queued, $message->status);
+        $this->assertNotNull($message->scheduled_for);
+        Queue::assertPushed(SendOutreachMessage::class, 1);
+
+        (new SendOutreachMessage($message->getKey()))->handle();
+
+        $lead->refresh();
+        $this->assertSame($initialSentAt->toDateTimeString(), $lead->initial_sent_at->toDateTimeString());
+        $this->assertSame(OutreachMessageStatus::Sent, $message->refresh()->status);
+        $this->assertTrue($lead->next_send_at->between(now()->addDays(4)->subMinute(), now()->addDays(4)->addMinute()));
+
+        $this->artisan('outreach:resend', ['lead' => [$lead->getKey()]])
+            ->expectsOutputToContain('Recovery resends queued')
+            ->assertSuccessful();
+        $this->assertDatabaseCount('outreach_messages', 1);
+    }
+
     /** @param array<string, mixed> $attributes */
     private function lead(array $attributes = []): OutreachLead
     {

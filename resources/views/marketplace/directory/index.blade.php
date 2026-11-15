@@ -9,20 +9,26 @@
 
             <form method="get" class="mt-8 grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-[1fr_1fr_auto]">
                 <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">City
-                    <select name="city" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800">
-                        <option value="">Any city</option>
-                        @foreach ($cities as $city)
-                            <option value="{{ $city->city_slug }}" @selected(($filters['city'] ?? null) === $city->city_slug)>{{ $city->publicCityName() }}, {{ $city->province }}</option>
-                        @endforeach
-                    </select>
+                    @include('marketplace.partials.public-select', [
+                        'name' => 'city',
+                        'value' => $filters['city'] ?? '',
+                        'options' => [['value' => '', 'label' => 'Any city'], ...$cities->map(fn ($city) => ['value' => $city->city_slug, 'label' => $city->publicCityName().', '.$city->province])->all()],
+                        'placeholder' => 'Any city',
+                        'ariaLabel' => 'Filter venue guide by city',
+                        'wrapperClass' => 'mt-2',
+                        'fallbackClass' => 'app-select',
+                    ])
                 </label>
                 <label class="text-xs font-semibold uppercase tracking-wider text-slate-500">Sport
-                    <select name="sport" class="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800">
-                        <option value="">Any sport</option>
-                        @foreach ($sports as $sport)
-                            <option value="{{ $sport->slug }}" @selected(($filters['sport'] ?? null) === $sport->slug)>{{ $sport->name }}</option>
-                        @endforeach
-                    </select>
+                    @include('marketplace.partials.public-select', [
+                        'name' => 'sport',
+                        'value' => $filters['sport'] ?? '',
+                        'options' => [['value' => '', 'label' => 'Any sport'], ...$sports->map(fn ($sport) => ['value' => $sport->slug, 'label' => $sport->name])->all()],
+                        'placeholder' => 'Any sport',
+                        'ariaLabel' => 'Filter venue guide by sport',
+                        'wrapperClass' => 'mt-2',
+                        'fallbackClass' => 'app-select',
+                    ])
                 </label>
                 <button class="self-end rounded-xl bg-court-700 px-6 py-3 text-sm font-semibold text-white hover:bg-court-800">Show venues</button>
             </form>

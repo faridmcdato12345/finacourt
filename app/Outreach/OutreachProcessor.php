@@ -115,6 +115,102 @@ class OutreachProcessor
         return $this->report($due, $suppressed, $used + $queued, $limit, count($slots), $queued);
     }
 
+    /**
+     * Queue one audited recovery resend per explicitly selected lead.
+     *
+     * @param  array<int, int>  $leadIds
+     * @return array{requested: int, eligible: int, skipped: int, queued: int, dailyQuotaUsed: int, dailyQuotaRemaining: int, pacedSlotsAvailable: int}
+     */
+    public function resend(array $leadIds, bool $dryRun = false): array
+    {
+        $leadIds = array_values(array_unique(array_filter($leadIds, fn (mixed $id): bool => is_int($id) || ctype_digit((string) $id))));
+        $leadIds = array_map('intval', $leadIds);
+        $at = now('UTC');
+        $quotaDate = $at->copy()->setTimezone((string) config('outreach.timezone'))->toDateString();
+        $limit = max(1, (int) config('outreach.daily_limit', 5));
+        $used = (int) (OutreachDailyQuota::query()
+            ->whereDate('quota_date', $quotaDate)
+            ->value('reserved_count') ?? 0);
+        $slots = $this->sendingWindow->slots($at, max(0, $limit - $used));
+
+        $leads = OutreachLead::query()
+            ->whereKey($leadIds)
+            ->with('messages:id,outreach_lead_id,message_type,status')
+            ->get()
+            ->keyBy('id');
+        $eligibleIds = collect($leadIds)
+            ->filter(function (int $leadId) use ($leads): bool {
+                /** @var OutreachLead|null $lead */
+                $lead = $leads->get($leadId);
+
+                return $lead !== null
+                    && $lead->initial_sent_at !== null
+                    && ! $lead->isSuppressed()
+                    && ! $lead->messages->contains('message_type', OutreachMessageType::Resend)
+                    && ! $lead->messages->contains(fn (OutreachMessage $message): bool => in_array(
+                        $message->message_type,
+                        [OutreachMessageType::Followup1, OutreachMessageType::Followup2],
+                        true,
+                    ));
+            })
+            ->values();
+
+        if ($dryRun || $slots === []) {
+            return [
+                'requested' => count($leadIds),
+                'eligible' => $eligibleIds->count(),
+                'skipped' => count($leadIds) - $eligibleIds->count(),
+                'queued' => 0,
+                'dailyQuotaUsed' => $used,
+                'dailyQuotaRemaining' => max(0, $limit - $used),
+                'pacedSlotsAvailable' => count($slots),
+            ];
+        }
+
+        OutreachDailyQuota::query()->insertOrIgnore([
+            'quota_date' => $quotaDate,
+            'reserved_count' => 0,
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]);
+
+        $queued = 0;
+
+        foreach ($eligibleIds as $leadId) {
+            if ($queued >= count($slots)) {
+                break;
+            }
+
+            $message = $this->reserveResendMessage(
+                (int) $leadId,
+                $at,
+                $slots[$queued],
+                $quotaDate,
+                $limit,
+            );
+
+            if ($message === null) {
+                continue;
+            }
+
+            $queued++;
+            SendOutreachMessage::dispatch($message->getKey())
+                ->onQueue('emails')
+                ->delay($message->scheduled_for)
+                ->afterCommit();
+        }
+
+        return [
+            'requested' => count($leadIds),
+            'eligible' => $eligibleIds->count(),
+            'skipped' => count($leadIds) - $eligibleIds->count(),
+            'queued' => $queued,
+            'dailyQuotaUsed' => $used + $queued,
+            'dailyQuotaRemaining' => max(0, $limit - $used - $queued),
+            'pacedSlotsAvailable' => count($slots),
+        ];
+    }
+
     /** @return Builder<OutreachLead> */
     public function dueQuery(OutreachMessageType $type, Carbon $at): Builder
     {
@@ -166,6 +262,48 @@ class OutreachProcessor
 
             $message = $lead->messages()->create([
                 'message_type' => $type,
+                'status' => OutreachMessageStatus::Queued,
+                'queued_at' => $at,
+                'scheduled_for' => $scheduledFor,
+            ]);
+            $quota->increment('reserved_count');
+
+            return $message;
+        }, 3);
+    }
+
+    private function reserveResendMessage(
+        int $leadId,
+        Carbon $at,
+        \DateTimeInterface $scheduledFor,
+        string $quotaDate,
+        int $limit,
+    ): ?OutreachMessage {
+        return DB::transaction(function () use ($leadId, $at, $scheduledFor, $quotaDate, $limit): ?OutreachMessage {
+            $quota = OutreachDailyQuota::query()
+                ->whereDate('quota_date', $quotaDate)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($quota->reserved_count >= $limit) {
+                return null;
+            }
+
+            $lead = OutreachLead::query()->lockForUpdate()->find($leadId);
+
+            if ($lead === null
+                || $lead->initial_sent_at === null
+                || $lead->isSuppressed()
+                || $lead->messages()->where('message_type', OutreachMessageType::Resend->value)->exists()
+                || $lead->messages()->whereIn('message_type', [
+                    OutreachMessageType::Followup1->value,
+                    OutreachMessageType::Followup2->value,
+                ])->exists()) {
+                return null;
+            }
+
+            $message = $lead->messages()->create([
+                'message_type' => OutreachMessageType::Resend,
                 'status' => OutreachMessageStatus::Queued,
                 'queued_at' => $at,
                 'scheduled_for' => $scheduledFor,

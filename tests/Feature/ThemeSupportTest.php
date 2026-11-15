@@ -11,7 +11,7 @@ class ThemeSupportTest extends TestCase
         $response = $this->get('/privacy');
 
         $response->assertOk();
-        $response->assertSee('data-theme="light"', false);
+        $response->assertSee('data-theme="dark"', false);
         $response->assertSee('content="light dark"', false);
         $response->assertSee('finacourt-theme', false);
         $response->assertSee('data-theme-toggle', false);
@@ -23,7 +23,7 @@ class ThemeSupportTest extends TestCase
         $response = $this->get('/login');
 
         $response->assertOk();
-        $response->assertSee('data-theme="light"', false);
+        $response->assertSee('data-theme="dark"', false);
         $response->assertSee('content="light dark"', false);
         $response->assertSee('finacourt-theme', false);
     }

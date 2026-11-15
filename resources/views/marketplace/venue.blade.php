@@ -37,7 +37,7 @@
     </section>
 
     <section class="page-shell py-6 sm:py-8">
-        <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(23rem,0.82fr)]">
+        <div class="space-y-6">
             <div class="min-w-0 space-y-6">
                 <section data-venue-gallery class="grid gap-2 sm:grid-cols-[minmax(0,1.8fr)_minmax(11rem,0.65fr)]">
                     <div class="relative h-72 overflow-hidden rounded-2xl sm:h-[25rem]">
@@ -163,6 +163,8 @@
                     </section>
                 @endif
 
+                @include('marketplace.partials.venue-availability')
+
                 <section class="app-card overflow-hidden">
                     <div class="border-b border-slate-100 px-5 py-5 sm:px-6"><p class="eyebrow">Inventory</p><h2 class="mt-1 text-xl font-semibold tracking-tight">Courts and pricing</h2></div>
                     <div class="divide-y divide-slate-100">
@@ -200,9 +202,7 @@
                 @endif
             </div>
 
-            <div class="space-y-6 xl:sticky xl:top-24">
-                @include('marketplace.partials.venue-availability')
-
+            <div class="space-y-6">
                 <section class="app-card overflow-hidden">
                     <div class="border-b border-slate-100 p-5"><p class="eyebrow">Location</p><h2 class="mt-2 text-xl font-semibold">Find {{ $venue->name }}</h2></div>
                     @if ($map)

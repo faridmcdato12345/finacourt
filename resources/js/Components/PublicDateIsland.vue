@@ -11,12 +11,13 @@ const props = defineProps({
 
 const open = ref(false);
 const selectedDate = ref(props.config.value ? parseDate(props.config.value) : undefined);
+const displayLabel = ref(props.config.displayLabel ?? null);
 const minimumDate = computed(() => props.config.min ? parseDate(props.config.min) : undefined);
 const calendarPlaceholder = computed(() => selectedDate.value ?? minimumDate.value ?? today(getLocalTimeZone()));
 const formatter = new DateFormatter('en-PH', { dateStyle: 'medium' });
-const formattedDate = computed(() => selectedDate.value
+const formattedDate = computed(() => displayLabel.value ?? (selectedDate.value
     ? formatter.format(selectedDate.value.toDate(getLocalTimeZone()))
-    : props.config.placeholder);
+    : props.config.placeholder));
 const triggerClass = computed(() => {
     const shared = 'flex w-full items-center justify-between gap-2 text-left text-sm outline-none transition disabled:cursor-not-allowed disabled:opacity-50';
 
@@ -38,6 +39,7 @@ const triggerClass = computed(() => {
 function chooseDate(value) {
     if (!value) return;
     selectedDate.value = value;
+    displayLabel.value = null;
     open.value = false;
 }
 </script>

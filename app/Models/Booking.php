@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'organization_id',
+    'reservation_group_id',
     'venue_id',
     'resource_id',
     'promotion_id',
@@ -77,6 +78,12 @@ class Booking extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /** @return BelongsTo<ReservationGroup, $this> */
+    public function reservationGroup(): BelongsTo
+    {
+        return $this->belongsTo(ReservationGroup::class);
     }
 
     /** @return BelongsTo<Venue, $this> */

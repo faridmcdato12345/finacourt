@@ -112,13 +112,26 @@ class PayMongoPaymentProvider implements ReconcilesHostedCheckout, RefundPayment
             ]);
         }
 
-        $lineItems = $this->lineItems($payment, $booking);
+        $bookings = $payment->reservation_group_id !== null
+            ? Booking::query()
+                ->where('reservation_group_id', $payment->reservation_group_id)
+                ->with(['resource.sport', 'venue'])
+                ->orderBy('id')
+                ->get()
+            : collect([$booking]);
+        $lineItems = $this->lineItems($payment, $booking, $bookings);
         $lineItemTotal = array_sum(array_map(
             fn (array $item): int => $item['amount'] * $item['quantity'],
             $lineItems,
         ));
 
-        if ($lineItemTotal !== $amountCentavos) {
+        $expectedCheckoutTotal = $amountCentavos;
+        if ($payment->reservation_group_id !== null) {
+            $serviceFee = $this->centavos((string) $payment->platform_service_fee_amount) ?? 0;
+            $expectedCheckoutTotal = (int) round((float) $payment->venue_amount * 100) + $serviceFee;
+        }
+
+        if ($lineItemTotal !== $expectedCheckoutTotal) {
             throw ValidationException::withMessages([
                 'payment' => 'The checkout line items do not match the payment price snapshot.',
             ]);
@@ -786,15 +799,15 @@ class PayMongoPaymentProvider implements ReconcilesHostedCheckout, RefundPayment
     }
 
     /** @return array<int, array{name: string, amount: int, currency: string, quantity: int}> */
-    private function lineItems(Payment $payment, Booking $booking): array
+    private function lineItems(Payment $payment, Booking $booking, ?\Illuminate\Support\Collection $groupBookings = null): array
     {
         $currency = strtoupper($payment->currency);
-        $lineItems = [[
-            'name' => $this->lineItemName($booking),
-            'amount' => $this->centavos($payment->venue_amount) ?? $this->centavos($booking->total_amount) ?? 0,
+        $lineItems = ($groupBookings ?? collect([$booking]))->map(fn (Booking $item): array => [
+            'name' => $this->lineItemName($item),
+            'amount' => $this->centavos($item->total_amount) ?? 0,
             'currency' => $currency,
             'quantity' => 1,
-        ]];
+        ])->all();
         $serviceFeeCentavos = $this->centavos($payment->platform_service_fee_amount);
 
         if ($serviceFeeCentavos !== null && $serviceFeeCentavos > 0) {
