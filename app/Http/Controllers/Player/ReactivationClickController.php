@@ -20,7 +20,7 @@ class ReactivationClickController extends Controller
             ->where('user_id', $request->user()->getKey())
             ->whereNotNull('sent_at')
             ->whereNull('suppressed_at')
-            ->with(['campaign.venue'])
+            ->with(['campaign.venue', 'customerOffer'])
             ->firstOrFail();
 
         if ($recipient->clicked_at === null) {
@@ -28,6 +28,12 @@ class ReactivationClickController extends Controller
         }
 
         $attribution->reactivation($request, $recipient->campaign);
+        if ($recipient->customerOffer !== null) {
+            $request->session()->put('customer_offer.intent', [
+                'offer_id' => $recipient->customerOffer->getKey(),
+                'venue_id' => $recipient->campaign->venue_id,
+            ]);
+        }
         $parameters = ['venueSlug' => $recipient->campaign->venue->slug];
 
         if ($recipient->suggested_resource_id !== null && $recipient->suggested_date !== null) {
@@ -38,6 +44,11 @@ class ReactivationClickController extends Controller
             ];
         }
 
-        return redirect()->route('marketplace.venues.show', $parameters);
+        return redirect()->route('marketplace.venues.show', $parameters)->with(
+            'status',
+            $recipient->customerOffer === null
+                ? 'Welcome back. Choose a court and time to continue.'
+                : 'Your exclusive welcome-back offer is ready. It will be applied automatically when it gives you the best eligible price.',
+        );
     }
 }

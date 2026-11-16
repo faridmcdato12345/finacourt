@@ -70,6 +70,12 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(ReactivationCampaignRecipient::class);
     }
 
+    /** @return HasMany<CustomerOffer, $this> */
+    public function customerOffers(): HasMany
+    {
+        return $this->hasMany(CustomerOffer::class);
+    }
+
     /** @return HasMany<VenueClaimRequest, $this> */
     public function venueClaimRequests(): HasMany
     {

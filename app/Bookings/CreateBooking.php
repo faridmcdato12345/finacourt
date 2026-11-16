@@ -3,6 +3,7 @@
 namespace App\Bookings;
 
 use App\Analytics\SnapshotBookingAttribution;
+use App\CustomerOffers\CustomerOfferService;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentMode;
@@ -30,6 +31,7 @@ class CreateBooking
         private readonly PromotionApplicability $promotions,
         private readonly SnapshotBookingAttribution $attribution,
         private readonly VenueLoyalty $loyalty,
+        private readonly CustomerOfferService $customerOffers,
     ) {}
 
     /** @param array<string, mixed> $data */
@@ -72,6 +74,7 @@ class CreateBooking
                 $data['campaign'] ?? null,
                 lockForUpdate: true,
             );
+            $basePrice = $this->prices->quote($resource, $window->durationMinutes, null, $window);
             $price = $this->prices->quote($resource, $window->durationMinutes, $promotion, $window);
             $paymentProvider = ($data['create_payment'] ?? false)
                 ? ($data['payment_provider'] ?? null)
@@ -79,6 +82,23 @@ class CreateBooking
             $paymentMode = ($data['create_payment'] ?? false)
                 ? $this->createPayment->mode($paymentProvider)
                 : null;
+            $customerOfferSelection = null;
+
+            // Public promotions and personal offers are intentionally compared
+            // here, under the same locks that create the booking snapshot. A
+            // personal offer only wins when it is strictly better; equal values
+            // leave the public promotion selected and the offer untouched.
+            if ($player !== null
+                && $data['source'] === BookingSource::Marketplace->value
+                && $paymentMode === PaymentMode::HostedCheckout) {
+                $candidate = $this->customerOffers->bestAvailable($venue, $player, $basePrice['total_amount'], lock: true);
+                if ($candidate !== null
+                    && $this->moneyToCents($candidate['discount_amount']) > $this->moneyToCents($price['discount_amount'])) {
+                    $customerOfferSelection = $candidate;
+                    $price = $this->customerOffers->applyToBookingPrice($basePrice, $candidate, $window->durationMinutes);
+                    $promotion = null;
+                }
+            }
             $loyaltyDiscount = null;
 
             $rewardVersion = isset($data['loyalty_reward_version']) ? (int) $data['loyalty_reward_version'] : null;
@@ -129,6 +149,7 @@ class CreateBooking
                 && $data['source'] === BookingSource::Marketplace->value
                 && $paymentMode === PaymentMode::HostedCheckout
                 && $window->durationMinutes >= 60;
+            $selectedCustomerOffer = $customerOfferSelection['offer'] ?? null;
 
             $booking = Booking::query()->create([
                 'organization_id' => $organizationId,
@@ -137,6 +158,10 @@ class CreateBooking
                 'promotion_id' => $promotion?->getKey(),
                 'promotion_campaign_token' => $promotion?->campaign_token,
                 'promotion_title' => $promotion?->title,
+                'customer_offer_id' => $selectedCustomerOffer?->getKey(),
+                'customer_offer_campaign_id' => $selectedCustomerOffer?->customer_offer_campaign_id,
+                'customer_offer_label' => $selectedCustomerOffer?->campaign->label(),
+                'customer_offer_discount_amount' => $customerOfferSelection['discount_amount'] ?? null,
                 'player_user_id' => $player?->getKey(),
                 'reference' => $this->references->generate(),
                 'status' => $status,
@@ -175,6 +200,14 @@ class CreateBooking
                 ]);
             }
 
+            if ($customerOfferSelection !== null) {
+                $this->customerOffers->reserve(
+                    $customerOfferSelection['offer'],
+                    $booking,
+                    $basePrice['total_amount'],
+                );
+            }
+
             $this->attribution->record(
                 $booking,
                 $data['acquisition_context'] ?? null,
@@ -193,4 +226,12 @@ class CreateBooking
             return $booking;
         }, 5);
     }
+
+    private function moneyToCents(string $amount): int
+    {
+        [$whole, $fraction] = array_pad(explode('.', $amount, 2), 2, '0');
+
+        return (int) $whole * 100 + (int) str_pad(substr($fraction, 0, 2), 2, '0');
+    }
+
 }

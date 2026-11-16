@@ -43,11 +43,17 @@
                         <input data-nearby-latitude type="hidden" name="latitude" value="{{ $filters['latitude'] ?? '' }}">
                         <input data-nearby-longitude type="hidden" name="longitude" value="{{ $filters['longitude'] ?? '' }}">
                         <label class="mt-3 block text-xs font-semibold text-slate-700" for="nearby-radius">Search radius</label>
-                        <select data-nearby-radius id="nearby-radius" name="radius_km" class="app-select mt-1.5 h-10 bg-white text-sm" @disabled(! isset($filters['latitude'], $filters['longitude']))>
-                            @foreach ([5, 10, 25, 50] as $radius)
-                                <option value="{{ $radius }}" @selected((int) ($filters['radius_km'] ?? 25) === $radius)>Within {{ $radius }} km</option>
-                            @endforeach
-                        </select>
+                        <div data-nearby-radius class="mt-1.5">
+                            @include('marketplace.partials.public-select', [
+                                'name' => 'radius_km',
+                                'value' => (string) ($filters['radius_km'] ?? 25),
+                                'options' => collect([5, 10, 25, 50])->map(fn ($radius) => ['value' => (string) $radius, 'label' => "Within {$radius} km"])->all(),
+                                'placeholder' => 'Choose a radius',
+                                'ariaLabel' => 'Nearby search radius',
+                                'disabled' => ! isset($filters['latitude'], $filters['longitude']),
+                                'fallbackClass' => 'app-select h-10 text-sm',
+                            ])
+                        </div>
                         <button data-use-current-location type="button" class="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-court-300 bg-white px-3 py-2 text-sm font-semibold text-court-800 shadow-sm hover:border-court-500 hover:bg-court-100 disabled:cursor-wait disabled:opacity-60">
                             @include('marketplace.partials.icon', ['name' => 'location', 'class' => 'size-4'])
                             {{ isset($filters['latitude'], $filters['longitude']) ? 'Update my location' : 'Use my location' }}

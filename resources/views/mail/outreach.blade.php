@@ -24,7 +24,7 @@
                     </tr>
                     <tr>
                         <td style="padding:32px 30px 14px;">
-                            <p style="margin:0 0 18px;font-size:17px;line-height:1.65;color:#17384d;">Hi po {{ $messageType->value === 'followup_1' ? '😊' : '👋' }}</p>
+                            <p style="margin:0 0 18px;font-size:17px;line-height:1.65;color:#17384d;">Hi po {{ in_array($messageType->value, ['followup_1', 'resend'], true) ? '😊' : '👋' }}</p>
 
                             @if ($messageType->value === 'initial')
                                 <p style="margin:0 0 16px;font-size:16px;line-height:1.65;color:#476579;">Napapansin po namin na mas dumarami ngayon ang sports courts at rental venues.</p>
@@ -42,8 +42,8 @@
                                 <p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:#476579;">💰 mas flexible na access sa available earnings</p>
                                 <p style="margin:20px 0 0;font-size:16px;line-height:1.65;color:#476579;">Para hindi na rin po kayo magsimula from scratch, naghanda na ako ng private FinACourt page para sa <strong style="color:#17384d;">{{ $venueName }}</strong>.</p>
                                 <p style="margin:10px 0 0;font-size:16px;line-height:1.65;color:#476579;">Pwede n'yo pong i-preview dito:</p>
-                            @elseif ($messageType->value === 'followup_1')
-                                <p style="margin:0 0 16px;font-size:16px;line-height:1.65;color:#476579;">Follow-up lang po in case hindi n'yo pa nakita yung private FinACourt page na inihanda ko para sa <strong style="color:#17384d;">{{ $venueName }}</strong>.</p>
+                            @elseif (in_array($messageType->value, ['followup_1', 'resend'], true))
+                                <p style="margin:0 0 16px;font-size:16px;line-height:1.65;color:#476579;">{{ $messageType->value === 'resend' ? 'Quick follow-up lang po. In case hindi n\'yo nakita ang earlier email, nandito ulit ang private FinACourt page na inihanda ko para sa' : 'Follow-up lang po in case hindi n\'yo pa nakita yung private FinACourt page na inihanda ko para sa' }} <strong style="color:#17384d;">{{ $venueName }}</strong>.</p>
                                 <p style="margin:0 0 16px;font-size:16px;line-height:1.65;color:#476579;">FinACourt is not only about managing bookings.</p>
                                 <p style="margin:0 0 10px;font-size:16px;line-height:1.65;color:#476579;">Goal din namin na matulungan ang court owners na:</p>
                                 <p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:#476579;">🏸 malaman kung saan nanggagaling ang players</p>
@@ -74,7 +74,7 @@
                                 <p style="margin:18px 0 0;font-size:15px;line-height:1.6;color:#476579;">If you're interested, pwede rin po akong mag-send ng short demo para makita ninyo kung paano gumagana ang growth features.</p>
                             </td>
                         </tr>
-                    @elseif ($messageType->value === 'followup_1')
+                    @elseif (in_array($messageType->value, ['followup_1', 'resend'], true))
                         <tr><td style="padding:0 30px 22px;font-size:15px;line-height:1.6;color:#476579;">If useful po, pwede rin akong mag-send ng short demo video.</td></tr>
                     @endif
                     <tr>

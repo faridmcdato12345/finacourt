@@ -63,16 +63,16 @@
                     @foreach ($loyaltyPrograms as $program)
                         @php
                             $readyCard = collect($program['rewards'])->first(fn (array $card) => $card['rewards_available'] > 0);
-                            $nextCard = collect($program['rewards'])->first(fn (array $card) => $card['stamps'] % $card['stamps_required'] !== 0);
-                            $discountCard = $readyCard ?? $nextCard;
-                            $completedCard = $readyCard && ! $nextCard ? $readyCard : null;
-                            $progressCard = $nextCard ?? $completedCard;
-                            $stampsRequired = max(1, (int) ($progressCard['stamps_required'] ?? $program['venue']->loyalty_stamps_required));
-                            $stampsProgress = $completedCard
+                            $stampsRequired = max(1, (int) $program['venue']->loyalty_stamps_required);
+                            $stampsProgress = $program['rewards_available'] > 0
                                 ? $stampsRequired
-                                : (int) (($progressCard['stamps'] ?? 0) % $stampsRequired);
-                            $discountPercent = $discountCard['discount_percent'] ?? $program['venue']->loyalty_discount_percent;
-                            $discountCap = $discountCard['discount_cap'] ?? $program['venue']->loyalty_discount_cap;
+                                : (int) $program['stamps'] % $stampsRequired;
+                            $stampsNeeded = $program['rewards_available'] > 0
+                                ? 0
+                                : max(0, $stampsRequired - $stampsProgress);
+                            $completedCard = $program['rewards_available'] > 0;
+                            $discountPercent = $program['venue']->loyalty_discount_percent;
+                            $discountCap = $program['venue']->loyalty_discount_cap;
                         @endphp
                         <article data-loyalty-card class="min-w-0 shrink-0 snap-start overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.06)] {{ $loyaltyPrograms->count() > 1 ? 'w-[calc(100%-2.5rem)] max-w-sm' : 'w-full' }} lg:w-[42rem] lg:max-w-[calc(100%-2rem)]">
                             <div class="grid lg:h-full lg:grid-cols-[12rem_minmax(0,1fr)]">
@@ -87,14 +87,14 @@
                                         </div>
                                     </div>
                                     <div class="mt-4 flex flex-wrap items-center gap-2">
-                                        <span class="rounded-full px-3 py-1 text-xs font-bold {{ $program['rewards_available'] > 0 ? 'bg-amber-100 text-amber-950' : 'bg-court-50 text-court-800' }}">{{ $program['rewards_available'] > 0 ? $program['rewards_available'].' '.Str::plural('reward', $program['rewards_available']).' ready' : $program['stamps_needed'].' '.Str::plural('game', $program['stamps_needed']).' to go' }}</span>
+                                        <span class="rounded-full px-3 py-1 text-xs font-bold {{ $program['rewards_available'] > 0 ? 'bg-amber-100 text-amber-950' : 'bg-court-50 text-court-800' }}">{{ $program['rewards_available'] > 0 ? $program['rewards_available'].' '.Str::plural('reward', $program['rewards_available']).' ready' : $stampsNeeded.' '.Str::plural('game', $stampsNeeded).' to go' }}</span>
                                         <span class="rounded-full px-3 py-1 text-xs font-semibold {{ $program['venue']->loyalty_active ? 'bg-court-50 text-court-800' : 'bg-slate-100 text-slate-600' }}">{{ $program['venue']->loyalty_active ? 'Stamps on' : 'Earning paused' }}</span>
                                     </div>
                                     <p class="mt-3 text-sm font-semibold text-slate-950">{{ $program['rewards_available'] > 0 ? 'Reward unlocked!' : ($program['venue']->loyalty_active ? 'Keep your streak going!' : 'Your progress is saved') }}</p>
                                     <p class="mt-1 text-sm text-slate-600">{{ $program['stamps'] }} {{ Str::plural('stamp', $program['stamps']) }} earned{{ $program['rewards_available'] > 0 ? '. Use a reward on a future booking.' : '.' }}</p>
 
                                     <div class="mt-4 rounded-2xl bg-court-50 p-4">
-                                        <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-court-700">{{ $readyCard ? 'Available reward' : 'Next reward' }}</p>
+                                        <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-court-700">{{ $completedCard ? 'Available reward' : 'Next reward' }}</p>
                                         <strong class="text-xl font-semibold text-court-950">{{ number_format((float) $discountPercent, 2) }}% off</strong>
                                         <span class="ml-1 text-sm text-court-900">court price · up to ₱{{ number_format((float) $discountCap, 2) }}</span>
                                         <p class="mt-1 text-xs font-semibold text-court-800">Stacks with deals</p>

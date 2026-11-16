@@ -7,11 +7,21 @@
         $start = $booking->start_at->setTimezone($booking->timezone);
         $end = $booking->end_at->setTimezone($booking->timezone);
         $canCancel = in_array($status, [App\Enums\BookingStatus::Hold, App\Enums\BookingStatus::Confirmed], true) && $booking->start_at->isFuture();
-        $payment = $booking->payment;
+        $group = $booking->reservationGroup;
+        $groupBookings = $group?->bookings->sortBy(['start_at', 'resource_id'])->values() ?? collect([$booking]);
+        $isGroupedReservation = $group !== null;
+        $activeStampsRequired = max(1, (int) $booking->venue->loyalty_stamps_required);
+        $activeProgress = (int) $loyaltyBalance['stamps'] % $activeStampsRequired;
+        $activeStampsNeeded = $activeProgress === 0 && (int) $loyaltyBalance['stamps'] > 0
+            ? 0
+            : $activeStampsRequired - $activeProgress;
+        $payment = $booking->payment ?? $group?->payments->first();
         $paymentStatus = $payment?->effectiveStatus($booking);
         $refundRequest = $payment?->refundRequest;
         $isClosureRefund = $refundRequest?->court_closure_id !== null;
-        $playerTotal = (float) $booking->player_total_amount > 0 ? $booking->player_total_amount : $booking->total_amount;
+        $playerTotal = $isGroupedReservation && $payment !== null
+            ? $payment->amount
+            : ((float) $booking->player_total_amount > 0 ? $booking->player_total_amount : $booking->total_amount);
         $dealSavings = max(0, (float) $booking->discount_amount - (float) ($loyaltyRewardDiscount ?? 0));
         $coverPhoto = $booking->venue->photos->first();
         $coverPhotoUrl = $coverPhoto
@@ -38,27 +48,31 @@
                 <div>
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="rounded-full px-3 py-1.5 text-xs font-bold {{ $statusTone }}">{{ $status->label() }}</span>
-                        <span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-court-100 backdrop-blur">{{ $booking->resource->sport->name }}</span>
+                        <span class="rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-court-100 backdrop-blur">{{ $isGroupedReservation ? $groupBookings->count().' courts' : $booking->resource->sport->name }}</span>
                         @if ($booking->promotion_title)<span class="rounded-full bg-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-950">Deal applied</span>@endif
                         @if ($loyaltyRewardDiscount)<span class="rounded-full bg-court-300 px-3 py-1.5 text-xs font-semibold text-court-950">Loyalty reward −₱{{ number_format((float) $loyaltyRewardDiscount, 2) }}</span>@endif
                     </div>
                     <p class="mt-6 text-xs font-semibold uppercase tracking-[0.2em] text-court-300">Your game pass</p>
                     <h1 class="mt-2 text-4xl font-semibold tracking-[-0.04em] sm:text-5xl">{{ $booking->venue->name }}</h1>
-                    <p class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-court-100/75"><span>{{ $booking->resource->name }}</span><span aria-hidden="true">·</span><span>{{ $booking->venue->city }}, {{ $booking->venue->province }}</span></p>
+                    <p class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-court-100/75"><span>{{ $isGroupedReservation ? 'Multi-court reservation' : $booking->resource->name }}</span><span aria-hidden="true">·</span><span>{{ $booking->venue->city }}, {{ $booking->venue->province }}</span></p>
                     <div class="mt-7 flex flex-wrap gap-3">
                         <span class="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold backdrop-blur">@include('marketplace.partials.icon', ['name' => 'calendar', 'class' => 'size-4 text-court-300']) {{ $start->format('D, M j') }}</span>
                         <span class="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold backdrop-blur">@include('marketplace.partials.icon', ['name' => 'clock', 'class' => 'size-4 text-court-300']) {{ $start->format('H:i') }}–{{ $end->format('H:i') }}</span>
-                        <span class="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold backdrop-blur">@include('marketplace.partials.icon', ['name' => 'sport-'.$booking->resource->sport->slug, 'class' => 'size-4 text-court-300']) {{ $booking->resource->name }}</span>
+                        @if ($isGroupedReservation)
+                            <span class="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold backdrop-blur">{{ $groupBookings->count() }} courts held together</span>
+                        @else
+                            <span class="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold backdrop-blur">@include('marketplace.partials.icon', ['name' => 'sport-'.$booking->resource->sport->slug, 'class' => 'size-4 text-court-300']) {{ $booking->resource->name }}</span>
+                        @endif
                     </div>
                 </div>
                 <div data-player-game-ticket class="relative overflow-hidden rounded-3xl border border-white/20 bg-white p-5 text-slate-950 shadow-2xl shadow-black/20">
                     <div aria-hidden="true" class="absolute -left-3 top-1/2 size-6 -translate-y-1/2 rounded-full bg-court-950"></div>
                     <div aria-hidden="true" class="absolute -right-3 top-1/2 size-6 -translate-y-1/2 rounded-full bg-court-950"></div>
-                    <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Game total</p>
+                    <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{{ $isGroupedReservation ? 'Combined total' : 'Game total' }}</p>
                     <p class="mt-2 text-3xl font-semibold tracking-tight">₱{{ number_format((float) $playerTotal, 2) }}</p>
                     <div class="my-4 border-t border-dashed border-slate-300"></div>
                     <p class="text-xs font-semibold text-slate-700">{{ $paymentStatus?->label() ?: 'Payment not started' }}</p>
-                    <p class="mt-2 break-all text-[10px] font-medium text-slate-400">{{ $booking->reference }}</p>
+                    <p class="mt-2 break-all text-[10px] font-medium text-slate-400">{{ $isGroupedReservation ? $group->reference : $booking->reference }}</p>
                 </div>
             </div>
         </div>
@@ -69,6 +83,25 @@
             @if (session('status'))<p role="status" aria-live="polite" class="rounded-2xl border border-court-200 bg-court-50 px-5 py-4 text-sm font-medium text-court-800">{{ session('status') }}</p>@endif
             @if ($errors->any())<p role="alert" class="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">{{ $errors->first() }}</p>@endif
 
+            @if ($isGroupedReservation)
+                <section class="rounded-3xl border border-court-200 bg-court-50 p-5 sm:p-6">
+                    <p class="eyebrow">Your selected courts</p>
+                    <h2 class="mt-2 text-xl font-semibold text-court-950">{{ $groupBookings->count() }} courts in one reservation</h2>
+                    <div class="mt-5 grid gap-3 sm:grid-cols-2">
+                        @foreach ($groupBookings as $groupBooking)
+                            @php($groupStart = $groupBooking->start_at->setTimezone($groupBooking->timezone))
+                            @php($groupEnd = $groupBooking->end_at->setTimezone($groupBooking->timezone))
+                            <article class="rounded-2xl border border-court-100 bg-white p-4">
+                                <p class="font-semibold text-slate-950">{{ $groupBooking->resource->name }}</p>
+                                <p class="mt-1 text-sm text-slate-600">{{ $groupBooking->resource->sport->name }} · {{ $groupStart->format('D, M j · H:i') }}–{{ $groupEnd->format('H:i') }}</p>
+                                <p class="mt-2 text-sm font-semibold text-court-800">₱{{ number_format((float) $groupBooking->player_total_amount, 2) }}</p>
+                            </article>
+                        @endforeach
+                    </div>
+                    <p class="mt-4 text-xs text-court-800">One payment covers every court listed above.</p>
+                </section>
+            @endif
+
             @if ($booking->venue->loyalty_active || $booking->loyalty_eligible || $loyaltyBalance['stamps'] > 0 || $loyaltyBalance['reward_debt'] > 0)
                 <section data-loyalty-progress class="rounded-3xl border border-court-200 bg-court-50 p-5 sm:p-6">
                     <p class="eyebrow">Venue loyalty</p>
@@ -77,48 +110,32 @@
                     @if ($loyaltyBalance['rewards_available'] > 0)
                         <p class="mt-2 text-sm text-court-800">You can choose to use one reward on a future online booking, including a booking with a deal.</p>
                     @else
-                        <p class="mt-2 text-sm text-court-800"><strong>{{ $loyaltyBalance['stamps_needed'] }} more qualifying {{ Illuminate\Support\Str::plural('game', $loyaltyBalance['stamps_needed']) }}</strong> needed to unlock a reward. Stamps are added only after an online-paid game is completed, at most once per venue-local day.</p>
+                        <p class="mt-2 text-sm text-court-800"><strong>{{ $activeStampsNeeded }} more qualifying {{ Illuminate\Support\Str::plural('game', $activeStampsNeeded) }}</strong> needed to unlock this venue’s current reward. Stamps are added only after an online-paid game is completed, at most once per venue-local day.</p>
                     @endif
                     @if ($loyaltyBalance['reward_debt'] > 0)
                         <p class="mt-3 rounded-xl bg-amber-50 px-4 py-3 text-xs text-amber-950">A refunded game removed a stamp after a reward was used. New qualifying stamps must cover that used reward before another becomes available.</p>
                     @endif
-                    <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                        @forelse ($loyaltyBalance['rewards'] as $card)
-                            <div class="rounded-xl border border-court-100 bg-white p-4 text-sm text-slate-700">
-                                <p class="font-semibold text-slate-950">{{ $card['stamps_required'] }} {{ Illuminate\Support\Str::plural('stamp', $card['stamps_required']) }} = {{ number_format((float) $card['discount_percent'], 2) }}% off</p>
-                                <p class="mt-1">{{ $card['stamps'] }} earned under these terms · {{ $card['rewards_available'] }} {{ Illuminate\Support\Str::plural('reward', $card['rewards_available']) }} ready</p>
-                                <p class="mt-1 text-xs text-slate-500">
-                                    @if ($card['rewards_available'] > 0)
-                                        Reward unlocked
-                                        @if ($card['stamps'] % $card['stamps_required'] > 0)
-                                            · {{ $card['stamps'] % $card['stamps_required'] }}/{{ $card['stamps_required'] }} toward another reward
-                                        @endif
-                                    @else
-                                        {{ $card['stamps'] % $card['stamps_required'] }}/{{ $card['stamps_required'] }} toward a reward
-                                    @endif
-                                    · capped at ₱{{ number_format((float) $card['discount_cap'], 2) }}
-                                </p>
-                            </div>
-                        @empty
-                            <div class="rounded-xl border border-court-100 bg-white p-4 text-sm text-slate-700">
-                                <p class="font-semibold text-slate-950">Current offer: {{ $booking->venue->loyalty_stamps_required }} {{ Illuminate\Support\Str::plural('stamp', $booking->venue->loyalty_stamps_required) }} = {{ number_format((float) $booking->venue->loyalty_discount_percent, 2) }}% off</p>
-                                <p class="mt-1">0/{{ $booking->venue->loyalty_stamps_required }} earned · capped at ₱{{ number_format((float) $booking->venue->loyalty_discount_cap, 2) }}</p>
-                            </div>
-                        @endforelse
+                    <div class="mt-4 rounded-xl border border-court-100 bg-white p-4 text-sm text-slate-700">
+                        <p class="font-semibold text-slate-950">Current offer: {{ $activeStampsRequired }} {{ Illuminate\Support\Str::plural('stamp', $activeStampsRequired) }} = {{ number_format((float) $booking->venue->loyalty_discount_percent, 2) }}% off</p>
+                        <p class="mt-1">{{ $activeProgress }}/{{ $activeStampsRequired }} toward a reward · capped at ₱{{ number_format((float) $booking->venue->loyalty_discount_cap, 2) }}</p>
                     </div>
+                    <p class="mt-3 text-xs leading-5 text-court-800">Earn 1 stamp only after an online-paid, qualifying game is completed. If you reserve multiple courts at this venue on the same local day, the whole reservation can earn a maximum of 1 stamp—not one stamp per court.</p>
+                    @if (collect($loyaltyBalance['rewards'])->contains(fn (array $card): bool => (int) $card['version'] !== (int) $booking->venue->loyalty_terms_version))
+                        <p class="mt-3 text-xs text-court-800">Your earlier stamps remain protected. This card shows the venue’s active offer; historical terms are kept only for accurate reward accounting.</p>
+                    @endif
                     @if ($booking->payment_status === App\Enums\PaymentStatus::Refunded)
                         <p class="mt-4 text-xs text-amber-900">This booking was refunded, so it cannot earn or keep a loyalty stamp.</p>
                     @elseif ($loyaltyRefundBlocked)
                         <p class="mt-4 text-xs text-amber-900">This booking's stamp is on hold while its refund is being reviewed. It returns if the request is declined; a completed refund removes it.</p>
                     @elseif ($loyaltyStampEarned)
-                        <p class="mt-4 text-xs text-court-800">This completed booking added one of the earned stamps shown above.</p>
+                        <p class="mt-4 text-xs text-court-800">This completed {{ $isGroupedReservation ? 'multi-court reservation' : 'booking' }} added one of the earned stamps shown above.</p>
                     @elseif ($booking->loyalty_eligible && in_array($status, [App\Enums\BookingStatus::Hold, App\Enums\BookingStatus::Confirmed], true) && $booking->payment_status !== App\Enums\PaymentStatus::Refunded)
                         @if ($gameEnded && $booking->loyalty_processed_at === null)
                             <p class="mt-4 text-xs text-court-800">Your game has ended. Your stamp is being checked and will appear here after the next loyalty sync if this booking qualifies.</p>
                         @elseif ($gameEnded)
                             <p class="mt-4 text-xs text-court-800">No additional stamp was awarded for this booking. Only one game per venue-local day can earn a stamp.</p>
                         @else
-                            <p class="mt-4 text-xs text-court-800">This reservation has not earned a stamp yet. It can add one after the game ends and online payment is verified, provided no other game at this venue earned a stamp for you that day.</p>
+                            <p class="mt-4 text-xs text-court-800">This reservation has not earned a stamp yet. It can add one after a qualifying game ends and online payment is verified, provided no other game at this venue earned a stamp for you that day.</p>
                         @endif
                     @endif
                     @unless ($booking->venue->loyalty_active)
@@ -187,14 +204,28 @@
 
             <section data-player-card class="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                 <div class="flex items-center gap-3"><span class="grid size-11 place-items-center rounded-2xl bg-court-50 text-court-700">@include('marketplace.partials.icon', ['name' => 'court', 'class' => 'size-5'])</span><div><p class="eyebrow">Game plan</p><h2 class="mt-1 text-xl font-semibold">When and where to play</h2></div></div>
+                @if ($isGroupedReservation)
+                    <div class="mt-6 space-y-3">
+                        @foreach ($groupBookings as $groupBooking)
+                            @php($groupStart = $groupBooking->start_at->setTimezone($groupBooking->timezone))
+                            @php($groupEnd = $groupBooking->end_at->setTimezone($groupBooking->timezone))
+                            <div class="rounded-2xl bg-slate-50 p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                                <div><p class="font-semibold">{{ $groupBooking->resource->name }} · {{ $groupBooking->resource->sport->name }}</p><p class="mt-1 text-sm text-slate-500">{{ $groupStart->format('D, M j, Y') }} · {{ $groupStart->format('H:i') }}–{{ $groupEnd->format('H:i') }} {{ $groupBooking->timezone }}</p></div>
+                                <p class="mt-2 shrink-0 font-semibold text-court-800 sm:mt-0">₱{{ number_format((float) $groupBooking->player_total_amount, 2) }}</p>
+                            </div>
+                        @endforeach
+                        <div class="rounded-2xl bg-slate-50 p-4"><p class="text-xs font-semibold uppercase tracking-wider text-slate-400">Booked for</p><p class="mt-2 font-semibold">{{ $booking->customer_name }}<span class="mt-1 block text-xs font-normal text-slate-500">{{ $booking->customer_email }}@if ($booking->customer_phone) · {{ $booking->customer_phone }}@endif</span></p></div>
+                    </div>
+                @else
                 <dl class="mt-6 grid gap-3 sm:grid-cols-2">
                     <div class="rounded-2xl bg-slate-50 p-4"><dt class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">@include('marketplace.partials.icon', ['name' => 'sport-'.$booking->resource->sport->slug, 'class' => 'size-4 text-court-600']) Court</dt><dd class="mt-2 font-semibold">{{ $booking->resource->name }} · {{ $booking->resource->sport->name }}</dd></div>
                     <div class="rounded-2xl bg-slate-50 p-4"><dt class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">@include('marketplace.partials.icon', ['name' => 'calendar', 'class' => 'size-4 text-court-600']) Date</dt><dd class="mt-2 font-semibold">{{ $start->format('D, M j, Y') }}</dd></div>
                     <div class="rounded-2xl bg-slate-50 p-4"><dt class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">@include('marketplace.partials.icon', ['name' => 'clock', 'class' => 'size-4 text-court-600']) Time</dt><dd class="mt-2 font-semibold">{{ $start->format('H:i') }}–{{ $end->format('H:i') }} <span class="block text-xs font-normal text-slate-400">{{ $booking->timezone }}</span></dd></div>
                     <div class="rounded-2xl bg-slate-50 p-4"><dt class="text-xs font-semibold uppercase tracking-wider text-slate-400">Booked for</dt><dd class="mt-2 font-semibold">{{ $booking->customer_name }}<span class="mt-1 block text-xs font-normal text-slate-500">{{ $booking->customer_email }}@if ($booking->customer_phone) · {{ $booking->customer_phone }}@endif</span></dd></div>
                 </dl>
+                @endif
                 <div class="mt-5 rounded-2xl border border-court-100 bg-court-50 p-4">
-                    <div class="flex items-end justify-between gap-4"><div><p class="text-xs font-semibold uppercase tracking-wider text-court-700">Price check</p><p class="mt-1 text-sm text-court-900">@if ((float) $booking->discount_amount > 0)<span class="mr-2 text-slate-400 line-through">₱{{ number_format((float) $booking->original_total_amount, 2) }}</span>@endif ₱{{ number_format((float) $booking->total_amount, 2) }} court price</p>@if ($booking->pricing_rule_snapshot)<p class="mt-1 text-xs text-court-800">The time-based court price was saved when this reservation was created.</p>@endif @if ((float) $booking->platform_service_fee_amount > 0)<p class="mt-1 text-xs text-court-800">{{ $booking->platform_service_fee_name ?: 'FinACourt service fee' }} · ₱{{ number_format((float) $booking->platform_service_fee_amount, 2) }}</p>@endif</div><p class="text-right"><span class="block text-xs text-court-700">Your total</span><strong class="text-xl text-court-950">₱{{ number_format((float) $playerTotal, 2) }}</strong></p></div>
+                    <div class="flex items-end justify-between gap-4"><div><p class="text-xs font-semibold uppercase tracking-wider text-court-700">Price check</p><p class="mt-1 text-sm text-court-900">@if ($isGroupedReservation)Combined court price for {{ $groupBookings->count() }} courts.@else @if ((float) $booking->discount_amount > 0)<span class="mr-2 text-slate-400 line-through">₱{{ number_format((float) $booking->original_total_amount, 2) }}</span>@endif ₱{{ number_format((float) $booking->total_amount, 2) }} court price.@endif</p>@if (! $isGroupedReservation && $booking->pricing_rule_snapshot)<p class="mt-1 text-xs text-court-800">The time-based court price was saved when this reservation was created.</p>@endif @if ($payment && (float) $payment->platform_service_fee_amount > 0)<p class="mt-1 text-xs text-court-800">{{ $payment->platform_service_fee_name ?: 'FinACourt service fee' }} · ₱{{ number_format((float) $payment->platform_service_fee_amount, 2) }}</p>@endif</div><p class="text-right"><span class="block text-xs text-court-700">Your total</span><strong class="text-xl text-court-950">₱{{ number_format((float) $playerTotal, 2) }}</strong></p></div>
                 </div>
             </section>
 

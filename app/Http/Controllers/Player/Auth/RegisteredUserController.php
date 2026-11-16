@@ -38,6 +38,7 @@ class RegisteredUserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users'],
             'password' => ['required', 'confirmed', Password::defaults()],
+            'marketing_opt_in' => ['nullable', 'boolean'],
         ]);
 
         $user = User::query()->create([
@@ -45,6 +46,15 @@ class RegisteredUserController extends Controller
             'email' => Str::lower($validated['email']),
             'password' => $validated['password'],
         ]);
+
+        if ($request->boolean('marketing_opt_in')) {
+            $user->marketingPreference()->create([
+                'marketing_opt_in' => true,
+                'in_app_marketing_enabled' => true,
+                'email_marketing_enabled' => true,
+                'opted_in_at' => now('UTC'),
+            ]);
+        }
 
         event(new Registered($user));
         Auth::login($user);

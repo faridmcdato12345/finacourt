@@ -84,6 +84,7 @@ class PlayerReservationFlowTest extends TestCase
             'start' => '09:00',
             'duration' => 60,
             'account_terms' => '1',
+            'marketing_opt_in' => '1',
         ])->assertRedirect($reviewPath)
             ->assertSessionHas('status');
 
@@ -92,6 +93,12 @@ class PlayerReservationFlowTest extends TestCase
         $this->assertDatabaseHas('passwordless_login_tokens', [
             'user_id' => $player->getKey(),
             'consumed_at' => null,
+        ]);
+        $this->assertDatabaseHas('marketing_preferences', [
+            'user_id' => $player->getKey(),
+            'marketing_opt_in' => true,
+            'in_app_marketing_enabled' => true,
+            'email_marketing_enabled' => true,
         ]);
 
         $magicUrl = null;
@@ -176,11 +183,18 @@ class PlayerReservationFlowTest extends TestCase
             'email' => 'alex@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
+            'marketing_opt_in' => '1',
         ])->assertRedirect(url($return));
 
         $player = User::query()->where('email', 'alex@example.com')->firstOrFail();
         $this->assertAuthenticatedAs($player);
         $this->assertDatabaseMissing('memberships', ['user_id' => $player->getKey()]);
+        $this->assertDatabaseHas('marketing_preferences', [
+            'user_id' => $player->getKey(),
+            'marketing_opt_in' => true,
+            'in_app_marketing_enabled' => true,
+            'email_marketing_enabled' => true,
+        ]);
 
         $this->post(route('logout'))->assertRedirect(route('marketplace.home'));
         $this->get(route('player.login', ['return' => $return]))->assertOk();

@@ -100,6 +100,7 @@ class OutreachLead extends Model
             OutreachMessageType::Followup2 => $this->followup_1_sent_at !== null
                 && $this->followup_2_sent_at === null
                 && $this->next_send_at?->lte($at) === true,
+            OutreachMessageType::Resend => false,
         };
     }
 

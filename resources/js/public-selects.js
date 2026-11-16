@@ -18,7 +18,8 @@ document.querySelectorAll('[data-public-select]').forEach((element) => {
     }
 });
 
-document.querySelectorAll('[data-public-date]').forEach((element) => {
+function enhancePublicDate(element) {
+    if (element.dataset.publicDateEnhanced === 'true') return;
     const configElement = element.querySelector('[data-public-date-config]');
 
     if (!configElement) return;
@@ -26,9 +27,16 @@ document.querySelectorAll('[data-public-date]').forEach((element) => {
     try {
         const config = JSON.parse(configElement.textContent);
         createApp(PublicDateIsland, { config }).mount(element);
+        element.dataset.publicDateEnhanced = 'true';
     } catch (error) {
         console.error('Unable to enhance marketplace date field.', error);
     }
+}
+
+document.querySelectorAll('[data-public-date]').forEach(enhancePublicDate);
+
+document.addEventListener('marketplace:availability-replaced', (event) => {
+    event.detail?.root?.querySelectorAll?.('[data-public-date]').forEach(enhancePublicDate);
 });
 
 document.querySelectorAll('[data-public-number]').forEach((element) => {

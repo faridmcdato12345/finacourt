@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'organization_id',
@@ -21,13 +22,18 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'message',
     'segment',
     'channel',
+    'delivery_mode',
+    'automation_enabled',
+    'inactivity_days',
     'status',
     'audience_count',
     'sent_count',
     'delivered_count',
+    'failed_count',
     'suppressed_count',
     'sent_at',
     'cancelled_at',
+    'automation_last_run_at',
 ])]
 class ReactivationCampaign extends Model
 {
@@ -59,6 +65,11 @@ class ReactivationCampaign extends Model
         return $this->hasMany(ReactivationCampaignRecipient::class);
     }
 
+    public function offerCampaign(): HasOne
+    {
+        return $this->hasOne(CustomerOfferCampaign::class);
+    }
+
     public function bookingAttributions(): HasMany
     {
         return $this->hasMany(BookingAttribution::class);
@@ -71,6 +82,9 @@ class ReactivationCampaign extends Model
             'status' => ReactivationCampaignStatus::class,
             'sent_at' => 'immutable_datetime',
             'cancelled_at' => 'immutable_datetime',
+            'automation_enabled' => 'boolean',
+            'inactivity_days' => 'integer',
+            'automation_last_run_at' => 'immutable_datetime',
         ];
     }
 }

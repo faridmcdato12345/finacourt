@@ -36,10 +36,14 @@ Complete overview para sa court owners:
 🎉 FinACourt is LIFETIME FREE for court owners — walang monthly or annual subscription.
 
 If you're interested, pwede rin po akong mag-send ng short demo para makita ninyo kung paano gumagana ang growth features.
-@elseif ($messageType->value === 'followup_1')
+@elseif (in_array($messageType->value, ['followup_1', 'resend'], true))
 Hi po 😊
 
+@if ($messageType->value === 'resend')
+Quick follow-up lang po tungkol sa private FinACourt page na inihanda ko para sa {{ $venueName }}. In case hindi n'yo nakita ang earlier email, nandito ulit ang link:
+@else
 Follow-up lang po in case hindi n'yo pa nakita yung private FinACourt page na inihanda ko para sa {{ $venueName }}:
+@endif
 
 {{ $privateLink }}
 

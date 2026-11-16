@@ -5,6 +5,7 @@
         'min' => isset($min) ? (string) $min : null,
         'placeholder' => $placeholder ?? 'Select date',
         'ariaLabel' => $ariaLabel ?? $placeholder ?? 'Select date',
+        'displayLabel' => $displayLabel ?? null,
         'disabled' => (bool) ($disabled ?? false),
         'variant' => $variant ?? 'default',
     ];

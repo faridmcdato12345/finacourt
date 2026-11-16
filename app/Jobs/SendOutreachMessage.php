@@ -170,6 +170,10 @@ class SendOutreachMessage implements ShouldBeUnique, ShouldQueue
             if ($lockedMessage->message_type === OutreachMessageType::Initial) {
                 $updates['initial_sent_at'] = $sentAt;
                 $updates['next_send_at'] = $sentAt->copy()->addDays((int) config('outreach.followup_1_days', 4));
+            } elseif ($lockedMessage->message_type === OutreachMessageType::Resend) {
+                // A recovery resend starts a fresh follow-up window without
+                // rewriting the original initial-send audit record.
+                $updates['next_send_at'] = $sentAt->copy()->addDays((int) config('outreach.followup_1_days', 4));
             } elseif ($lockedMessage->message_type === OutreachMessageType::Followup1) {
                 $updates['followup_1_sent_at'] = $sentAt;
                 $updates['next_send_at'] = $sentAt->copy()->addDays((int) config('outreach.followup_2_days', 5));

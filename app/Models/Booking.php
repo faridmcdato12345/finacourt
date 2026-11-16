@@ -18,11 +18,15 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'organization_id',
+    'reservation_group_id',
     'venue_id',
     'resource_id',
     'promotion_id',
+    'customer_offer_id',
+    'customer_offer_campaign_id',
     'promotion_campaign_token',
     'promotion_title',
+    'customer_offer_label',
     'player_user_id',
     'reference',
     'status',
@@ -42,6 +46,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'total_amount',
     'original_total_amount',
     'discount_amount',
+    'customer_offer_discount_amount',
     'pricing_rule_snapshot',
     'platform_service_fee_rule_id',
     'platform_service_fee_name',
@@ -79,6 +84,12 @@ class Booking extends Model
         return $this->belongsTo(Organization::class);
     }
 
+    /** @return BelongsTo<ReservationGroup, $this> */
+    public function reservationGroup(): BelongsTo
+    {
+        return $this->belongsTo(ReservationGroup::class);
+    }
+
     /** @return BelongsTo<Venue, $this> */
     public function venue(): BelongsTo
     {
@@ -95,6 +106,18 @@ class Booking extends Model
     public function promotion(): BelongsTo
     {
         return $this->belongsTo(Promotion::class);
+    }
+
+    /** @return BelongsTo<CustomerOffer, $this> */
+    public function customerOffer(): BelongsTo
+    {
+        return $this->belongsTo(CustomerOffer::class);
+    }
+
+    /** @return BelongsTo<CustomerOfferCampaign, $this> */
+    public function customerOfferCampaign(): BelongsTo
+    {
+        return $this->belongsTo(CustomerOfferCampaign::class);
     }
 
     /** @return BelongsTo<PlatformServiceFeeRule, $this> */
@@ -207,6 +230,7 @@ class Booking extends Model
             'total_amount' => 'decimal:2',
             'original_total_amount' => 'decimal:2',
             'discount_amount' => 'decimal:2',
+            'customer_offer_discount_amount' => 'decimal:2',
             'pricing_rule_snapshot' => 'array',
             'platform_service_fee_fixed_amount' => 'decimal:2',
             'platform_service_fee_amount' => 'decimal:2',

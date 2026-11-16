@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'organization_id',
+    'reservation_group_id',
     'booking_id',
     'reference',
     'provider',
@@ -45,6 +46,12 @@ class Payment extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    /** @return BelongsTo<ReservationGroup, $this> */
+    public function reservationGroup(): BelongsTo
+    {
+        return $this->belongsTo(ReservationGroup::class);
     }
 
     /** @return BelongsTo<Booking, $this> */

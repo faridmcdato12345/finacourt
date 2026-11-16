@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Player;
 
 use App\Analytics\AnalyticsRecorder;
 use App\Analytics\TrafficAttribution;
+use App\CustomerOffers\CustomerOfferService;
 use App\Bookings\AvailabilityService;
 use App\Bookings\BookingPrice;
 use App\Bookings\CancelBooking;
 use App\Bookings\ConfirmPlayerBooking;
 use App\Bookings\CreateBooking;
+use App\Bookings\CreateReservationGroup;
 use App\Enums\AcquisitionSource;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
@@ -42,6 +44,103 @@ use Illuminate\View\View;
 
 class BookingController extends Controller
 {
+    /** Review several independently selected court windows before creating one grouped hold. */
+    public function createMulti(
+        Request $request,
+        string $venueSlug,
+        MarketplaceQuery $marketplace,
+        AvailabilityService $availability,
+        BookingPrice $prices,
+        PromotionApplicability $promotionApplicability,
+        PromotionMarketplace $promotionMarketplace,
+        PaymentProviderRegistry $payments,
+        PlatformServiceFeeCalculator $serviceFees,
+    ): View {
+        $validated = $request->validate($this->multiSelectionRules());
+        $venue = $marketplace->venue($venueSlug);
+        $seen = [];
+        $selections = collect($validated['resources'])->map(function (array $selection) use ($venue, $availability, $prices, $promotionApplicability, $promotionMarketplace, $serviceFees, &$seen): array {
+            $resource = $venue->resources->firstWhere('id', (int) $selection['resource_id']);
+            if (! $resource) {
+                throw ValidationException::withMessages(['resources' => 'One selected court is not available at this venue.']);
+            }
+            $resource->setRelation('venue', $venue);
+            $duration = (int) $selection['duration_minutes'];
+            $endTime = $this->endTime($selection['start_time'], $duration);
+            $key = $resource->getKey().'|'.$selection['date'].'|'.$selection['start_time'].'|'.$duration;
+            if (isset($seen[$key])) {
+                throw ValidationException::withMessages(['resources' => 'Choose each court time only once.']);
+            }
+            $seen[$key] = true;
+            $error = null;
+            $window = null;
+            $promotion = null;
+            $price = $prices->quote($resource, $duration);
+            try {
+                $window = $availability->window($resource, $selection['date'], $selection['start_time'], $endTime);
+                $availability->ensureBookable($resource, $window);
+                $promotion = filled($selection['campaign'] ?? null)
+                    ? $promotionApplicability->resolve($resource, $window, $selection['campaign'])
+                    : $promotionApplicability->bestDiscount($promotionMarketplace->forVenue($venue), $resource, $window);
+                $price = $prices->quote($resource, $duration, $promotion, $window);
+                if ($availability->hasConflict($resource->getKey(), $window->utcStart, $window->utcEnd)) {
+                    $error = 'That time is no longer available.';
+                }
+            } catch (ValidationException $exception) {
+                $error = collect($exception->errors())->flatten()->first();
+            }
+            return [
+                'resource' => $resource, 'date' => $selection['date'], 'startTime' => $selection['start_time'], 'endTime' => $endTime,
+                'duration' => $duration, 'price' => $price, 'payAtVenueCourtPrice' => $price,
+                'onlinePrice' => $serviceFees->quote($price['total_amount'], $price['currency']),
+                'payAtVenuePrice' => $serviceFees->emptyQuoteFromAmount($price['total_amount']),
+                // A reward is a single booking entitlement today. It is deliberately unavailable
+                // here until group redemption has its own auditable allocation table.
+                'loyaltyReward' => null, 'promotion' => $promotion, 'campaign' => $promotion?->campaign_token,
+                'availabilityError' => $error,
+            ];
+        })->all();
+        $online = $payments->online();
+        $onlineAvailable = $online?->supportsHostedCheckout() === true;
+        return view('player.bookings.create-multi', [
+            'venue' => $venue, 'courtSelections' => $selections,
+            'hasErrors' => collect($selections)->contains(fn (array $item) => $item['availabilityError'] !== null),
+            'returnUrl' => $request->getRequestUri(),
+            'onlinePaymentAvailable' => $onlineAvailable,
+            'defaultPaymentOption' => $onlineAvailable ? PlayerPaymentOption::Online->value : PlayerPaymentOption::PayAtVenue->value,
+            'onlinePaymentMethods' => $this->onlinePaymentMethods($online?->key()),
+            ...$this->seo('Review your court reservations', $request->fullUrl()),
+        ]);
+    }
+
+    public function storeMulti(
+        Request $request,
+        string $venueSlug,
+        MarketplaceQuery $marketplace,
+        CreateReservationGroup $groups,
+        PaymentProviderRegistry $payments,
+    ): RedirectResponse {
+        $validated = $request->validate(array_merge($this->multiSelectionRules('resources.*.booking_date'), [
+            'customer_name' => ['required', 'string', 'max:120'],
+            'customer_phone' => ['nullable', 'string', 'max:40'],
+            'payment_option' => ['required', 'in:online,pay_at_venue'],
+        ]));
+        $venue = $marketplace->venue($venueSlug);
+        $option = PlayerPaymentOption::from($validated['payment_option']);
+        $provider = $payments->forPlayerOption($option);
+        if ($provider === null || ($option === PlayerPaymentOption::Online && ! $provider->supportsHostedCheckout())) {
+            throw ValidationException::withMessages(['payment_option' => 'That payment option is unavailable.']);
+        }
+        $selections = collect($validated['resources'])->map(fn (array $item) => [
+            'resource_id' => (int) $item['resource_id'], 'booking_date' => $item['booking_date'],
+            'start_time' => $item['start_time'], 'end_time' => $this->endTime($item['start_time'], (int) $item['duration_minutes']),
+            'campaign' => $item['campaign'] ?? null,
+        ])->all();
+        $group = $groups->handle($venue, $request->user(), $selections, $validated['customer_name'], $validated['customer_phone'] ?? null, $provider->key());
+        $anchor = $group->bookings->first();
+        return redirect()->route('player.bookings.show', $anchor->reference)
+            ->with('status', 'All selected courts are held together. Complete one payment before the hold expires.');
+    }
     public function create(
         Request $request,
         string $venueSlug,
@@ -55,6 +154,7 @@ class BookingController extends Controller
         PaymentProviderRegistry $payments,
         PlatformServiceFeeCalculator $serviceFees,
         VenueLoyalty $loyalty,
+        CustomerOfferService $customerOffers,
     ): View {
         $validated = $request->validate($this->selectionRules());
         $attribution->current($request);
@@ -68,6 +168,8 @@ class BookingController extends Controller
         $promotion = null;
         $window = null;
         $price = $prices->quote($resource, $duration);
+        $payAtVenueCourtPrice = $price;
+        $customerOffer = null;
 
         try {
             $window = $availability->window(
@@ -85,6 +187,20 @@ class BookingController extends Controller
                     $window,
                 );
             $price = $prices->quote($resource, $duration, $promotion, $window);
+            $payAtVenueCourtPrice = $price;
+
+            if ($request->user() !== null && $payments->online()?->supportsHostedCheckout() === true) {
+                // Assigned offers are private and automatically selected only
+                // when they beat the public promotion. The store action repeats
+                // this under locks, so this is only a helpful preview.
+                $basePrice = $prices->quote($resource, $duration, null, $window);
+                $candidate = $customerOffers->bestAvailable($venue, $request->user(), $basePrice['total_amount']);
+                if ($candidate !== null && $this->moneyToCents($candidate['discount_amount']) > $this->moneyToCents($price['discount_amount'])) {
+                    $customerOffer = $candidate;
+                    $price = $customerOffers->applyToBookingPrice($basePrice, $candidate, $duration);
+                    $promotion = null;
+                }
+            }
 
             if ($availability->hasConflict($resource->getKey(), $window->utcStart, $window->utcEnd)) {
                 $availabilityError = 'That time is no longer available. Choose another available slot.';
@@ -137,12 +253,13 @@ class BookingController extends Controller
             'endTime' => $endTime,
             'duration' => $duration,
             'price' => $price,
-            'payAtVenueCourtPrice' => $price,
+            'payAtVenueCourtPrice' => $payAtVenueCourtPrice,
             'onlinePrice' => $serviceFees->quote($price['total_amount'], $price['currency']),
-            'payAtVenuePrice' => $serviceFees->emptyQuoteFromAmount($price['total_amount']),
+            'payAtVenuePrice' => $serviceFees->emptyQuoteFromAmount($payAtVenueCourtPrice['total_amount']),
             'loyaltyReward' => $loyaltyReward,
             'loyaltyBalance' => $loyaltyBalance,
             'promotion' => $promotion,
+            'customerOffer' => $customerOffer,
             'payAtVenuePromotion' => $promotion,
             'campaign' => $promotion?->campaign_token,
             'availabilityError' => $availabilityError,
@@ -312,9 +429,13 @@ class BookingController extends Controller
     ): View {
         $booking = $this->playerBooking($request, $reference);
         Gate::authorize('viewAsPlayer', $booking);
-        $provider = $booking->payment ? $providers->find($booking->payment->provider) : null;
-        $refundDeadline = $refundEligibility->deadline($booking, $booking->payment);
+        $groupPayment = $booking->reservationGroup?->payments->first();
+        $payment = $booking->payment ?? $groupPayment;
+        $provider = $payment ? $providers->find($payment->provider) : null;
+        $refundDeadline = $refundEligibility->deadline($booking, $payment);
         $loyaltyRefundBlocked = $loyalty->hasBlockingRefund($booking);
+
+        $groupBookingIds = $booking->reservationGroup?->bookings->pluck('id')->all() ?? [$booking->getKey()];
 
         return view('player.bookings.show', [
             'booking' => $booking,
@@ -323,13 +444,13 @@ class BookingController extends Controller
             'loyaltyStampEarned' => ! $loyaltyRefundBlocked
                 && $booking->status === BookingStatus::Confirmed
                 && $booking->payment_status === PaymentStatus::Paid
-                && DB::table('loyalty_stamps')->where('booking_id', $booking->getKey())->whereNull('reversed_at')->exists(),
+                && DB::table('loyalty_stamps')->whereIn('booking_id', $groupBookingIds)->whereNull('reversed_at')->exists(),
             'loyaltyRewardDiscount' => DB::table('loyalty_redemptions')->where('booking_id', $booking->getKey())->value('court_discount_amount'),
             'canReview' => $request->user()->can('create', [VenueReview::class, $booking]),
             'shareUrl' => URL::signedRoute('bookings.share', $booking->reference),
             'hostedCheckoutAvailable' => $provider?->supportsHostedCheckout() ?? false,
             'refundPolicy' => [
-                'can_request' => $refundEligibility->canRequest($booking, $booking->payment),
+                'can_request' => $booking->reservation_group_id === null && $refundEligibility->canRequest($booking, $payment),
                 'cutoff_hours' => $refundEligibility->cutoffHours(),
                 'grace_minutes' => $refundEligibility->graceMinutes(),
                 'is_using_grace' => $refundEligibility->isUsingGrace($booking, $booking->payment),
@@ -371,7 +492,7 @@ class BookingController extends Controller
     ): RedirectResponse {
         $booking = $this->playerBooking($request, $reference);
         Gate::authorize('viewAsPlayer', $booking);
-        $payment = $booking->payment;
+        $payment = $booking->payment ?? $booking->reservationGroup?->payments->first();
         $result = null;
 
         if ($payment?->status === PaymentStatus::Pending && $payment->provider_reference !== null) {
@@ -460,11 +581,31 @@ class BookingController extends Controller
         ];
     }
 
+    /** @return array<string, mixed> */
+    private function multiSelectionRules(string $dateKey = 'resources.*.date'): array
+    {
+        return [
+            'resources' => ['required', 'array', 'min:2', 'max:6'],
+            'resources.*.resource_id' => ['required', 'integer'],
+            $dateKey => ['required', 'date_format:Y-m-d'],
+            'resources.*.start_time' => ['required', 'date_format:H:i'],
+            'resources.*.duration_minutes' => ['required', 'integer', 'between:15,'.config('booking.maximum_player_booking_minutes')],
+            'resources.*.campaign' => ['nullable', 'string', 'max:40'],
+        ];
+    }
+
     private function endTime(string $startTime, int $duration): string
     {
         return CarbonImmutable::createFromFormat('!H:i', $startTime)
             ->addMinutes($duration)
             ->format('H:i');
+    }
+
+    private function moneyToCents(string $amount): int
+    {
+        [$whole, $fraction] = array_pad(explode('.', $amount, 2), 2, '0');
+
+        return ((int) $whole * 100) + (int) str_pad(substr($fraction, 0, 2), 2, '0');
     }
 
     /** @return array<int, string> */
@@ -502,6 +643,11 @@ class BookingController extends Controller
                 'payment.refundRequest',
                 'payment.refundRequest.courtClosure:id,reason',
                 'review:id,booking_id,rating,body,status,moderation_note,created_at,published_at',
+                'reservationGroup:id,reference,status,expires_at',
+                'reservationGroup.payments:payments.id,payments.reservation_group_id,payments.booking_id,payments.reference,payments.provider,payments.provider_reference,payments.provider_payment_reference,payments.status,payments.mode,payments.amount,payments.venue_amount,payments.platform_service_fee_amount,payments.refunded_amount,payments.currency,payments.requires_review,payments.review_reason,payments.paid_at,payments.refunded_at',
+                'reservationGroup.bookings:id,reservation_group_id,venue_id,resource_id,reference,status,payment_status,start_at,end_at,timezone,total_amount,player_total_amount,currency',
+                'reservationGroup.bookings.resource:id,name,sport_id',
+                'reservationGroup.bookings.resource.sport:id,name,slug',
             ])
             ->firstOrFail();
     }

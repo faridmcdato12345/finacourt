@@ -76,25 +76,28 @@ class VenueController extends Controller
         // the UI; the resulting full window is revalidated when the hold is made.
         $duration = $resource->booking_increment_minutes;
         $availability = null;
+        $availabilityGrid = collect();
+        $gridAvailability = null;
         $availabilityError = null;
 
-        try {
-            $availability = $availabilityService->slots($resource, $date, $duration);
-            $analytics->recordAvailabilityView($request, $venue, $resource, $date);
+        foreach ($venue->resources as $gridResource) {
+            $gridResource->setRelation('venue', $venue);
 
-            if ($campaignPromotion !== null || ! isset($validated['campaign'])) {
-                $availability['slots'] = $availability['slots']->map(function (array $slot) use (
+            try {
+                $gridDuration = $gridResource->booking_increment_minutes;
+                $resourceAvailability = $availabilityService->slots($gridResource, $date, $gridDuration);
+                $resourceAvailability['slots'] = $resourceAvailability['slots']->map(function (array $slot) use (
                     $availabilityService,
                     $campaignPromotion,
                     $date,
                     $promotionApplicability,
                     $promotions,
                     $prices,
-                    $resource,
+                    $gridResource,
                 ): array {
                     $slotDate = $slot['booking_date'] ?? $date;
                     $window = $availabilityService->window(
-                        $resource,
+                        $gridResource,
                         $slotDate,
                         $slot['start_time'],
                         $slot['end_time'],
@@ -103,24 +106,37 @@ class VenueController extends Controller
                     $promotion = $campaignPromotion;
 
                     if ($promotion === null) {
-                        $promotion = $promotionApplicability->bestDiscount($promotions, $resource, $window);
-                    } elseif (! $promotion->appliesTo($resource, $window->localStart, $window->localEnd)) {
+                        $promotion = $promotionApplicability->bestDiscount($promotions, $gridResource, $window);
+                    } elseif (! $promotion->appliesTo($gridResource, $window->localStart, $window->localEnd)) {
                         $promotion = null;
                     }
 
                     $slot['campaign'] = $promotion?->campaign_token;
                     $slot['promotion_offer'] = $promotion?->offerLabel();
-                    $price = $prices->quote($resource, $window->durationMinutes, $promotion, $window);
+                    $price = $prices->quote($gridResource, $window->durationMinutes, $promotion, $window);
                     $slot['unit_price'] = $price['unit_price'];
+                    $slot['original_total_amount'] = $price['original_total_amount'];
                     $slot['total_amount'] = $price['total_amount'];
+                    $slot['discount_amount'] = $price['discount_amount'];
                     $slot['has_time_based_price'] = $price['pricing_rule_snapshot'] !== null;
 
                     return $slot;
                 });
+                $availabilityGrid->put($gridResource->getKey(), $resourceAvailability);
+
+                if ($gridResource->is($resource)) {
+                    $availability = $resourceAvailability;
+                    $analytics->recordAvailabilityView($request, $venue, $resource, $date);
+                }
+            } catch (ValidationException $exception) {
+                if ($gridResource->is($resource)) {
+                    $availabilityError = collect($exception->errors())->flatten()->first();
+                }
             }
-        } catch (ValidationException $exception) {
-            $availabilityError = collect($exception->errors())->flatten()->first();
         }
+
+        $gridAvailability = $availabilityGrid->get($resource->getKey())
+            ?? $availabilityGrid->first();
 
         $canonical = route('marketplace.venues.show', $venue->slug);
         $cityName = $venue->publicCitySeoName();
@@ -134,6 +150,8 @@ class VenueController extends Controller
             'venue' => $venue,
             'selectedResource' => $resource,
             'availability' => $availability,
+            'availabilityGrid' => $availabilityGrid,
+            'gridAvailability' => $gridAvailability,
             'availabilityError' => $availabilityError,
             'availabilityDate' => $date,
             'availabilityDuration' => $duration,

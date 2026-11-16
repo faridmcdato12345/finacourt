@@ -11,6 +11,8 @@ Artisan::command('inspire', function () {
 Schedule::command('bookings:send-reminders')->hourly()->withoutOverlapping();
 Schedule::command('refunds:reconcile-processing')->everyTenMinutes()->withoutOverlapping();
 Schedule::command('loyalty:sync-stamps')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('customer-offers:release-expired')->everyTenMinutes()->withoutOverlapping();
+Schedule::command('reactivation:process-automations')->hourly()->withoutOverlapping();
 Schedule::command('outreach:sync-google-sheet')->hourly()->withoutOverlapping();
 $outreachSchedule = Schedule::command('outreach:process')
     ->hourly()

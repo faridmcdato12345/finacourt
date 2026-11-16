@@ -20,6 +20,7 @@ use App\Tenancy\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -35,6 +36,9 @@ class BookingController extends Controller
         $date = $validated['date'] ?? CarbonImmutable::now($timezone)->toDateString();
         $localStart = CarbonImmutable::createFromFormat('!Y-m-d', $date, $timezone)->startOfDay();
         $localEnd = $localStart->addDay();
+        $calendarMonth = $localStart->startOfMonth();
+        $calendarStart = $calendarMonth->startOfWeek();
+        $calendarEnd = $calendarStart->addWeeks(6);
 
         $bookings = $organization->bookings()
             ->with([
@@ -88,12 +92,35 @@ class BookingController extends Controller
             ->get()
             ->map(fn (CourtAvailabilityBlock $block) => $this->courtBlockPayload($block));
 
+        $calendarBookings = $organization->bookings()
+            ->select(['id', 'start_at', 'status'])
+            ->where('start_at', '>=', $calendarStart->utc())
+            ->where('start_at', '<', $calendarEnd->utc())
+            ->get();
+
+        $calendarBlocks = $organization->availabilityBlocks()
+            ->active()
+            ->select(['id', 'starts_at', 'ends_at', 'is_all_day', 'timezone'])
+            ->where('starts_at', '<', $calendarEnd->utc())
+            ->where(fn ($query) => $query
+                ->whereNull('ends_at')
+                ->orWhere('ends_at', '>', $calendarStart->utc()))
+            ->get();
+
         return Inertia::render('Owner/Bookings/Index', [
             'date' => $date,
             'timezone' => $timezone,
             'bookings' => $bookings,
             'refundBookings' => $refundBookings,
             'courtBlocks' => $courtBlocks,
+            'calendar' => $this->calendarPayload(
+                $calendarMonth,
+                $calendarStart,
+                $calendarBookings,
+                $calendarBlocks,
+                $date,
+                $timezone,
+            ),
         ]);
     }
 
@@ -264,6 +291,88 @@ class BookingController extends Controller
             'closure_reference' => $block->closure?->reference,
             'can_remove' => $block->court_closure_id === null
                 && ($block->ends_at === null || $block->ends_at->isFuture()),
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Booking>  $bookings
+     * @param  Collection<int, CourtAvailabilityBlock>  $blocks
+     * @return array<string, mixed>
+     */
+    private function calendarPayload(
+        CarbonImmutable $month,
+        CarbonImmutable $calendarStart,
+        Collection $bookings,
+        Collection $blocks,
+        string $selectedDate,
+        string $timezone,
+    ): array {
+        $days = collect(range(0, 41))->mapWithKeys(function (int $offset) use ($calendarStart): array {
+            $day = $calendarStart->addDays($offset);
+
+            return [$day->toDateString() => [
+                'booking_count' => 0,
+                'confirmed_count' => 0,
+                'hold_count' => 0,
+                'block_count' => 0,
+            ]];
+        });
+
+        foreach ($bookings as $booking) {
+            $key = $booking->start_at->setTimezone($timezone)->toDateString();
+            if (! $days->has($key)) {
+                continue;
+            }
+
+            $day = $days->get($key);
+            $day['booking_count']++;
+            if ($booking->status === BookingStatus::Confirmed) {
+                $day['confirmed_count']++;
+            }
+            if ($booking->status === BookingStatus::Hold) {
+                $day['hold_count']++;
+            }
+            $days->put($key, $day);
+        }
+
+        $calendarEnd = $calendarStart->addWeeks(6);
+        foreach ($blocks as $block) {
+            $blockStart = $block->starts_at->setTimezone($block->timezone)->startOfDay();
+            $blockEnd = $block->ends_at?->setTimezone($block->timezone)->startOfDay()->addDay() ?? $calendarEnd;
+            $cursor = $blockStart->greaterThan($calendarStart) ? $blockStart : $calendarStart;
+            $end = $blockEnd->lessThan($calendarEnd) ? $blockEnd : $calendarEnd;
+
+            while ($cursor->lessThan($end)) {
+                $key = $cursor->toDateString();
+                $day = $days->get($key);
+                $day['block_count']++;
+                $days->put($key, $day);
+                $cursor = $cursor->addDay();
+            }
+        }
+
+        $today = CarbonImmutable::now($timezone)->toDateString();
+
+        return [
+            'label' => $month->format('F Y'),
+            'today_date' => $today,
+            'previous_date' => $month->subMonth()->toDateString(),
+            'next_date' => $month->addMonth()->toDateString(),
+            'weeks' => collect(range(0, 5))->map(function (int $week) use ($calendarStart, $days, $month, $selectedDate, $today): array {
+                return collect(range(0, 6))->map(function (int $weekday) use ($calendarStart, $days, $month, $selectedDate, $today, $week): array {
+                    $day = $calendarStart->addDays(($week * 7) + $weekday);
+                    $counts = $days->get($day->toDateString());
+
+                    return [
+                        'date' => $day->toDateString(),
+                        'day' => $day->day,
+                        'is_current_month' => $day->isSameMonth($month),
+                        'is_selected' => $day->toDateString() === $selectedDate,
+                        'is_today' => $day->toDateString() === $today,
+                        ...$counts,
+                    ];
+                })->all();
+            })->all(),
         ];
     }
 }

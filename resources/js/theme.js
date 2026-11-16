@@ -29,7 +29,7 @@ export function savedTheme(storage = availableStorage()) {
 }
 
 export function preferredTheme(storage = availableStorage()) {
-    return savedTheme(storage) || LIGHT_THEME;
+    return savedTheme(storage) || DARK_THEME;
 }
 
 function updateThemeControls(theme, documentRef) {
@@ -47,9 +47,9 @@ function updateThemeControls(theme, documentRef) {
 }
 
 export function applyTheme(theme, documentRef = globalThis.document) {
-    if (!documentRef?.documentElement) return isTheme(theme) ? theme : LIGHT_THEME;
+    if (!documentRef?.documentElement) return isTheme(theme) ? theme : DARK_THEME;
 
-    const nextTheme = isTheme(theme) ? theme : LIGHT_THEME;
+    const nextTheme = isTheme(theme) ? theme : DARK_THEME;
     const root = documentRef.documentElement;
     root.dataset.theme = nextTheme;
     root.style.colorScheme = nextTheme;

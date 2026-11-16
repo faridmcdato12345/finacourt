@@ -3,15 +3,21 @@
 namespace Tests\Feature;
 
 use App\CustomerReactivation\CustomerClassifier;
+use App\CustomerReactivation\ProcessAutomatedReactivationCampaigns;
 use App\CustomerReactivation\ReactivationReport;
+use App\CustomerOffers\CustomerOfferService;
+use App\Listeners\RecordReactivationDeliveryFailure;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
+use App\Enums\CustomerOfferDiscountType;
+use App\Enums\CustomerOfferStatus;
 use App\Enums\CustomerLifecycle;
 use App\Enums\PaymentStatus;
 use App\Enums\ReactivationCampaignStatus;
 use App\Enums\ReactivationSegment;
 use App\Models\Booking;
 use App\Models\CourtResource;
+use App\Models\CustomerOfferCampaign;
 use App\Models\MarketingPreference;
 use App\Models\Membership;
 use App\Models\OperatingHour;
@@ -297,6 +303,235 @@ class CustomerReactivationTest extends TestCase
         $report = app(ReactivationReport::class)->forOrganization($organization);
         $this->assertSame(0, $report['resulting_bookings']);
         $this->assertSame('0.00', $report['resulting_revenue']);
+    }
+
+    public function test_automated_campaign_uses_venue_local_inactivity_boundaries_and_never_duplicates_a_cycle(): void
+    {
+        $now = now('UTC')->startOfMinute();
+        $this->travelTo($now);
+        [$organization, $venue, $resource, $owner, $sport] = $this->inventory('automated-boundaries');
+        $otherVenue = Venue::factory()->published()->for($organization)->create();
+        $otherResource = CourtResource::factory()->for($otherVenue)->for($sport)->create();
+        $players = collect([5, 14, 30, 35, 60])->mapWithKeys(function (int $days) use ($organization, $venue, $resource, $now): array {
+            $player = User::factory()->create();
+            MarketingPreference::factory()->optedIn()->for($player)->create();
+            $this->completedBooking($organization, $venue, $resource, $player, $now->copy()->subDays($days));
+
+            return [$days => $player];
+        });
+        // A recent booking at another venue does not make this player active at
+        // the venue that is running the win-back campaign.
+        $this->completedBooking($organization, $otherVenue, $otherResource, $players[35], $now->copy()->subDay());
+        // A current/future booking at the campaign venue does suppress contact.
+        Booking::factory()->for($resource, 'resource')->create([
+            'organization_id' => $organization->getKey(),
+            'venue_id' => $venue->getKey(),
+            'player_user_id' => $players[60]->getKey(),
+            'status' => BookingStatus::Confirmed,
+            'source' => BookingSource::Marketplace,
+            'payment_status' => PaymentStatus::Paid,
+            'start_at' => $now->copy()->addDay(),
+            'end_at' => $now->copy()->addDay()->addHour(),
+        ]);
+        $campaign = $this->campaign($organization, $venue, $owner, $sport, 'Automatic return');
+        $campaign->update([
+            'delivery_mode' => 'automated',
+            'automation_enabled' => true,
+            'inactivity_days' => 30,
+            'status' => ReactivationCampaignStatus::Active,
+        ]);
+        $offerCampaign = CustomerOfferCampaign::query()->create([
+            'organization_id' => $organization->getKey(),
+            'venue_id' => $venue->getKey(),
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'name' => 'Automatic return offer',
+            'discount_type' => CustomerOfferDiscountType::Fixed,
+            'discount_value' => '100.00',
+            'valid_days' => 14,
+            'is_active' => true,
+        ]);
+
+        $this->assertSame(2, app(ProcessAutomatedReactivationCampaigns::class)->handle());
+        $this->assertSame(0, app(ProcessAutomatedReactivationCampaigns::class)->handle());
+
+        $this->assertDatabaseCount('reactivation_campaign_recipients', 2);
+        $this->assertDatabaseHas('reactivation_campaign_recipients', [
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'user_id' => $players[30]->getKey(),
+        ]);
+        $this->assertDatabaseHas('reactivation_campaign_recipients', [
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'user_id' => $players[35]->getKey(),
+        ]);
+        $this->assertDatabaseMissing('reactivation_campaign_recipients', [
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'user_id' => $players[5]->getKey(),
+        ]);
+        $this->assertDatabaseMissing('reactivation_campaign_recipients', [
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'user_id' => $players[14]->getKey(),
+        ]);
+        $this->assertDatabaseMissing('reactivation_campaign_recipients', [
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'user_id' => $players[60]->getKey(),
+        ]);
+        $this->assertSame(2, $offerCampaign->offers()->count());
+        $this->assertSame(2, $campaign->refresh()->sent_count);
+        $this->assertSame(2, $campaign->refresh()->delivered_count);
+    }
+
+    public function test_automated_campaign_respects_marketing_consent_and_contact_cooldowns_before_issuing_offers(): void
+    {
+        $now = now('UTC')->startOfMinute();
+        $this->travelTo($now);
+        [$organization, $venue, $resource, $owner, $sport] = $this->inventory('automated-consent');
+        $eligible = User::factory()->create();
+        $optedOut = User::factory()->create();
+        $cooldown = User::factory()->create();
+        foreach ([$eligible, $optedOut, $cooldown] as $player) {
+            $this->completedBooking($organization, $venue, $resource, $player, $now->copy()->subDays(35));
+        }
+        MarketingPreference::factory()->optedIn()->for($eligible)->create();
+        MarketingPreference::factory()->optedOut()->for($optedOut)->create();
+        MarketingPreference::factory()->optedIn()->for($cooldown)->create();
+        $previous = $this->campaign($organization, $venue, $owner, $sport, 'Previous contact');
+        $previous->update(['status' => ReactivationCampaignStatus::Sent]);
+        $previous->recipients()->create([
+            'user_id' => $cooldown->getKey(),
+            'click_token' => str_repeat('c', 40),
+            'lifecycle' => CustomerLifecycle::Inactive,
+            'last_booking_at' => $now->copy()->subDays(35),
+            'sent_at' => $now->copy()->subDay(),
+        ]);
+        $campaign = $this->campaign($organization, $venue, $owner, $sport, 'Consent check');
+        $campaign->update([
+            'delivery_mode' => 'automated',
+            'automation_enabled' => true,
+            'inactivity_days' => 30,
+            'status' => ReactivationCampaignStatus::Active,
+        ]);
+        $offerCampaign = CustomerOfferCampaign::query()->create([
+            'organization_id' => $organization->getKey(),
+            'venue_id' => $venue->getKey(),
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'name' => 'Consent offer',
+            'discount_type' => CustomerOfferDiscountType::Percentage,
+            'discount_value' => '10.00',
+            'minimum_spend' => '500.00',
+            'valid_days' => 7,
+            'is_active' => true,
+        ]);
+
+        $this->assertSame(3, app(ProcessAutomatedReactivationCampaigns::class)->handle());
+
+        $this->assertSame(1, $offerCampaign->offers()->count());
+        $this->assertDatabaseHas('reactivation_campaign_recipients', [
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'user_id' => $optedOut->getKey(),
+            'suppression_reason' => 'marketing_opt_out',
+        ]);
+        $this->assertDatabaseHas('reactivation_campaign_recipients', [
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'user_id' => $cooldown->getKey(),
+            'suppression_reason' => 'frequency_cooldown',
+        ]);
+        $this->assertSame(1, $campaign->refresh()->sent_count);
+        $this->assertSame(2, $campaign->refresh()->suppressed_count);
+    }
+
+    public function test_automation_pause_prevents_new_recipients_offers_and_notifications(): void
+    {
+        [$organization, $venue, $resource, $owner, $sport] = $this->inventory('automation-paused');
+        $player = User::factory()->create();
+        $this->completedBooking($organization, $venue, $resource, $player, now()->subDays(35));
+        MarketingPreference::factory()->optedIn()->for($player)->create();
+        $campaign = $this->campaign($organization, $venue, $owner, $sport);
+        $campaign->update([
+            'delivery_mode' => 'automated',
+            'automation_enabled' => false,
+            'inactivity_days' => 30,
+            'status' => ReactivationCampaignStatus::Active,
+        ]);
+
+        $this->assertSame(0, app(ProcessAutomatedReactivationCampaigns::class)->handle());
+        $this->assertDatabaseCount('reactivation_campaign_recipients', 0);
+    }
+
+    public function test_delivery_failure_is_idempotently_recorded_and_revokes_an_undelivered_private_offer(): void
+    {
+        [$organization, $venue, $resource, $owner, $sport] = $this->inventory('automation-delivery-failure');
+        $player = User::factory()->create();
+        $this->completedBooking($organization, $venue, $resource, $player, now()->subDays(35));
+        $campaign = $this->campaign($organization, $venue, $owner, $sport);
+        $offerCampaign = CustomerOfferCampaign::query()->create([
+            'organization_id' => $organization->getKey(),
+            'venue_id' => $venue->getKey(),
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'name' => 'Delivery failure offer',
+            'discount_type' => CustomerOfferDiscountType::Fixed,
+            'discount_value' => '100.00',
+            'valid_days' => 7,
+            'is_active' => true,
+        ]);
+        $recipient = $campaign->recipients()->create([
+            'user_id' => $player->getKey(),
+            'click_token' => str_repeat('f', 40),
+            'lifecycle' => CustomerLifecycle::Inactive,
+            'last_booking_at' => now()->subDays(35),
+            'sent_at' => now(),
+        ]);
+        $offer = app(CustomerOfferService::class)->issue($offerCampaign, $player, $recipient->getKey());
+
+        app(RecordReactivationDeliveryFailure::class)->handle($recipient->getKey());
+        app(RecordReactivationDeliveryFailure::class)->handle($recipient->getKey());
+
+        $this->assertNotNull($recipient->refresh()->delivery_failed_at);
+        $this->assertSame(1, $campaign->refresh()->failed_count);
+        $this->assertSame(CustomerOfferStatus::Revoked, $offer->refresh()->status);
+    }
+
+    public function test_analytics_reports_issued_redeemed_offers_discount_and_revenue_for_the_owning_tenant_only(): void
+    {
+        [$organization, $venue, $resource, $owner, $sport] = $this->inventory('offer-analytics');
+        $campaign = $this->campaign($organization, $venue, $owner, $sport);
+        $offerCampaign = CustomerOfferCampaign::query()->create([
+            'organization_id' => $organization->getKey(),
+            'venue_id' => $venue->getKey(),
+            'reactivation_campaign_id' => $campaign->getKey(),
+            'name' => 'Analytics offer',
+            'discount_type' => CustomerOfferDiscountType::Fixed,
+            'discount_value' => '100.00',
+            'valid_days' => 7,
+            'is_active' => true,
+        ]);
+        $player = User::factory()->create();
+        $offer = app(CustomerOfferService::class)->issue($offerCampaign, $player);
+        $offer->update(['status' => CustomerOfferStatus::Redeemed, 'redeemed_at' => now()]);
+        Booking::factory()->for($resource, 'resource')->create([
+            'organization_id' => $organization->getKey(),
+            'venue_id' => $venue->getKey(),
+            'player_user_id' => $player->getKey(),
+            'status' => BookingStatus::Confirmed,
+            'payment_status' => PaymentStatus::Paid,
+            'customer_offer_id' => $offer->getKey(),
+            'customer_offer_campaign_id' => $offerCampaign->getKey(),
+            'customer_offer_discount_amount' => '100.00',
+            'total_amount' => '900.00',
+        ]);
+        [$otherOrganization, $otherVenue, $otherResource] = $this->inventory('offer-analytics-other');
+        Booking::factory()->for($otherResource, 'resource')->create([
+            'organization_id' => $otherOrganization->getKey(),
+            'venue_id' => $otherVenue->getKey(),
+            'status' => BookingStatus::Confirmed,
+            'payment_status' => PaymentStatus::Paid,
+            'total_amount' => '9999.00',
+        ]);
+
+        $report = app(ReactivationReport::class)->forOrganization($organization);
+        $this->assertSame(1, $report['offers_issued']);
+        $this->assertSame(1, $report['offers_redeemed']);
+        $this->assertSame('100.00', $report['offer_discounts_granted']);
+        $this->assertSame('900.00', $report['offer_revenue']);
     }
 
     public function test_player_can_explicitly_opt_in_and_unsubscribe_without_affecting_booking_notices(): void

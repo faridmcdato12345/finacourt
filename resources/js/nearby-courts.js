@@ -81,11 +81,20 @@ export function initNearbyCourtSearch(
         const button = element.querySelector('[data-use-current-location]');
         const latitudeInput = element.querySelector('[data-nearby-latitude]');
         const longitudeInput = element.querySelector('[data-nearby-longitude]');
-        const radiusInput = element.querySelector('[data-nearby-radius]');
+        const radiusControl = element.querySelector('[data-nearby-radius]');
         const status = element.querySelector('[data-nearby-status]');
         const clearButton = element.querySelector('[data-clear-current-location]');
 
-        if (!form || !button || !latitudeInput || !longitudeInput || !radiusInput || !status) return;
+        if (!form || !button || !latitudeInput || !longitudeInput || !radiusControl || !status) return;
+
+        const radiusIsland = radiusControl.querySelector('[data-public-select]');
+        const fallbackRadiusInput = radiusControl.querySelector('select');
+        const setRadiusDisabled = (disabled) => {
+            fallbackRadiusInput?.toggleAttribute('disabled', disabled);
+            radiusIsland?.dispatchEvent(new CustomEvent('public-select:set-disabled', {
+                detail: { disabled },
+            }));
+        };
 
         const hasCoordinates = Boolean(latitudeInput.value && longitudeInput.value);
         let locating = false;
@@ -106,7 +115,7 @@ export function initNearbyCourtSearch(
 
                 latitudeInput.value = coordinates.latitude;
                 longitudeInput.value = coordinates.longitude;
-                radiusInput.disabled = false;
+                setRadiusDisabled(false);
                 status.textContent = 'Location found. Sorting the nearest courts…';
                 if (remember) savePreference(storage, true);
                 form.requestSubmit();
@@ -123,7 +132,7 @@ export function initNearbyCourtSearch(
             savePreference(storage, false);
             latitudeInput.value = '';
             longitudeInput.value = '';
-            radiusInput.disabled = true;
+            setRadiusDisabled(true);
             status.textContent = 'Nearby search removed. Showing courts from every location…';
             form.requestSubmit();
         });
