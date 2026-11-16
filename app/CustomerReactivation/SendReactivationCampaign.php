@@ -2,6 +2,7 @@
 
 namespace App\CustomerReactivation;
 
+use App\CustomerOffers\CustomerOfferService;
 use App\Enums\ReactivationCampaignStatus;
 use App\Models\ReactivationCampaign;
 use App\Models\ReactivationCampaignRecipient;
@@ -16,6 +17,7 @@ class SendReactivationCampaign
         private readonly CustomerBookingHistory $history,
         private readonly CustomerClassifier $classifier,
         private readonly RebookingSuggestion $suggestions,
+        private readonly CustomerOfferService $offers,
     ) {}
 
     public function handle(ReactivationCampaign $campaign): ReactivationCampaign
@@ -32,7 +34,7 @@ class SendReactivationCampaign
                 ]);
             }
 
-            $campaign->loadMissing(['organization', 'venue']);
+            $campaign->loadMissing(['organization', 'venue', 'offerCampaign']);
             $audience = $this->history->audience($campaign);
             $sent = 0;
             $suppressed = 0;
@@ -48,7 +50,7 @@ class SendReactivationCampaign
                     continue;
                 }
 
-                ReactivationCampaignRecipient::query()->create([
+                $recipient = ReactivationCampaignRecipient::query()->create([
                     'reactivation_campaign_id' => $campaign->getKey(),
                     'user_id' => $user->getKey(),
                     'suggested_resource_id' => $suggestion['resource_id'] ?? null,
@@ -62,6 +64,10 @@ class SendReactivationCampaign
                     'suppressed_at' => $reason === null ? null : now('UTC'),
                     'suppression_reason' => $reason,
                 ]);
+
+                if ($reason === null && $campaign->offerCampaign !== null) {
+                    $this->offers->issue($campaign->offerCampaign, $user, $recipient->getKey());
+                }
 
                 $reason === null ? $sent++ : $suppressed++;
             }
@@ -95,8 +101,44 @@ class SendReactivationCampaign
      */
     public function preview(ReactivationCampaign $campaign): array
     {
-        $campaign->loadMissing(['organization', 'venue']);
-        $audience = $this->history->audience($campaign);
+        $campaign->loadMissing(['organization', 'venue', 'offerCampaign']);
+        return $this->previewAudience($campaign, $this->history->audience($campaign));
+    }
+
+    /**
+     * Estimated delivery audience for an automated, venue-local campaign.
+     * This is deliberately read-only: it does not create recipients, offers,
+     * or delivery attempts.
+     *
+     * @return array{
+     *     audience: int,
+     *     eligible: int,
+     *     email: int,
+     *     in_app: int,
+     *     suppressed: int,
+     *     suppression_reasons: array{marketing_opt_out: int, frequency_cooldown: int}
+     * }
+     */
+    public function previewAutomated(ReactivationCampaign $campaign): array
+    {
+        $campaign->loadMissing(['organization', 'venue', 'offerCampaign']);
+
+        return $this->previewAudience($campaign, $this->history->automatedAudience($campaign));
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, array{user: User, last_booking_at: mixed}> $audience
+     * @return array{
+     *     audience: int,
+     *     eligible: int,
+     *     email: int,
+     *     in_app: int,
+     *     suppressed: int,
+     *     suppression_reasons: array{marketing_opt_out: int, frequency_cooldown: int}
+     * }
+     */
+    private function previewAudience(ReactivationCampaign $campaign, \Illuminate\Support\Collection $audience): array
+    {
         $summary = [
             'audience' => $audience->count(),
             'eligible' => 0,
@@ -129,7 +171,7 @@ class SendReactivationCampaign
         return $summary;
     }
 
-    private function suppressionReason(ReactivationCampaign $campaign, User $user): ?string
+    public function suppressionReason(ReactivationCampaign $campaign, User $user): ?string
     {
         if (! $user->marketingPreference?->hasEnabledMarketingChannel()) {
             return 'marketing_opt_out';

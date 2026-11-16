@@ -5,6 +5,7 @@ namespace App\Notifications;
 use App\Models\ReactivationCampaignRecipient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -17,6 +18,26 @@ class ReactivationNotification extends Notification implements ShouldQueue
     public function __construct(private readonly ReactivationCampaignRecipient $recipient)
     {
         $this->onQueue('emails')->afterCommit();
+    }
+
+    public function recipientId(): int
+    {
+        return $this->recipient->getKey();
+    }
+
+    /**
+     * Laravel invokes this after the queued notification has exhausted its
+     * retry policy. A single successful channel is recorded separately by the
+     * NotificationSent listener, so the failure handler remains idempotent.
+     */
+    public function failed(\Throwable $exception): void
+    {
+        Log::warning('Customer reactivation notification failed after retries.', [
+            'recipient_id' => $this->recipientId(),
+            'exception' => $exception::class,
+        ]);
+
+        app(\App\Listeners\RecordReactivationDeliveryFailure::class)->handle($this->recipientId());
     }
 
     /** @return array<int, string> */
@@ -42,7 +63,7 @@ class ReactivationNotification extends Notification implements ShouldQueue
         return [
             'kind' => 'customer_reactivation',
             'title' => $this->recipient->campaign->title,
-            'message' => $this->recipient->campaign->message,
+            'message' => $this->messageFor($notifiable),
             'url' => route('player.reactivation.click', $this->recipient->click_token),
             'campaign_token' => $this->recipient->campaign->campaign_token,
         ];
@@ -52,11 +73,12 @@ class ReactivationNotification extends Notification implements ShouldQueue
     {
         $campaign = $this->recipient->campaign;
         $venue = $campaign->venue;
+        $offer = $this->recipient->customerOffer;
         $url = route('player.reactivation.click', $this->recipient->click_token);
         $viewData = [
             'playerName' => $notifiable->name,
             'campaignTitle' => $campaign->title,
-            'campaignMessage' => $campaign->message,
+            'campaignMessage' => $this->messageFor($notifiable),
             'venueName' => $venue->name,
             'ctaUrl' => $url,
             'preferencesUrl' => route('player.preferences.edit'),
@@ -64,6 +86,9 @@ class ReactivationNotification extends Notification implements ShouldQueue
             'suggestedCourt' => $this->recipient->suggestedResource?->name,
             'suggestedDate' => $this->recipient->suggested_date?->format('D, M j'),
             'suggestedTime' => $this->formatSuggestedTime(),
+            'offerLabel' => $offer?->campaign?->label(),
+            'offerExpiration' => $offer?->expires_at?->setTimezone($venue->organization->timezone)->format('M j, Y'),
+            'offerMinimumSpend' => $offer?->minimum_spend,
         ];
 
         return (new MailMessage)
@@ -87,5 +112,20 @@ class ReactivationNotification extends Notification implements ShouldQueue
         );
 
         return $time?->format('g:i A');
+    }
+
+    private function messageFor(object $notifiable): string
+    {
+        $offer = $this->recipient->customerOffer;
+        $venue = $this->recipient->campaign->venue;
+        $replacements = [
+            '{{customer_name}}' => (string) $notifiable->name,
+            '{{venue_name}}' => $venue->name,
+            '{{offer_amount}}' => $offer?->campaign?->label() ?? '',
+            '{{offer_expiration}}' => $offer?->expires_at?->setTimezone($venue->organization->timezone)->format('M j, Y') ?? '',
+            '{{booking_link}}' => route('player.reactivation.click', $this->recipient->click_token),
+        ];
+
+        return strtr($this->recipient->campaign->message, $replacements);
     }
 }
