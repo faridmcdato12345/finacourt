@@ -35,6 +35,21 @@
                             <p style="margin:12px 0 0;font-size:16px;line-height:1.6;color:#5c7282;">It has been a little while since your last game at <strong style="color:#123247;">{{ $venueName }}</strong>. Your next court is ready when you are.</p>
                         </td>
                     </tr>
+                    @if ($offerLabel)
+                        <tr>
+                            <td style="padding:10px 32px 6px;">
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#fff7df;border:1px solid #f6cf65;border-radius:16px;">
+                                    <tr>
+                                        <td style="padding:18px 20px;">
+                                            <p style="margin:0;font-size:11px;font-weight:800;letter-spacing:1.4px;color:#9a5700;">YOUR EXCLUSIVE WELCOME-BACK OFFER</p>
+                                            <p style="margin:7px 0 0;font-size:22px;font-weight:800;color:#123247;">{{ $offerLabel }}</p>
+                                            <p style="margin:6px 0 0;font-size:13px;line-height:1.55;color:#73551f;">Valid through {{ $offerExpiration }}@if ($offerMinimumSpend), on court bookings of at least ₱{{ number_format((float) $offerMinimumSpend, 2) }}@endif. It is saved to your FinACourt account and applies automatically when it is the best eligible discount.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    @endif
                     @if ($suggestedCourt || $suggestedDate || $suggestedTime)
                         <tr>
                             <td style="padding:16px 32px 6px;">
@@ -54,7 +69,7 @@
                     @endif
                     <tr>
                         <td align="center" style="padding:24px 32px 34px;">
-                            <a href="{{ $ctaUrl }}" style="display:inline-block;padding:15px 25px;border-radius:12px;background:#fd7d02;color:#082f49;font-size:16px;font-weight:800;text-decoration:none;box-shadow:0 8px 20px rgba(3,105,161,.16);">Find my next game&nbsp; →</a>
+                            <a href="{{ $ctaUrl }}" style="display:inline-block;padding:15px 25px;border-radius:12px;background:#fd7d02;color:#082f49;font-size:16px;font-weight:800;text-decoration:none;box-shadow:0 8px 20px rgba(3,105,161,.16);">{{ $offerLabel ? 'Use my exclusive offer' : 'Find my next game' }}&nbsp; →</a>
                             <p style="margin:14px 0 0;font-size:12px;line-height:1.5;color:#7b91a0;">Open FinACourt to see current courts, times, and prices.</p>
                         </td>
                     </tr>

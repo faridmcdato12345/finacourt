@@ -6,6 +6,7 @@ use App\Google\BusinessProfile\Contracts\GoogleBusinessProfileClient;
 use App\Google\BusinessProfile\GoogleBusinessProfileHttpClient;
 use App\Google\BusinessProfile\NullGoogleBusinessProfileClient;
 use App\Models\Booking;
+use App\Listeners\RecordReactivationDelivery;
 use App\Models\CourtResource;
 use App\Models\Organization;
 use App\Models\Promotion;
@@ -37,6 +38,7 @@ use App\Visibility\StoredBusinessProfileGateway;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -100,6 +102,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Event::listen(NotificationSent::class, RecordReactivationDelivery::class);
         Event::listen(function (SocialiteWasCalled $event): void {
             $event->extendSocialite('apple', AppleProvider::class);
         });

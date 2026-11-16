@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Player;
 
 use App\Analytics\AnalyticsRecorder;
 use App\Analytics\TrafficAttribution;
+use App\CustomerOffers\CustomerOfferService;
 use App\Bookings\AvailabilityService;
 use App\Bookings\BookingPrice;
 use App\Bookings\CancelBooking;
@@ -55,6 +56,7 @@ class BookingController extends Controller
         PaymentProviderRegistry $payments,
         PlatformServiceFeeCalculator $serviceFees,
         VenueLoyalty $loyalty,
+        CustomerOfferService $customerOffers,
     ): View {
         $validated = $request->validate($this->selectionRules());
         $attribution->current($request);
@@ -68,6 +70,8 @@ class BookingController extends Controller
         $promotion = null;
         $window = null;
         $price = $prices->quote($resource, $duration);
+        $payAtVenueCourtPrice = $price;
+        $customerOffer = null;
 
         try {
             $window = $availability->window(
@@ -85,6 +89,20 @@ class BookingController extends Controller
                     $window,
                 );
             $price = $prices->quote($resource, $duration, $promotion, $window);
+            $payAtVenueCourtPrice = $price;
+
+            if ($request->user() !== null && $payments->online()?->supportsHostedCheckout() === true) {
+                // Assigned offers are private and automatically selected only
+                // when they beat the public promotion. The store action repeats
+                // this under locks, so this is only a helpful preview.
+                $basePrice = $prices->quote($resource, $duration, null, $window);
+                $candidate = $customerOffers->bestAvailable($venue, $request->user(), $basePrice['total_amount']);
+                if ($candidate !== null && $this->moneyToCents($candidate['discount_amount']) > $this->moneyToCents($price['discount_amount'])) {
+                    $customerOffer = $candidate;
+                    $price = $customerOffers->applyToBookingPrice($basePrice, $candidate, $duration);
+                    $promotion = null;
+                }
+            }
 
             if ($availability->hasConflict($resource->getKey(), $window->utcStart, $window->utcEnd)) {
                 $availabilityError = 'That time is no longer available. Choose another available slot.';
@@ -137,12 +155,13 @@ class BookingController extends Controller
             'endTime' => $endTime,
             'duration' => $duration,
             'price' => $price,
-            'payAtVenueCourtPrice' => $price,
+            'payAtVenueCourtPrice' => $payAtVenueCourtPrice,
             'onlinePrice' => $serviceFees->quote($price['total_amount'], $price['currency']),
-            'payAtVenuePrice' => $serviceFees->emptyQuoteFromAmount($price['total_amount']),
+            'payAtVenuePrice' => $serviceFees->emptyQuoteFromAmount($payAtVenueCourtPrice['total_amount']),
             'loyaltyReward' => $loyaltyReward,
             'loyaltyBalance' => $loyaltyBalance,
             'promotion' => $promotion,
+            'customerOffer' => $customerOffer,
             'payAtVenuePromotion' => $promotion,
             'campaign' => $promotion?->campaign_token,
             'availabilityError' => $availabilityError,
@@ -465,6 +484,13 @@ class BookingController extends Controller
         return CarbonImmutable::createFromFormat('!H:i', $startTime)
             ->addMinutes($duration)
             ->format('H:i');
+    }
+
+    private function moneyToCents(string $amount): int
+    {
+        [$whole, $fraction] = array_pad(explode('.', $amount, 2), 2, '0');
+
+        return ((int) $whole * 100) + (int) str_pad(substr($fraction, 0, 2), 2, '0');
     }
 
     /** @return array<int, string> */

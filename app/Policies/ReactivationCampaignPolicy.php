@@ -28,7 +28,17 @@ class ReactivationCampaignPolicy
         return $user->can('manageBookings', $campaign->organization);
     }
 
+    public function update(User $user, ReactivationCampaign $campaign): bool
+    {
+        return $user->can('manageBookings', $campaign->organization);
+    }
+
     public function cancel(User $user, ReactivationCampaign $campaign): bool
+    {
+        return $user->can('manageBookings', $campaign->organization);
+    }
+
+    public function manageAutomation(User $user, ReactivationCampaign $campaign): bool
     {
         return $user->can('manageBookings', $campaign->organization);
     }

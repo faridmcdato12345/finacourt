@@ -98,6 +98,55 @@ class CustomerBookingHistory
             ]);
     }
 
+    /**
+     * Venue-local audience for automated win-back. A player active at a
+     * different venue remains eligible here, while any current or future hold
+     * at this venue suppresses a reminder.
+     *
+     * @return Collection<int, array{user: User, last_booking_at: mixed}>
+     */
+    public function automatedAudience(ReactivationCampaign $campaign): Collection
+    {
+        $threshold = max(1, (int) $campaign->inactivity_days);
+        $latest = $this->qualifying($campaign->organization)
+            ->where('venue_id', $campaign->venue_id)
+            ->when($campaign->sport_id, fn (Builder $query) => $query
+                ->whereHas('resource', fn (Builder $resource) => $resource->where('sport_id', $campaign->sport_id)))
+            ->selectRaw('player_user_id, MAX(end_at) as last_booking_at')
+            ->groupBy('player_user_id')
+            ->havingRaw('MAX(end_at) <= ?', [now('UTC')->subDays($threshold)])
+            ->orderByDesc('last_booking_at')
+            ->limit((int) config('reactivation.audience_limit', 500))
+            ->get()
+            ->keyBy('player_user_id');
+
+        if ($latest->isEmpty()) {
+            return collect();
+        }
+
+        $upcomingPlayerIds = Booking::query()
+            ->where('venue_id', $campaign->venue_id)
+            ->whereIn('player_user_id', $latest->keys())
+            ->where('start_at', '>', now('UTC'))
+            ->where(function (Builder $query): void {
+                $query->where('status', BookingStatus::Confirmed)
+                    ->orWhere(fn (Builder $hold) => $hold
+                        ->where('status', BookingStatus::Hold)
+                        ->where('expires_at', '>', now('UTC')));
+            })
+            ->pluck('player_user_id')
+            ->all();
+
+        return User::query()
+            ->whereKey($latest->keys()->diff($upcomingPlayerIds))
+            ->with('marketingPreference')
+            ->get()
+            ->map(fn (User $user) => [
+                'user' => $user,
+                'last_booking_at' => $latest->get($user->getKey())->last_booking_at,
+            ]);
+    }
+
     /** @return array{inactive_30: int, inactive_60: int, prior_weekday: int} */
     public function segmentCounts(Organization $organization): array
     {

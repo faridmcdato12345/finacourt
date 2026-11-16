@@ -53,6 +53,7 @@
                             <label class="block"><span class="text-sm font-medium">Email</span><input name="email" type="email" value="{{ old('email') }}" autocomplete="email" required class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label>
                         </div>
                         <label class="mt-5 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><input name="account_terms" type="checkbox" value="1" required class="mt-1 rounded border-slate-300"><span>I agree to the <a href="{{ route('marketplace.terms', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</span></label>
+                        <label class="mt-3 flex items-start gap-3 rounded-xl border border-court-200 bg-court-50/60 p-4 text-sm leading-6 text-slate-600"><input name="marketing_opt_in" type="checkbox" value="1" @checked(old('marketing_opt_in')) class="mt-1 rounded border-slate-300 text-court-700 focus:ring-court-500"><span><strong class="block text-slate-900">Allow optional comeback messages</strong><span class="mt-1 block">Receive occasional private offers and game updates through your FinACourt account and email from venues where you have completed a booking. You can change this anytime.</span></span></label>
                         <button data-loading-label="Sending secure link…" class="mt-6 min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Email me a secure link</button>
                         <p class="mt-4 text-center text-xs leading-5 text-slate-500">The link expires in {{ config('auth.passwordless.expire') }} minutes. This court is not held until you return and submit the reservation.</p>
                         <div class="mt-5 border-t border-slate-100 pt-5 text-center text-sm text-slate-500">Already have an account? <a href="{{ route('player.login', ['return' => $returnUrl]) }}" class="font-semibold text-court-700">Sign in</a></div>
@@ -164,6 +165,13 @@
                 <div class="mx-5 rounded-xl bg-amber-50 p-4">
                     <p class="text-xs font-semibold uppercase tracking-wider text-amber-700">{{ $promotion->offerLabel() ?: $promotion->promotion_type->label() }}</p>
                     <p class="mt-1 text-sm font-semibold">{{ $promotion->title }}</p>
+                </div>
+            @endif
+            @if ($customerOffer)
+                <div class="mx-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-amber-700">Exclusive offer available</p>
+                    <p class="mt-1 font-semibold">{{ $customerOffer['offer']->campaign->label() }} saved to your account</p>
+                    <p class="mt-1 text-xs leading-5">Choose online checkout to use it automatically when it saves more than a public deal. It is reserved only when the hold is created, redeemed only after payment succeeds, and never stacks with public deals.</p>
                 </div>
             @endif
             @if ($loyaltyReward)

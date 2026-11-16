@@ -3,6 +3,7 @@
 namespace App\Payments;
 
 use App\Analytics\AnalyticsRecorder;
+use App\CustomerOffers\CustomerOfferService;
 use App\Enums\BookingStatus;
 use App\Enums\CourtClosureBookingStatus;
 use App\Enums\PaymentStatus;
@@ -21,6 +22,7 @@ class ApplyPaymentTransition
         private readonly BookingNotifier $notifications,
         private readonly OwnerSettlementLedger $settlements,
         private readonly VenueLoyalty $loyalty,
+        private readonly CustomerOfferService $customerOffers,
     ) {}
 
     /**
@@ -62,17 +64,23 @@ class ApplyPaymentTransition
             } elseif ($booking->effectiveStatus() !== BookingStatus::Confirmed) {
                 $attributes['requires_review'] = true;
                 $attributes['review_reason'] = 'Payment was received after the reservation stopped being active.';
+                // An expired or cancelled hold cannot consume a personal offer.
+                // Release it in the same transaction so a late provider event
+                // is auditable but the player can still use the offer later.
+                $this->customerOffers->releaseForBooking($booking, $now);
             }
         }
 
         if ($target === PaymentStatus::Failed) {
             $attributes['failed_at'] = $now;
             $this->cancelActiveHold($booking, $actor, 'Payment failed before confirmation.');
+            $this->customerOffers->releaseForBooking($booking);
         }
 
         if ($target === PaymentStatus::Cancelled) {
             $attributes['cancelled_at'] = $now;
             $this->cancelActiveHold($booking, $actor, 'Payment was cancelled before confirmation.');
+            $this->customerOffers->releaseForBooking($booking);
         }
 
         if ($target === PaymentStatus::Refunded) {
@@ -93,6 +101,9 @@ class ApplyPaymentTransition
         ]);
 
         if ($target === PaymentStatus::Paid) {
+            if ($booking->fresh()->status === BookingStatus::Confirmed) {
+                $this->customerOffers->redeemForBooking($booking);
+            }
             $this->settlements->recordPaidPayment($payment);
         } elseif ($target === PaymentStatus::Refunded) {
             $this->loyalty->reverse($booking);

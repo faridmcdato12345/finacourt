@@ -32,6 +32,7 @@ class PasswordlessLoginController extends Controller
             'duration' => ['required', 'integer', 'between:15,'.config('booking.maximum_player_booking_minutes')],
             'campaign' => ['nullable', 'string', 'max:40'],
             'account_terms' => ['accepted'],
+            'marketing_opt_in' => ['nullable', 'boolean'],
         ]);
 
         $venue = $marketplace->venue($venueSlug);
@@ -45,6 +46,18 @@ class PasswordlessLoginController extends Controller
                 'password' => Str::password(64),
             ],
         );
+
+        if ($request->boolean('marketing_opt_in')) {
+            $preference = $user->marketingPreference;
+            $user->marketingPreference()->updateOrCreate([], [
+                'marketing_opt_in' => true,
+                'in_app_marketing_enabled' => true,
+                'email_marketing_enabled' => true,
+                'opted_in_at' => $preference?->opted_in_at ?? now('UTC'),
+                'opted_out_at' => null,
+                'unsubscribed_at' => null,
+            ]);
+        }
 
         $intendedPath = route('player.bookings.create', array_filter([
             'venueSlug' => $venue->slug,

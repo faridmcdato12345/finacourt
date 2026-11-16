@@ -22,10 +22,10 @@
                 <label class="block"><span class="text-sm font-medium">Password</span><input name="password" type="password" autocomplete="new-password" required class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"></label>
                 @error('password')<p class="text-sm text-red-600">{{ $message }}</p>@enderror
                 <label class="block"><span class="text-sm font-medium">Confirm password</span><input name="password_confirmation" type="password" autocomplete="new-password" required class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"></label>
+                <p class="text-center text-xs leading-5 text-slate-500">By creating an account, you agree to FinACourt's <a href="{{ route('marketplace.terms', [], false) }}" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</p>
+                <label class="flex items-start gap-3 rounded-xl border border-court-200 bg-court-50/60 p-4 text-sm leading-6 text-slate-600"><input name="marketing_opt_in" type="checkbox" value="1" @checked(old('marketing_opt_in')) class="mt-1 rounded border-slate-300 text-court-700 focus:ring-court-500"><span><strong class="block text-slate-900">Allow optional comeback messages</strong><span class="mt-1 block">Get occasional private offers and game updates through your FinACourt account and email from venues where you have completed a booking. You can change this anytime.</span></span></label>
                 <button class="w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Create account</button>
             </form>
-
-            <p class="mt-4 text-center text-xs leading-5 text-slate-500">By creating an account, you agree to FinACourt's <a href="{{ route('marketplace.terms', [], false) }}" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</p>
             <p class="mt-6 text-center text-sm text-slate-500">Already registered? <a href="{{ route('player.login', request()->query('return') ? ['return' => request()->query('return')] : []) }}" class="font-semibold text-court-700">Sign in</a></p>
         </div>
     </section>
