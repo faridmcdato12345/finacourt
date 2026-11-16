@@ -354,6 +354,20 @@ function bindMobileCourtPickers() {
         tabs.forEach((tab) => {
             tab.addEventListener('click', () => showCourt(tab.dataset.resourceId));
         });
+
+        // Deal links can target a court that appears later in the horizontal
+        // list. Keep the selected tab in view instead of making the player
+        // discover that their promoted court is off-screen.
+        const initiallySelectedTab = tabs.find((tab) => tab.getAttribute('aria-selected') === 'true');
+        if (initiallySelectedTab) {
+            requestAnimationFrame(() => {
+                initiallySelectedTab.scrollIntoView({
+                    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                    block: 'nearest',
+                    inline: 'center',
+                });
+            });
+        }
     });
 }
 

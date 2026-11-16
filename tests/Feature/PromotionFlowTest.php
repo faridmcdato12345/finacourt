@@ -218,7 +218,9 @@ class PromotionFlowTest extends TestCase
             'date' => $date,
             'duration' => 60,
         ]));
-        $venueResponse->assertOk()->assertSee('campaign='.$promotion->campaign_token, false);
+        $venueResponse->assertOk()
+            ->assertSee('campaign='.$promotion->campaign_token, false)
+            ->assertSee($promotion->offerLabel().' applied');
 
         $this->actingAs(User::factory()->create())->get(route('player.bookings.create', [
             'venueSlug' => $venue->slug,
@@ -233,6 +235,39 @@ class PromotionFlowTest extends TestCase
             ->assertSee('name="campaign" value="'.$promotion->campaign_token.'"', false);
 
         $this->assertSame(1, $promotion->refresh()->clicks_count);
+    }
+
+    public function test_deal_link_opens_its_eligible_court_in_the_mobile_schedule(): void
+    {
+        [$organization, $venue, $firstResource] = $this->setupInventory();
+        $eligibleResource = CourtResource::factory()->for($venue)->for($firstResource->sport)->create([
+            'name' => 'Deal Court',
+            'base_hourly_rate' => '800.00',
+            'booking_increment_minutes' => 60,
+        ]);
+        $promotion = Promotion::factory()->for($venue)->create([
+            'organization_id' => $organization->getKey(),
+            'resource_id' => $eligibleResource->getKey(),
+            'title' => 'Deal Court special',
+        ]);
+
+        $response = $this->get(route('marketplace.venues.show', [
+            'venueSlug' => $venue->slug,
+            ...$promotion->marketplaceParameters(),
+        ]));
+
+        $response->assertOk()
+            ->assertSee('data-resource-id="'.$eligibleResource->getKey().'"', false)
+            ->assertSee('aria-selected="true"', false);
+
+        $this->assertMatchesRegularExpression(
+            '/<button\s+[^>]*data-mobile-court-tab[^>]*data-resource-id="'.$eligibleResource->getKey().'"[^>]*aria-selected="true"/',
+            $response->getContent(),
+        );
+        $this->assertMatchesRegularExpression(
+            '/<section\s+id="mobile-court-'.$eligibleResource->getKey().'"[^>]*data-mobile-court-panel[^>]*data-resource-id="'.$eligibleResource->getKey().'"(?![^>]*\shidden)[^>]*>/',
+            $response->getContent(),
+        );
     }
 
     public function test_best_public_deal_is_automatically_attached_to_eligible_venue_slots(): void

@@ -115,7 +115,9 @@ class VenueController extends Controller
                     $slot['promotion_offer'] = $promotion?->offerLabel();
                     $price = $prices->quote($gridResource, $window->durationMinutes, $promotion, $window);
                     $slot['unit_price'] = $price['unit_price'];
+                    $slot['original_total_amount'] = $price['original_total_amount'];
                     $slot['total_amount'] = $price['total_amount'];
+                    $slot['discount_amount'] = $price['discount_amount'];
                     $slot['has_time_based_price'] = $price['pricing_rule_snapshot'] !== null;
 
                     return $slot;

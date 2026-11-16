@@ -83,7 +83,7 @@
                             <span class="inline-flex items-center gap-1.5 text-slate-500">@include('marketplace.partials.icon', ['name' => 'clock', 'class' => 'size-4']) Closed today</span>
                         @endif
                     </div>
-                    <div class="mt-5 flex flex-wrap gap-2">
+                    <div class="-mx-5 mt-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&>*]:shrink-0 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
                         @foreach ($venue->sports as $sport)
                             <a href="{{ route('marketplace.courts.sport-city', [$sport->slug, $venue->city_slug]) }}" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-court-300 hover:text-court-800">@include('marketplace.partials.icon', ['name' => 'sport-'.$sport->slug, 'class' => 'size-4 text-court-600']) {{ $sport->name }}</a>
                         @endforeach
@@ -106,7 +106,7 @@
                 @if ($promotions->isNotEmpty())
                     <section class="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50">
                         <div class="flex items-center justify-between gap-4 border-b border-amber-200 px-5 py-4"><div class="flex items-center gap-3"><span class="grid size-10 place-items-center rounded-xl bg-white text-amber-700">@include('marketplace.partials.icon', ['name' => 'tag', 'class' => 'size-5'])</span><div><p class="text-xs font-semibold uppercase tracking-wider text-amber-700">Available promotions</p><h2 class="mt-1 font-semibold">Deals from {{ $venue->name }}</h2></div></div><a href="{{ route('marketplace.deals') }}" class="text-xs font-semibold text-amber-800 sm:text-sm">All deals →</a></div>
-                        <div class="grid gap-3 p-4 sm:grid-cols-2">
+                        <div class="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:thin] sm:mx-0 sm:grid sm:grid-cols-2 sm:px-4 sm:pb-4">
                             @foreach ($promotions as $promotion)
                                 @php
                                     $nextSlot = $promotion->nextSlot();
@@ -114,7 +114,7 @@
                                     $nextSlotStartsAt = $nextSlot?->startsAt($venue->organization->timezone);
                                     $nextSlotEndsAt = $nextSlot?->endsAt($venue->organization->timezone);
                                 @endphp
-                                <a href="{{ route('marketplace.venues.show', ['venueSlug' => $venue->slug, ...$promotion->marketplaceParameters()]) }}#availability" class="rounded-xl border border-amber-200 bg-white p-4"><div class="flex items-start justify-between gap-3"><div><h3 class="font-semibold">{{ $promotion->title }}</h3><p class="mt-1 text-sm text-slate-500">{{ $nextSlot?->resource?->name ?: $promotion->resource?->name ?: 'Eligible venue courts' }}</p></div>@if ($promotion->offerLabel())<span class="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">{{ $promotion->offerLabel() }}</span>@endif</div><p class="mt-3 text-xs leading-5 text-slate-400">@if ($nextSlot){{ $nextSlotStartsAt->format('M j') }} · {{ $nextSlotStartsAt->format('g:i A') }}–{{ $nextSlotEndsAt->format('g:i A') }}@elseif ($isUpcoming)Available from {{ $promotion->starts_on->format('M j, Y') }}@else Eligibility is checked for the exact court and time selected.@endif</p></a>
+                                <a href="{{ route('marketplace.venues.show', ['venueSlug' => $venue->slug, ...$promotion->marketplaceParameters()]) }}#availability" class="w-[min(18rem,82vw)] shrink-0 snap-start rounded-xl border border-amber-200 bg-white p-4 sm:w-auto"><div class="flex items-start justify-between gap-3"><div><h3 class="font-semibold">{{ $promotion->title }}</h3><p class="mt-1 text-sm text-slate-500">{{ $nextSlot?->resource?->name ?: $promotion->resource?->name ?: 'Eligible venue courts' }}</p></div>@if ($promotion->offerLabel())<span class="shrink-0 rounded-lg bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-900">{{ $promotion->offerLabel() }}</span>@endif</div><p class="mt-3 text-xs leading-5 text-slate-400">@if ($nextSlot){{ $nextSlotStartsAt->format('M j') }} · {{ $nextSlotStartsAt->format('g:i A') }}–{{ $nextSlotEndsAt->format('g:i A') }}@elseif ($isUpcoming)Available from {{ $promotion->starts_on->format('M j, Y') }}@else Eligibility is checked for the exact court and time selected.@endif</p></a>
                             @endforeach
                         </div>
                     </section>

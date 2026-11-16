@@ -57,19 +57,29 @@
                     <span>{{ $gridAvailability['hours_label_12_hour'] }}</span>
                 </div>
 
+                @if ($campaignPromotion?->offerLabel())
+                    <div data-active-campaign class="mb-4 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-xs text-amber-950">
+                        <span class="font-semibold">{{ $campaignPromotion->offerLabel() }} applied</span>
+                        <span class="text-right text-amber-800">Eligible times are marked below</span>
+                    </div>
+                @endif
+
                 <div class="sm:hidden" data-slot-picker data-mobile-court-picker data-review-url="{{ route('player.bookings.create', $venue->slug) }}" data-date="{{ $availabilityDate }}" data-maximum-duration="{{ config('booking.maximum_player_booking_minutes') }}">
                     <p class="mb-3 text-xs font-medium leading-5 text-slate-500">Choose a court, then tap one or more consecutive open times. You can switch courts and add another court before checkout.</p>
                     <div role="tablist" aria-label="Choose a court" class="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
                         @foreach ($gridResources as $gridResource)
-                            <button type="button" role="tab" data-mobile-court-tab data-resource-id="{{ $gridResource->id }}" aria-controls="mobile-court-{{ $gridResource->id }}" aria-selected="{{ $loop->first ? 'true' : 'false' }}" class="shrink-0 rounded-xl border px-3.5 py-2.5 text-left text-xs font-semibold transition {{ $loop->first ? 'border-court-600 bg-court-700 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700' }}">
+                            @php
+                                $isSelectedGridResource = $gridResource->is($selectedResource);
+                            @endphp
+                            <button type="button" role="tab" data-mobile-court-tab data-resource-id="{{ $gridResource->id }}" aria-controls="mobile-court-{{ $gridResource->id }}" aria-selected="{{ $isSelectedGridResource ? 'true' : 'false' }}" class="shrink-0 rounded-xl border px-3.5 py-2.5 text-left text-xs font-semibold transition {{ $isSelectedGridResource ? 'border-court-600 bg-court-700 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-700' }}">
                                 <span class="block max-w-36 truncate">{{ $gridResource->name }}</span>
-                                <span class="mt-0.5 block text-[10px] {{ $loop->first ? 'text-court-100' : 'text-slate-400' }}">₱{{ number_format((float) $gridResource->base_hourly_rate, 0) }} / hr</span>
+                                <span class="mt-0.5 block text-[10px] {{ $isSelectedGridResource ? 'text-court-100' : 'text-slate-400' }}">₱{{ number_format((float) $gridResource->base_hourly_rate, 0) }} / hr</span>
                             </button>
                         @endforeach
                     </div>
 
                     @foreach ($gridResources as $gridResource)
-                        <section id="mobile-court-{{ $gridResource->id }}" role="tabpanel" data-mobile-court-panel data-resource-id="{{ $gridResource->id }}" @unless($loop->first) hidden @endunless class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <section id="mobile-court-{{ $gridResource->id }}" role="tabpanel" data-mobile-court-panel data-resource-id="{{ $gridResource->id }}" @unless($gridResource->is($selectedResource)) hidden @endunless class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
                             <div class="mb-3 flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
                                 <div><h3 class="font-semibold text-slate-950">{{ $gridResource->name }}</h3><p class="mt-1 text-xs text-slate-500">{{ $gridResource->sport?->name }} · ₱{{ number_format((float) $gridResource->base_hourly_rate, 0) }} / hour</p></div>
                                 <span class="rounded-full bg-court-50 px-2.5 py-1 text-[10px] font-semibold text-court-800">{{ $gridResource->booking_increment_minutes }} min slots</span>
@@ -81,22 +91,23 @@
                                         $schedule = $availabilityGrid->get($gridResource->id);
                                         $slot = $schedule['slots']->first(fn (array $candidate): bool => $candidate['booking_date'].'|'.$candidate['start_time'] === $slotKey);
                                     @endphp
-                                    <div class="grid grid-cols-[5.75rem_1fr] items-stretch gap-2">
-                                        <p class="flex items-center text-[11px] font-semibold leading-4 text-slate-600">{{ $rowSlot['display_time_12_hour'] }}</p>
-                                        @if ($slot && $slot['available'])
-                                            <a
-                                                href="{{ route('player.bookings.create', array_filter(['venueSlug' => $venue->slug, 'resource' => $gridResource->id, 'date' => $slot['booking_date'], 'start' => $slot['start_time'], 'duration' => $gridResource->booking_increment_minutes, 'campaign' => $slot['campaign'] ?? null])) }}"
-                                                data-slot data-resource="{{ $gridResource->id }}" data-slot-index="{{ $loop->index }}" data-date="{{ $slot['booking_date'] }}" data-start="{{ $slot['start_time'] }}" data-end="{{ $slot['end_time'] }}" data-start-offset="{{ $slot['start_offset_minutes'] }}" data-end-offset="{{ $slot['end_offset_minutes'] }}" data-start-label="{{ $slot['start_label_12_hour'] }}" data-end-label="{{ $slot['end_label_12_hour'] }}" data-campaign="{{ $slot['campaign'] ?? '' }}" data-price="{{ $slot['total_amount'] }}" aria-pressed="false"
-                                                aria-label="Select {{ $gridResource->name }}, {{ $slot['start_label_12_hour'] }} to {{ $slot['end_label_12_hour'] }}"
-                                                class="flex min-h-12 items-center justify-between rounded-xl border border-court-200 bg-court-50 px-3 text-sm font-semibold text-court-900 transition hover:border-court-500 hover:bg-court-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-court-600"
-                                            >
-                                                <span>{{ $slot['start_label_12_hour'] }}–{{ $slot['end_label_12_hour'] }}</span>
+                                    @if ($slot && $slot['available'])
+                                        <a
+                                            href="{{ route('player.bookings.create', array_filter(['venueSlug' => $venue->slug, 'resource' => $gridResource->id, 'date' => $slot['booking_date'], 'start' => $slot['start_time'], 'duration' => $gridResource->booking_increment_minutes, 'campaign' => $slot['campaign'] ?? null])) }}"
+                                            data-slot data-resource="{{ $gridResource->id }}" data-slot-index="{{ $loop->index }}" data-date="{{ $slot['booking_date'] }}" data-start="{{ $slot['start_time'] }}" data-end="{{ $slot['end_time'] }}" data-start-offset="{{ $slot['start_offset_minutes'] }}" data-end-offset="{{ $slot['end_offset_minutes'] }}" data-start-label="{{ $slot['start_label_12_hour'] }}" data-end-label="{{ $slot['end_label_12_hour'] }}" data-campaign="{{ $slot['campaign'] ?? '' }}" data-price="{{ $slot['total_amount'] }}" aria-pressed="false"
+                                            aria-label="Select {{ $gridResource->name }}, {{ $slot['start_label_12_hour'] }} to {{ $slot['end_label_12_hour'] }}"
+                                            class="flex min-h-14 items-center justify-between rounded-xl border border-court-200 bg-court-50 px-3.5 text-sm font-semibold text-court-900 transition hover:border-court-500 hover:bg-court-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-court-600"
+                                        >
+                                            <span class="max-w-28 leading-5">{{ $rowSlot['display_time_12_hour'] }}</span>
+                                            <span class="flex flex-col items-end gap-0.5">
+                                                @if ((float) ($slot['discount_amount'] ?? 0) > 0)<span class="text-[10px] font-medium text-slate-400 line-through">₱{{ number_format((float) $slot['original_total_amount'], 0) }}</span>@endif
                                                 <span>₱{{ number_format((float) $slot['total_amount'], 0) }}</span>
-                                            </a>
-                                        @else
-                                            <span class="flex min-h-12 items-center justify-center rounded-xl border border-slate-100 bg-slate-50 px-3 text-xs font-medium text-slate-400">Unavailable</span>
-                                        @endif
-                                    </div>
+                                                @if ($slot['campaign'] ?? null)<span class="text-[10px] font-semibold text-amber-700">{{ $slot['promotion_offer'] ?: 'Deal' }}</span>@endif
+                                            </span>
+                                        </a>
+                                    @else
+                                        <span class="flex min-h-14 items-center justify-between rounded-xl border border-slate-100 bg-slate-50 px-3.5 text-xs font-medium text-slate-400"><span class="max-w-28 leading-4 text-slate-600">{{ $rowSlot['display_time_12_hour'] }}</span><span>Unavailable</span></span>
+                                    @endif
                                 @endforeach
                             </div>
                         </section>
@@ -136,6 +147,7 @@
                                         aria-label="Select {{ $gridResource->name }}, {{ $slot['start_label_12_hour'] }} to {{ $slot['end_label_12_hour'] }}"
                                         class="m-0.5 flex min-h-12 flex-col items-center justify-center rounded-lg border border-court-700/70 bg-court-900/70 px-2 text-center text-[11px] font-semibold text-court-50 transition hover:border-court-300 hover:bg-court-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-court-200"
                                     >
+                                        @if ((float) ($slot['discount_amount'] ?? 0) > 0)<span class="text-[9px] font-medium text-slate-400 line-through">₱{{ number_format((float) $slot['original_total_amount'], 0) }}</span>@endif
                                         <span>₱{{ number_format((float) $slot['total_amount'], 0) }}</span>
                                         @if ($slot['campaign'] ?? null)<span class="mt-0.5 text-[9px] text-amber-200">{{ $slot['promotion_offer'] ?: 'Deal' }}</span>@endif
                                     </a>
