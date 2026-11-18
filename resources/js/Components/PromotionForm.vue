@@ -71,6 +71,10 @@ const form = useForm({
         ? (props.promotion.discount_type || '')
         : 'percentage',
     discount_value: props.promotion?.discount_value || '',
+    qualifying_minutes: props.promotion?.qualifying_minutes || 120,
+    bonus_minutes: props.promotion?.bonus_minutes || 60,
+    max_redemptions: props.promotion?.max_redemptions || '',
+    allow_loyalty_stacking: props.promotion?.allow_loyalty_stacking ?? true,
     starts_on: props.promotion?.starts_on || props.defaults.starts_on || '',
     ends_on: props.promotion?.ends_on || props.defaults.ends_on || '',
     days_of_week: props.promotion?.days_of_week || [],
@@ -115,8 +119,13 @@ const previewResource = computed(() => {
 const pricePreview = computed(() => previewResource.value
     ? promotionPricePreview({
         baseHourlyRate: previewResource.value.base_hourly_rate,
+        durationMinutes: form.discount_type === 'bonus_hours'
+            ? Number(form.qualifying_minutes || 0) + Number(form.bonus_minutes || 0)
+            : 60,
         discountType: form.discount_type || null,
         discountValue: form.discount_value || null,
+        qualifyingMinutes: form.qualifying_minutes || null,
+        bonusMinutes: form.bonus_minutes || null,
         serviceFee: props.serviceFee,
     })
     : null);
@@ -146,6 +155,12 @@ const offerLabel = computed(() => {
 
     if (form.discount_type === 'fixed_hourly_rate' && Number(form.discount_value) > 0) {
         return `${money(Number(form.discount_value))} special hourly price`;
+    }
+
+    if (form.discount_type === 'bonus_hours'
+        && Number(form.qualifying_minutes) > 0
+        && Number(form.bonus_minutes) > 0) {
+        return `Book ${durationLabel(form.qualifying_minutes)}, get ${durationLabel(form.bonus_minutes)} free`;
     }
 
     return 'Promotional visibility without a price discount';
@@ -231,8 +246,13 @@ function isSlotSelected(opportunity) {
 function selectOffer(type) {
     form.discount_type = type;
 
-    if (!type) form.discount_value = '';
+    if (!type || type === 'bonus_hours') form.discount_value = '';
     else if (!form.discount_value) form.discount_value = type === 'percentage' ? '20' : '';
+
+    if (type === 'bonus_hours') {
+        if (!form.qualifying_minutes) form.qualifying_minutes = 120;
+        if (!form.bonus_minutes) form.bonus_minutes = 60;
+    }
 }
 
 function selectStatus(value) {
@@ -287,11 +307,18 @@ function stepIssue(step) {
     if (step === 3) {
         if (!form.title.trim()) return 'Give the deal a short title.';
 
-        if (form.discount_type) {
+        if (form.discount_type && form.discount_type !== 'bonus_hours') {
             const value = Number(form.discount_value);
 
             if (!Number.isFinite(value) || value <= 0) return 'Enter a valid discount value.';
             if (form.discount_type === 'percentage' && value > 100) return 'Percentage discounts cannot exceed 100%.';
+        }
+
+        if (form.discount_type === 'bonus_hours') {
+            const qualifying = Number(form.qualifying_minutes);
+            const bonus = Number(form.bonus_minutes);
+            if (!Number.isInteger(qualifying) || qualifying < 15) return 'Set the consecutive time a player must book.';
+            if (!Number.isInteger(bonus) || bonus < 15) return 'Set the bonus court time a player receives.';
         }
     }
 
@@ -378,6 +405,13 @@ function money(value) {
         minimumFractionDigits: 2,
     }).format(Number(value || 0));
 }
+
+function durationLabel(minutes) {
+    const value = Number(minutes || 0);
+    if (value > 0 && value % 60 === 0) return `${value / 60} ${value === 60 ? 'hour' : 'hours'}`;
+
+    return `${value} minutes`;
+}
 </script>
 
 <template>
@@ -455,9 +489,11 @@ function money(value) {
         <section v-show="currentStep === 3" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
             <p class="text-xs font-semibold uppercase tracking-[0.16em] text-court-700">Step 3 of 4</p><h2 class="mt-2 text-2xl font-semibold tracking-tight">Set the offer</h2><p class="mt-2 max-w-2xl text-sm leading-6 text-slate-500">Give players a clear reason to book. Final prices are always recalculated securely by the server.</p>
             <div class="mt-7 grid gap-5 sm:grid-cols-2"><label class="sm:col-span-2"><span class="text-sm font-medium">Deal title</span><input v-model="form.title" required maxlength="255" placeholder="Example: 30% off Friday morning" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><FormError :message="form.errors.title" /></label><label class="sm:col-span-2"><span class="text-sm font-medium">Short description <span class="font-normal text-slate-400">optional</span></span><textarea v-model="form.description" rows="3" maxlength="2000" placeholder="Tell players why this is a good time to book." class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"></textarea><FormError :message="form.errors.description" /></label></div>
-            <fieldset class="mt-7"><legend class="text-sm font-semibold">What will players receive?</legend><div class="mt-3 grid gap-3 sm:grid-cols-3"><button type="button" :aria-pressed="form.discount_type === 'percentage'" :class="['rounded-2xl border p-4 text-left', form.discount_type === 'percentage' ? 'border-court-500 bg-court-50 ring-2 ring-court-100' : 'border-slate-200']" @click="selectOffer('percentage')"><strong class="block text-sm">Percentage discount</strong><span class="mt-2 block text-xs leading-5 text-slate-500">Take a percentage off the normal court price.</span></button><button type="button" :aria-pressed="form.discount_type === 'fixed_hourly_rate'" :class="['rounded-2xl border p-4 text-left', form.discount_type === 'fixed_hourly_rate' ? 'border-court-500 bg-court-50 ring-2 ring-court-100' : 'border-slate-200']" @click="selectOffer('fixed_hourly_rate')"><strong class="block text-sm">Special hourly price</strong><span class="mt-2 block text-xs leading-5 text-slate-500">Replace the normal hourly price with a lower one.</span></button><button type="button" :aria-pressed="!form.discount_type" :class="['rounded-2xl border p-4 text-left', !form.discount_type ? 'border-court-500 bg-court-50 ring-2 ring-court-100' : 'border-slate-200']" @click="selectOffer('')"><strong class="block text-sm">Promote without discount</strong><span class="mt-2 block text-xs leading-5 text-slate-500">Highlight the availability while keeping the normal price.</span></button></div></fieldset>
-            <div v-if="form.discount_type" class="mt-5 max-w-xl"><label><span class="text-sm font-medium">{{ form.discount_type === 'percentage' ? 'Percentage off' : 'Special hourly price' }}</span><div class="relative mt-2"><span v-if="form.discount_type === 'fixed_hourly_rate'" class="absolute inset-y-0 left-4 flex items-center font-semibold text-slate-500">₱</span><input v-model="form.discount_value" type="number" min="0" :max="form.discount_type === 'percentage' ? 100 : 999999.99" step="0.01" :class="['w-full rounded-xl border border-slate-300 py-3 pr-12', form.discount_type === 'fixed_hourly_rate' ? 'pl-9' : 'pl-4']"><span v-if="form.discount_type === 'percentage'" class="absolute inset-y-0 right-4 flex items-center font-semibold text-slate-500">%</span></div><FormError :message="form.errors.discount_value" /></label></div>
-            <section v-if="pricePreview" class="mt-7 overflow-hidden rounded-2xl bg-court-950 text-white"><div class="border-b border-white/10 px-5 py-4"><p class="text-xs font-semibold uppercase tracking-wider text-court-300">One-hour price example</p><h3 class="mt-1 font-semibold">{{ previewResource.name }}</h3></div><dl class="grid gap-4 p-5 sm:grid-cols-4"><div><dt class="text-xs text-slate-400">Normal court price</dt><dd class="mt-1 text-lg font-semibold">{{ money(pricePreview.originalTotal) }}</dd></div><div><dt class="text-xs text-slate-400">Deal court price</dt><dd class="mt-1 text-lg font-semibold text-court-300">{{ money(pricePreview.venueTotal) }}</dd></div><div><dt class="text-xs text-slate-400">FinACourt service fee</dt><dd class="mt-1 text-lg font-semibold">{{ money(pricePreview.serviceFee) }}</dd></div><div><dt class="text-xs text-slate-400">Estimated player total</dt><dd class="mt-1 text-xl font-semibold">{{ money(pricePreview.playerTotal) }}</dd></div></dl><p class="px-5 pb-5 text-xs leading-5 text-slate-400">This is an estimate for one hour. The booking server calculates the final amount from the exact court, duration, and active service-fee rule.</p></section>
+            <fieldset class="mt-7"><legend class="text-sm font-semibold">What will players receive?</legend><div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><button type="button" :aria-pressed="form.discount_type === 'percentage'" :class="['rounded-2xl border p-4 text-left', form.discount_type === 'percentage' ? 'border-court-500 bg-court-50 ring-2 ring-court-100' : 'border-slate-200']" @click="selectOffer('percentage')"><strong class="block text-sm">Percentage discount</strong><span class="mt-2 block text-xs leading-5 text-slate-500">Take a percentage off the normal court price.</span></button><button type="button" :aria-pressed="form.discount_type === 'fixed_hourly_rate'" :class="['rounded-2xl border p-4 text-left', form.discount_type === 'fixed_hourly_rate' ? 'border-court-500 bg-court-50 ring-2 ring-court-100' : 'border-slate-200']" @click="selectOffer('fixed_hourly_rate')"><strong class="block text-sm">Special hourly price</strong><span class="mt-2 block text-xs leading-5 text-slate-500">Replace the normal hourly price with a lower one.</span></button><button type="button" :aria-pressed="form.discount_type === 'bonus_hours'" :class="['rounded-2xl border p-4 text-left', form.discount_type === 'bonus_hours' ? 'border-court-500 bg-court-50 ring-2 ring-court-100' : 'border-slate-200']" @click="selectOffer('bonus_hours')"><strong class="block text-sm">Book time, get time free</strong><span class="mt-2 block text-xs leading-5 text-slate-500">Reserve consecutive hours; the final bonus time is held and free.</span></button><button type="button" :aria-pressed="!form.discount_type" :class="['rounded-2xl border p-4 text-left', !form.discount_type ? 'border-court-500 bg-court-50 ring-2 ring-court-100' : 'border-slate-200']" @click="selectOffer('')"><strong class="block text-sm">Promote without discount</strong><span class="mt-2 block text-xs leading-5 text-slate-500">Highlight the availability while keeping the normal price.</span></button></div></fieldset>
+            <div v-if="form.discount_type && form.discount_type !== 'bonus_hours'" class="mt-5 max-w-xl"><label><span class="text-sm font-medium">{{ form.discount_type === 'percentage' ? 'Percentage off' : 'Special hourly price' }}</span><div class="relative mt-2"><span v-if="form.discount_type === 'fixed_hourly_rate'" class="absolute inset-y-0 left-4 flex items-center font-semibold text-slate-500">₱</span><input v-model="form.discount_value" type="number" min="0" :max="form.discount_type === 'percentage' ? 100 : 999999.99" step="0.01" :class="['w-full rounded-xl border border-slate-300 py-3 pr-12', form.discount_type === 'fixed_hourly_rate' ? 'pl-9' : 'pl-4']"><span v-if="form.discount_type === 'percentage'" class="absolute inset-y-0 right-4 flex items-center font-semibold text-slate-500">%</span></div><FormError :message="form.errors.discount_value" /></label></div>
+            <div v-if="form.discount_type === 'bonus_hours'" class="mt-5 grid max-w-2xl gap-4 rounded-2xl border border-court-200 bg-court-50/60 p-5 sm:grid-cols-2"><label><span class="text-sm font-medium">Player books consecutively</span><input v-model="form.qualifying_minutes" type="number" min="15" step="15" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><span class="mt-2 block text-xs text-slate-500">Minutes that the player pays for.</span><FormError :message="form.errors.qualifying_minutes" /></label><label><span class="text-sm font-medium">Bonus court time</span><input v-model="form.bonus_minutes" type="number" min="15" step="15" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><span class="mt-2 block text-xs text-slate-500">Minutes held at ₱0 court price.</span><FormError :message="form.errors.bonus_minutes" /></label><label class="sm:col-span-2"><span class="text-sm font-medium">Maximum redemptions <span class="font-normal text-slate-400">optional</span></span><input v-model="form.max_redemptions" type="number" min="1" step="1" placeholder="Unlimited" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3"><span class="mt-2 block text-xs text-slate-500">Holds reserve a use; cancelled or expired holds release it. Leave empty for no campaign-wide limit.</span><FormError :message="form.errors.max_redemptions" /></label><p class="sm:col-span-2 rounded-xl bg-white px-4 py-3 text-sm leading-6 text-court-900">Players must choose at least <strong>{{ durationLabel(Number(form.qualifying_minutes || 0) + Number(form.bonus_minutes || 0)) }}</strong> continuously on one court. The final <strong>{{ durationLabel(form.bonus_minutes) }}</strong> is reserved with their booking at no court charge.</p></div>
+            <label v-if="form.discount_type" class="mt-5 flex max-w-2xl gap-3 rounded-2xl border border-slate-200 p-4"><input v-model="form.allow_loyalty_stacking" type="checkbox" class="mt-1 size-4 rounded border-slate-300 text-court-700"><span><span class="block text-sm font-semibold">Allow venue loyalty rewards to stack</span><span class="mt-1 block text-xs leading-5 text-slate-500">When enabled, an eligible player can use a loyalty reward after this deal is applied. Other public deals are never combined.</span></span></label>
+            <section v-if="pricePreview" class="mt-7 overflow-hidden rounded-2xl bg-court-950 text-white"><div class="border-b border-white/10 px-5 py-4"><p class="text-xs font-semibold uppercase tracking-wider text-court-300">{{ form.discount_type === 'bonus_hours' ? 'Bonus-time booking example' : 'One-hour price example' }}</p><h3 class="mt-1 font-semibold">{{ previewResource.name }}</h3></div><dl class="grid gap-4 p-5 sm:grid-cols-4"><div><dt class="text-xs text-slate-400">Normal court price</dt><dd class="mt-1 text-lg font-semibold">{{ money(pricePreview.originalTotal) }}</dd></div><div><dt class="text-xs text-slate-400">Deal court price</dt><dd class="mt-1 text-lg font-semibold text-court-300">{{ money(pricePreview.venueTotal) }}</dd></div><div><dt class="text-xs text-slate-400">FinACourt service fee</dt><dd class="mt-1 text-lg font-semibold">{{ money(pricePreview.serviceFee) }}</dd></div><div><dt class="text-xs text-slate-400">Estimated player total</dt><dd class="mt-1 text-xl font-semibold">{{ money(pricePreview.playerTotal) }}</dd></div></dl><p class="px-5 pb-5 text-xs leading-5 text-slate-400">{{ form.discount_type === 'bonus_hours' ? `This estimates ${durationLabel(Number(form.qualifying_minutes || 0) + Number(form.bonus_minutes || 0))}: ${durationLabel(form.qualifying_minutes)} paid and ${durationLabel(form.bonus_minutes)} free.` : 'This is an estimate for one hour.' }} The booking server calculates the final amount from the exact court, duration, and active service-fee rule.</p></section>
             <p v-else class="mt-7 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-500">Choose a venue with a bookable court to see a price example.</p>
         </section>
 

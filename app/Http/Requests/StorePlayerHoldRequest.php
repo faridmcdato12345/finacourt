@@ -31,6 +31,7 @@ class StorePlayerHoldRequest extends FormRequest
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:40'],
             'terms' => ['accepted'],
+            'marketing_opt_in' => ['nullable', 'boolean'],
         ];
     }
 }

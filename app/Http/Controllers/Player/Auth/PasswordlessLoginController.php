@@ -24,15 +24,12 @@ class PasswordlessLoginController extends Controller
         $request->merge(['email' => Str::lower((string) $request->input('email'))]);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255'],
             'resource' => ['required', 'integer'],
             'date' => ['required', 'date_format:Y-m-d'],
             'start' => ['required', 'date_format:H:i'],
             'duration' => ['required', 'integer', 'between:15,'.config('booking.maximum_player_booking_minutes')],
             'campaign' => ['nullable', 'string', 'max:40'],
-            'account_terms' => ['accepted'],
-            'marketing_opt_in' => ['nullable', 'boolean'],
         ]);
 
         $venue = $marketplace->venue($venueSlug);
@@ -42,22 +39,13 @@ class PasswordlessLoginController extends Controller
         $user = User::query()->firstOrCreate(
             ['email' => $email],
             [
-                'name' => $validated['name'],
+                // A verified guest provides their booking name on the next
+                // step. This neutral fallback lets us issue the secure link
+                // without asking for extra account details first.
+                'name' => 'Player',
                 'password' => Str::password(64),
             ],
         );
-
-        if ($request->boolean('marketing_opt_in')) {
-            $preference = $user->marketingPreference;
-            $user->marketingPreference()->updateOrCreate([], [
-                'marketing_opt_in' => true,
-                'in_app_marketing_enabled' => true,
-                'email_marketing_enabled' => true,
-                'opted_in_at' => $preference?->opted_in_at ?? now('UTC'),
-                'opted_out_at' => null,
-                'unsubscribed_at' => null,
-            ]);
-        }
 
         $intendedPath = route('player.bookings.create', array_filter([
             'venueSlug' => $venue->slug,
@@ -72,7 +60,7 @@ class PasswordlessLoginController extends Controller
 
         return redirect($intendedPath)->with(
             'status',
-            'Check your email for a secure sign-in link. The court is not held until you return and submit the reservation.',
+            'Check your email to continue. No password is needed. We will check live availability again before a hold is created.',
         );
     }
 
@@ -139,7 +127,12 @@ class PasswordlessLoginController extends Controller
         Auth::login($loginToken->user);
         $request->session()->regenerate();
 
+        $reservationFlow = Str::startsWith($loginToken->intended_path, '/venues/')
+            && str_contains($loginToken->intended_path, '/reserve');
+
         return redirect($loginToken->intended_path)
-            ->with('status', 'Email verified. You are securely signed in.');
+            ->with('status', $reservationFlow
+                ? 'Email confirmed. Finish your booking below to create a short court hold.'
+                : 'Email verified. You are securely signed in.');
     }
 }

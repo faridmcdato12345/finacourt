@@ -12,6 +12,7 @@ const organizations = computed(() => page.props.organizations || []);
 const abilities = computed(() => page.props.abilities || {});
 const claimOnboarding = computed(() => page.props.ownerClaimOnboarding || { restricted: false });
 const venueSetup = computed(() => page.props.ownerVenueSetup || { is_complete: false });
+const interactiveDemo = computed(() => page.props.interactiveDemo || null);
 const isEmailVerified = computed(() => Boolean(user.value?.email_verified));
 const isWorkspaceRestricted = computed(() => isEmailVerified.value && Boolean(claimOnboarding.value.restricted));
 const showSetupProgress = computed(() => (
@@ -36,11 +37,55 @@ function closeMobileNavigation() {
     mobileNavigationOpen.value = false;
 }
 
+function submitDemoAction(url) {
+    // These endpoints can leave the Inertia application (for example, Exit
+    // redirects to the server-rendered demo page). Use a normal form submit so
+    // Inertia does not render that full HTML response as an overlay modal.
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = url;
+
+    const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    if (token) {
+        const csrf = document.createElement('input');
+        csrf.type = 'hidden';
+        csrf.name = '_token';
+        csrf.value = token;
+        form.append(csrf);
+    }
+
+    document.body.append(form);
+    form.submit();
+}
+
+function switchDemo(role) {
+    submitDemoAction(role === 'owner' ? interactiveDemo.value.owner_url : interactiveDemo.value.player_url);
+}
+
+function resetDemo() {
+    submitDemoAction(interactiveDemo.value.reset_url);
+}
+
+function exitDemo() {
+    submitDemoAction(interactiveDemo.value.exit_url);
+}
+
 watch(() => page.url, closeMobileNavigation);
 </script>
 
 <template>
     <div class="min-h-screen bg-[#f6f9fc]">
+        <div v-if="interactiveDemo" class="sticky top-0 z-50 border-b border-cyan-300/30 bg-court-950 px-4 py-2.5 text-white">
+            <div class="mx-auto flex max-w-screen-2xl flex-wrap items-center justify-between gap-2 text-xs sm:px-2 sm:text-sm">
+                <p><strong class="text-cyan-200">Live demo</strong><span class="mx-2 text-court-300">·</span>{{ interactiveDemo.venue_name }}<span class="ml-2 text-court-200">Payments and emails are simulated.</span></p>
+                <div class="flex items-center gap-2 font-semibold">
+                    <button type="button" :class="interactiveDemo.role === 'player' ? 'rounded-lg bg-cyan-300 px-3 py-1.5 text-court-950' : 'rounded-lg border border-white/20 px-3 py-1.5 hover:bg-white/10'" @click="switchDemo('player')">Player</button>
+                    <button type="button" :class="interactiveDemo.role === 'owner' ? 'rounded-lg bg-cyan-300 px-3 py-1.5 text-court-950' : 'rounded-lg border border-white/20 px-3 py-1.5 hover:bg-white/10'" @click="switchDemo('owner')">Court owner</button>
+                    <button type="button" class="px-2 py-1.5 text-court-100 hover:text-white" @click="resetDemo">Reset</button>
+                    <button type="button" class="px-2 py-1.5 text-court-100 hover:text-white" @click="exitDemo">Exit</button>
+                </div>
+            </div>
+        </div>
         <header class="sticky top-0 z-40 border-b border-court-900 bg-court-950 text-white lg:hidden" @keydown.esc="closeMobileNavigation">
             <div class="flex h-16 items-center justify-between gap-4 px-4">
                 <a :href="ownerLandingUrl" class="flex items-center gap-2.5 text-lg font-bold tracking-[0.08em]">
@@ -86,7 +131,7 @@ watch(() => page.url, closeMobileNavigation);
                     </template>
                     <Link v-if="isEmailVerified && organization?.role === 'owner'" href="/owner/directory-claims" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/directory-claims') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">Venue requests</Link>
                     <Link href="/owner/account" :class="['rounded-xl px-4 py-3 font-medium', isActive('/owner/account') ? 'bg-white text-court-950 shadow-sm' : 'text-court-100 hover:bg-white/10 hover:text-white']">My account</Link>
-                    <Link v-if="user?.is_platform_admin" href="/platform/dashboard" class="rounded-xl px-4 py-3 font-medium text-court-100 hover:bg-white/10 hover:text-white">Platform administration</Link>
+                    <Link v-if="user?.is_platform_admin && !interactiveDemo" href="/platform/dashboard" class="rounded-xl px-4 py-3 font-medium text-court-100 hover:bg-white/10 hover:text-white">Platform administration</Link>
                     <LogoutForm class="rounded-xl px-4 py-3 text-left font-medium text-court-100 hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60" />
                 </nav>
             </div>
@@ -149,7 +194,7 @@ watch(() => page.url, closeMobileNavigation);
                     </Link>
                     <LogoutForm class="rounded-lg p-2 text-sm font-semibold text-court-200 hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-60" aria-label="Sign out" />
                 </div>
-                <Link v-if="user?.is_platform_admin" href="/platform/dashboard" class="mt-3 block rounded-lg px-2 py-2 text-xs font-semibold text-court-200 hover:bg-white/10">Platform admin</Link>
+                <Link v-if="user?.is_platform_admin && !interactiveDemo" href="/platform/dashboard" class="mt-3 block rounded-lg px-2 py-2 text-xs font-semibold text-court-200 hover:bg-white/10">Platform admin</Link>
             </div>
         </aside>
 

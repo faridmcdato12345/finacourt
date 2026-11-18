@@ -42,6 +42,39 @@ function bindOnlineForms() {
     });
 }
 
+function bindHoldCountdowns() {
+    document.querySelectorAll('[data-hold-countdown]').forEach((countdown) => {
+        if (countdown.dataset.enhanced === 'true') return;
+        countdown.dataset.enhanced = 'true';
+
+        const expiresAt = Date.parse(countdown.dataset.expiresAt || '');
+        if (Number.isNaN(expiresAt)) {
+            countdown.textContent = 'Check booking status';
+            return;
+        }
+
+        const update = () => {
+            const remainingSeconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+            if (remainingSeconds === 0) {
+                countdown.textContent = 'Expired — refresh to check availability';
+                return true;
+            }
+
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            countdown.textContent = `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+
+            return false;
+        };
+
+        if (update()) return;
+
+        const interval = window.setInterval(() => {
+            if (update()) window.clearInterval(interval);
+        }, 1000);
+    });
+}
+
 function bindInstallPrompt() {
     const button = document.querySelector('[data-install-app]');
     if (!button) return;
@@ -475,6 +508,7 @@ window.addEventListener('offline', updateNetworkStatus);
 document.addEventListener('DOMContentLoaded', async () => {
     updateNetworkStatus();
     bindOnlineForms();
+    bindHoldCountdowns();
     bindInstallPrompt();
     bindDirectoryInfiniteScroll();
     bindPlayerExperience();

@@ -43,7 +43,7 @@ class PlayerReservationFlowTest extends TestCase
             'duration' => 60,
         ]))
             ->assertOk()
-            ->assertSee('Choose any consecutive available times within this date’s opening hours.')
+            ->assertSee('Tap open times and select consecutive slots on one court.')
             ->assertSee('data-maximum-duration="1440"', false)
             ->assertSee('data-slot-picker', false)
             ->assertSee('data-start="09:00"', false);
@@ -54,10 +54,12 @@ class PlayerReservationFlowTest extends TestCase
             ->assertSee('/storage/'.$coverPhoto->storage_path, false)
             ->assertSee('Players on the featured court')
             ->assertDontSee('Venue photo placeholder for '.$venue->name)
-            ->assertSee('Continue with a secure email link')
+            ->assertSee('Continue with email')
             ->assertSee('name="email"', false)
             ->assertSee('₱650.00')
-            ->assertDontSee('name="customer_name"', false);
+            ->assertDontSee('name="customer_name"', false)
+            ->assertDontSee('name="account_terms"', false)
+            ->assertDontSee('name="marketing_opt_in"', false);
     }
 
     public function test_guest_is_sent_to_player_login_only_when_creating_a_hold(): void
@@ -77,29 +79,22 @@ class PlayerReservationFlowTest extends TestCase
         $reviewPath = $this->reviewUrl($venue, $resource, $date, false);
 
         $this->post(route('player.guest-access.store', $venue->slug), [
-            'name' => 'Guest Player',
             'email' => 'GUEST@example.com',
             'resource' => $resource->getKey(),
             'date' => $date,
             'start' => '09:00',
             'duration' => 60,
-            'account_terms' => '1',
-            'marketing_opt_in' => '1',
         ])->assertRedirect($reviewPath)
-            ->assertSessionHas('status');
+            ->assertSessionHas('status', 'Check your email to continue. No password is needed. We will check live availability again before a hold is created.');
 
         $player = User::query()->where('email', 'guest@example.com')->firstOrFail();
+        $this->assertSame('Player', $player->name);
         $this->assertNull($player->email_verified_at);
         $this->assertDatabaseHas('passwordless_login_tokens', [
             'user_id' => $player->getKey(),
             'consumed_at' => null,
         ]);
-        $this->assertDatabaseHas('marketing_preferences', [
-            'user_id' => $player->getKey(),
-            'marketing_opt_in' => true,
-            'in_app_marketing_enabled' => true,
-            'email_marketing_enabled' => true,
-        ]);
+        $this->assertDatabaseMissing('marketing_preferences', ['user_id' => $player->getKey()]);
 
         $magicUrl = null;
         Notification::assertSentTo(
@@ -115,16 +110,31 @@ class PlayerReservationFlowTest extends TestCase
         $this->assertIsString($magicUrl);
         $this->get($magicUrl)
             ->assertRedirect($reviewPath)
-            ->assertSessionHas('status', 'Email verified. You are securely signed in.');
+            ->assertSessionHas('status', 'Email confirmed. Finish your booking below to create a short court hold.');
 
         $player->refresh();
         $this->assertAuthenticatedAs($player);
         $this->assertNotNull($player->email_verified_at);
         $this->assertNotNull(PasswordlessLoginToken::query()->firstOrFail()->consumed_at);
 
-        $this->post(route('player.bookings.store', $venue->slug), $this->holdData($resource))
+        $this->get($reviewPath)
+            ->assertOk()
+            ->assertSee('name="terms"', false)
+            ->assertSee('name="marketing_opt_in"', false)
+            ->assertSee('Allow optional comeback messages');
+
+        $this->post(route('player.bookings.store', $venue->slug), [
+            ...$this->holdData($resource),
+            'marketing_opt_in' => '1',
+        ])
             ->assertRedirect();
         $this->assertDatabaseHas('bookings', ['player_user_id' => $player->getKey()]);
+        $this->assertDatabaseHas('marketing_preferences', [
+            'user_id' => $player->getKey(),
+            'marketing_opt_in' => true,
+            'in_app_marketing_enabled' => true,
+            'email_marketing_enabled' => true,
+        ]);
 
         $this->post(route('logout'));
         $this->get($magicUrl)
@@ -233,6 +243,12 @@ class PlayerReservationFlowTest extends TestCase
         $this->assertSame('650.00', $booking->total_amount);
         $this->assertSame($player->email, $booking->customer_email);
         $this->assertNotNull($booking->expires_at);
+
+        $this->actingAs($player)
+            ->get(route('player.bookings.show', $booking->reference))
+            ->assertOk()
+            ->assertSee('data-hold-countdown', false)
+            ->assertSee('Time remaining:');
     }
 
     public function test_consecutive_slots_create_one_multi_hour_hold_with_server_calculated_price(): void

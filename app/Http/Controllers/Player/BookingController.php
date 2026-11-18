@@ -4,13 +4,13 @@ namespace App\Http\Controllers\Player;
 
 use App\Analytics\AnalyticsRecorder;
 use App\Analytics\TrafficAttribution;
-use App\CustomerOffers\CustomerOfferService;
 use App\Bookings\AvailabilityService;
 use App\Bookings\BookingPrice;
 use App\Bookings\CancelBooking;
 use App\Bookings\ConfirmPlayerBooking;
 use App\Bookings\CreateBooking;
 use App\Bookings\CreateReservationGroup;
+use App\CustomerOffers\CustomerOfferService;
 use App\Enums\AcquisitionSource;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
@@ -19,6 +19,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\PlayerPaymentOption;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePlayerHoldRequest;
+use App\InteractiveDemo\InteractiveDemoWorkspaceManager;
 use App\Loyalty\VenueLoyalty;
 use App\Marketplace\MarketplaceQuery;
 use App\Models\Booking;
@@ -55,9 +56,11 @@ class BookingController extends Controller
         PromotionMarketplace $promotionMarketplace,
         PaymentProviderRegistry $payments,
         PlatformServiceFeeCalculator $serviceFees,
+        InteractiveDemoWorkspaceManager $demo,
     ): View {
+        $demoWorkspace = $demo->playerWorkspaceForVenue($request, $venueSlug);
         $validated = $request->validate($this->multiSelectionRules());
-        $venue = $marketplace->venue($venueSlug);
+        $venue = $marketplace->venue($venueSlug, $demoWorkspace?->venue_id);
         $seen = [];
         $selections = collect($validated['resources'])->map(function (array $selection) use ($venue, $availability, $prices, $promotionApplicability, $promotionMarketplace, $serviceFees, &$seen): array {
             $resource = $venue->resources->firstWhere('id', (int) $selection['resource_id']);
@@ -89,6 +92,7 @@ class BookingController extends Controller
             } catch (ValidationException $exception) {
                 $error = collect($exception->errors())->flatten()->first();
             }
+
             return [
                 'resource' => $resource, 'date' => $selection['date'], 'startTime' => $selection['start_time'], 'endTime' => $endTime,
                 'duration' => $duration, 'price' => $price, 'payAtVenueCourtPrice' => $price,
@@ -100,8 +104,10 @@ class BookingController extends Controller
                 'availabilityError' => $error,
             ];
         })->all();
-        $online = $payments->online();
+        $isInteractiveDemo = $demoWorkspace !== null;
+        $online = $isInteractiveDemo ? $payments->find('demo') : $payments->online();
         $onlineAvailable = $online?->supportsHostedCheckout() === true;
+
         return view('player.bookings.create-multi', [
             'venue' => $venue, 'courtSelections' => $selections,
             'hasErrors' => collect($selections)->contains(fn (array $item) => $item['availabilityError'] !== null),
@@ -119,15 +125,18 @@ class BookingController extends Controller
         MarketplaceQuery $marketplace,
         CreateReservationGroup $groups,
         PaymentProviderRegistry $payments,
+        InteractiveDemoWorkspaceManager $demo,
     ): RedirectResponse {
+        $demoWorkspace = $demo->playerWorkspaceForVenue($request, $venueSlug);
         $validated = $request->validate(array_merge($this->multiSelectionRules('resources.*.booking_date'), [
             'customer_name' => ['required', 'string', 'max:120'],
             'customer_phone' => ['nullable', 'string', 'max:40'],
             'payment_option' => ['required', 'in:online,pay_at_venue'],
         ]));
-        $venue = $marketplace->venue($venueSlug);
-        $option = PlayerPaymentOption::from($validated['payment_option']);
-        $provider = $payments->forPlayerOption($option);
+        $venue = $marketplace->venue($venueSlug, $demoWorkspace?->venue_id);
+        $isInteractiveDemo = $demoWorkspace !== null;
+        $option = $isInteractiveDemo ? PlayerPaymentOption::Online : PlayerPaymentOption::from($validated['payment_option']);
+        $provider = $isInteractiveDemo ? $payments->find('demo') : $payments->forPlayerOption($option);
         if ($provider === null || ($option === PlayerPaymentOption::Online && ! $provider->supportsHostedCheckout())) {
             throw ValidationException::withMessages(['payment_option' => 'That payment option is unavailable.']);
         }
@@ -138,9 +147,11 @@ class BookingController extends Controller
         ])->all();
         $group = $groups->handle($venue, $request->user(), $selections, $validated['customer_name'], $validated['customer_phone'] ?? null, $provider->key());
         $anchor = $group->bookings->first();
+
         return redirect()->route('player.bookings.show', $anchor->reference)
             ->with('status', 'All selected courts are held together. Complete one payment before the hold expires.');
     }
+
     public function create(
         Request $request,
         string $venueSlug,
@@ -155,10 +166,12 @@ class BookingController extends Controller
         PlatformServiceFeeCalculator $serviceFees,
         VenueLoyalty $loyalty,
         CustomerOfferService $customerOffers,
+        InteractiveDemoWorkspaceManager $demo,
     ): View {
+        $demoWorkspace = $demo->playerWorkspaceForVenue($request, $venueSlug);
         $validated = $request->validate($this->selectionRules());
         $attribution->current($request);
-        $venue = $marketplace->venue($venueSlug);
+        $venue = $marketplace->venue($venueSlug, $demoWorkspace?->venue_id);
         $resource = $venue->resources->firstWhere('id', (int) $validated['resource']);
         abort_if(! $resource, 404);
         $resource->setRelation('venue', $venue);
@@ -210,8 +223,9 @@ class BookingController extends Controller
         }
 
         $returnUrl = $request->getRequestUri();
-        $defaultPaymentProvider = $payments->default();
-        $onlinePaymentProvider = $payments->online();
+        $isInteractiveDemo = $demoWorkspace !== null;
+        $defaultPaymentProvider = $isInteractiveDemo ? $payments->find('demo') : $payments->default();
+        $onlinePaymentProvider = $isInteractiveDemo ? $payments->find('demo') : $payments->online();
         $onlinePaymentAvailable = $onlinePaymentProvider?->supportsHostedCheckout() === true;
         $defaultPaymentOption = $onlinePaymentAvailable
             && $defaultPaymentProvider->mode() === PaymentMode::HostedCheckout
@@ -224,6 +238,7 @@ class BookingController extends Controller
             && $window !== null
             && $onlinePaymentAvailable
             && $request->user() !== null
+            && ($promotion === null || $promotion->allow_loyalty_stacking)
             ? collect($loyaltyBalance['rewards'])->first(fn (array $reward): bool => $reward['rewards_available'] > 0)
             : null;
 
@@ -285,9 +300,11 @@ class BookingController extends Controller
         TrafficAttribution $attribution,
         AnalyticsRecorder $analytics,
         PaymentProviderRegistry $payments,
+        InteractiveDemoWorkspaceManager $demo,
     ): RedirectResponse {
+        $demoWorkspace = $demo->playerWorkspaceForVenue($request, $venueSlug);
         $validated = $request->validated();
-        $venue = $marketplace->venue($venueSlug);
+        $venue = $marketplace->venue($venueSlug, $demoWorkspace?->venue_id);
         $resource = $venue->resources->firstWhere('id', (int) $validated['resource_id']);
 
         if (! $resource) {
@@ -316,12 +333,20 @@ class BookingController extends Controller
             )?->campaign_token;
         }
 
-        $paymentOption = isset($validated['payment_option'])
+        $isInteractiveDemo = $demoWorkspace !== null;
+        if ($isInteractiveDemo) {
+            $rewardVersion = $validated['loyalty_reward_version'] ?? null;
+        }
+        $paymentOption = $isInteractiveDemo
+            ? PlayerPaymentOption::Online
+            : (isset($validated['payment_option'])
             ? PlayerPaymentOption::from($validated['payment_option'])
-            : null;
-        $paymentProvider = $paymentOption === null
+            : null);
+        $paymentProvider = $isInteractiveDemo
+            ? $payments->find('demo')
+            : ($paymentOption === null
             ? $payments->default()
-            : $payments->forPlayerOption($paymentOption);
+            : $payments->forPlayerOption($paymentOption));
 
         if (
             $paymentProvider === null
@@ -336,6 +361,19 @@ class BookingController extends Controller
             ? $venue->promotions()->where('campaign_token', $campaign)->first()
             : null;
         $traffic = $attribution->current($request);
+
+        if ($request->boolean('marketing_opt_in')) {
+            $player = $request->user();
+            $preference = $player->marketingPreference;
+            $player->marketingPreference()->updateOrCreate([], [
+                'marketing_opt_in' => true,
+                'in_app_marketing_enabled' => true,
+                'email_marketing_enabled' => true,
+                'opted_in_at' => $preference?->opted_in_at ?? now('UTC'),
+                'opted_out_at' => null,
+                'unsubscribed_at' => null,
+            ]);
+        }
 
         $booking = $createBooking->handle(
             $venue->organization_id,
@@ -478,7 +516,24 @@ class BookingController extends Controller
         Request $request,
         string $reference,
         StartHostedCheckout $checkout,
+        InteractiveDemoWorkspaceManager $demo,
     ): RedirectResponse {
+        $booking = $this->playerBooking($request, $reference);
+
+        // Fail closed for any historical or crafted non-demo booking that a
+        // demo identity could otherwise reach. Only its own demo venue may use
+        // the simulated provider.
+        if ($demo->playerWorkspace($request) !== null && ! $demo->isActiveForBooking($request, $booking)) {
+            abort(404);
+        }
+
+        if ($demo->isActiveForBooking($request, $booking)) {
+            $demo->completeSimulatedCheckout($request, $booking);
+
+            return redirect()->route('player.bookings.show', $booking->reference)
+                ->with('status', 'Demo payment complete. This reservation is confirmed; no real charge, email, or provider call was made.');
+        }
+
         $session = $checkout->handle($reference, $request->user());
 
         return redirect()->away($session->url);

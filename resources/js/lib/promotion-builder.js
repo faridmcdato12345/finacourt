@@ -51,7 +51,12 @@ export function normalizePromotionPayload(data, strategy) {
 
     normalized.is_public = ['scheduled', 'active'].includes(normalized.status);
 
-    if (!normalized.discount_type) normalized.discount_value = null;
+    if (!normalized.discount_type || normalized.discount_type === 'bonus_hours') normalized.discount_value = null;
+
+    if (normalized.discount_type !== 'bonus_hours') {
+        normalized.qualifying_minutes = null;
+        normalized.bonus_minutes = null;
+    }
 
     return normalized;
 }
@@ -61,6 +66,8 @@ export function promotionPricePreview({
     durationMinutes = 60,
     discountType = null,
     discountValue = null,
+    qualifyingMinutes = null,
+    bonusMinutes = null,
     serviceFee = null,
 }) {
     const originalUnitCents = moneyToCents(baseHourlyRate);
@@ -78,7 +85,13 @@ export function promotionPricePreview({
     }
 
     const originalTotalCents = durationTotal(originalUnitCents, durationMinutes);
-    const venueTotalCents = durationTotal(unitCents, durationMinutes);
+    const bonusEligible = discountType === 'bonus_hours'
+        && Number(qualifyingMinutes) > 0
+        && Number(bonusMinutes) > 0
+        && Number(durationMinutes) >= Number(qualifyingMinutes) + Number(bonusMinutes);
+    const venueTotalCents = bonusEligible
+        ? durationTotal(originalUnitCents, Number(durationMinutes) - Number(bonusMinutes))
+        : durationTotal(unitCents, durationMinutes);
     const serviceFeeCents = calculateServiceFee(venueTotalCents, serviceFee);
 
     return {

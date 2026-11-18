@@ -11,6 +11,8 @@ account_password="${DEMO_VIDEO_ACCOUNT_PASSWORD:-finacourt-demo-only}"
 reuse_scenes="${DEMO_VIDEO_REUSE_SCENES:-0}"
 start_at_scene="${DEMO_VIDEO_START_AT:-}"
 variant="${DEMO_VIDEO_VARIANT:-standard}"
+profile="${DEMO_VIDEO_PROFILE:-seeded}"
+manifest_filename="manifest.json"
 
 case "${variant}" in
     standard)
@@ -41,8 +43,15 @@ case "${variant}" in
         minimum_duration=135
         maximum_duration=145
         ;;
+    tutorial)
+        scenes=(intro owner-dashboard owner-venue owner-courts owner-promotions owner-promotion-wizard owner-loyalty owner-team owner-bookings owner-emergency owner-earnings owner-reactivation owner-analytics player-transition player-mobile-discovery player-mobile-venue player-mobile-schedule player-mobile-booking player-mobile-bookings player-mobile-game-pass outro)
+        scene_durations=(8 13 15 15 13 16 14 12 13 13 13 14 14 4 15 18 18 16 17 16 9)
+        final_filename="finacourt-owner-player-tutorial.mp4"
+        minimum_duration=270
+        maximum_duration=300
+        ;;
     *)
-        echo "Unknown DEMO_VIDEO_VARIANT: ${variant}. Use standard, owner, owner-earnings, or full." >&2
+    echo "Unknown DEMO_VIDEO_VARIANT: ${variant}. Use standard, owner, owner-earnings, full, or tutorial." >&2
         exit 1
         ;;
 esac
@@ -74,11 +83,23 @@ cleanup() {
 trap cleanup EXIT
 cleanup
 
-echo "Preparing isolated FinACourt demo data..."
-docker compose exec -T app php artisan migrate --force
-docker compose exec -T \
-    -e DEMO_VIDEO_ACCOUNT_PASSWORD="${account_password}" \
-    app php artisan finacourt:demo-video-seed
+if [[ "${variant}" == "tutorial" ]]; then
+    if [[ "${profile}" != "current-development-data" ]]; then
+        echo "The tutorial variant requires DEMO_VIDEO_PROFILE=current-development-data." >&2
+        exit 1
+    fi
+
+    account_password="${DEMO_VIDEO_CURRENT_ACCOUNT_PASSWORD:-password}"
+    manifest_filename="tutorial-manifest.json"
+    echo "Building a read-only manifest from approved development demo data..."
+    docker compose exec -T app php artisan finacourt:demo-video-current-manifest
+else
+    echo "Preparing isolated FinACourt demo data..."
+    docker compose exec -T app php artisan migrate --force
+    docker compose exec -T \
+        -e DEMO_VIDEO_ACCOUNT_PASSWORD="${account_password}" \
+        app php artisan finacourt:demo-video-seed
+fi
 
 resume_reached=0
 if [[ -z "${start_at_scene}" ]]; then
@@ -160,16 +181,23 @@ done
 
 record_scene() {
     local scene="$1"
+    local record_mode="desktop"
     local automation_pid
     local automation_status
     local ffmpeg_pid
 
-    echo "Recording ${scene} scene..."
+    if [[ "${scene}" == player-mobile-* ]]; then
+        record_mode="mobile"
+    fi
+
+    echo "Recording ${scene} scene (${record_mode})..."
     docker compose exec -T \
         -e SELENIUM_URL="http://${browser_name}:4444" \
         -e APP_URL="http://localhost:8000" \
         -e DEMO_VIDEO_ACCOUNT_PASSWORD="${account_password}" \
         -e DEMO_VIDEO_OUTPUT="/var/www/html/output/demo-video" \
+        -e DEMO_VIDEO_MANIFEST="${manifest_filename}" \
+        -e DEMO_VIDEO_RECORD_MODE="${record_mode}" \
         node node tools/demo-video/record-scene.mjs "${scene}" \
         >"${output_directory}/scene-${scene}.automation.log" 2>&1 &
     automation_pid=$!
@@ -192,6 +220,7 @@ record_scene() {
         exit 1
     fi
 
+    docker exec "${browser_name}" bash -lc "DISPLAY=:99 xsetroot -solid '#061b2c'" >/dev/null 2>&1 || true
     docker exec -d "${browser_name}" bash -lc "
         ffmpeg -hide_banner -loglevel warning -y \
             -f x11grab -draw_mouse 0 -framerate 30 -video_size 1920x1080 -i :99.0 \
@@ -278,12 +307,27 @@ else
 fi
 
 echo "Trimming recorder pre-roll and assembling the final pacing..."
+pre_roll="0.70"
+if [[ "${variant}" == "tutorial" ]]; then
+    # Tutorial scenes already include a deliberate settled pause. Retain it so
+    # the long-form owner-to-player walkthrough keeps its intended 4–5 minute pace.
+    pre_roll="0.10"
+fi
 for index in "${!scenes[@]}"; do
     scene="${scenes[$index]}"
     duration="${scene_durations[$index]}"
+    scene_filter="null"
+
+    if [[ "${variant}" == "tutorial" && "${scene}" == player-mobile-* ]]; then
+        # Selenium's Xvfb window adds desktop chrome around the narrow viewport.
+        # Keep only the app viewport and its injected bezel, centered on the
+        # tutorial background, so player chapters look like a phone recording.
+        scene_filter='crop=460:1000:730:40,pad=1920:1080:730:40:color=0x061b2c'
+    fi
+
     docker exec "${browser_name}" ffmpeg -hide_banner -loglevel warning -y \
-        -ss 0.70 -i "/output/scene-${scene}.mp4" -t "${duration}" \
-        -an -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -r 30 \
+        -ss "${pre_roll}" -i "/output/scene-${scene}.mp4" -t "${duration}" \
+        -vf "${scene_filter}" -an -c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p -r 30 \
         "/output/scene-${scene}.trimmed.mp4"
 done
 
@@ -294,9 +338,15 @@ for scene in "${scenes[@]}"; do
 done
 
 echo "Encoding final H.264 MP4..."
+final_video_filter='fps=30,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2'
+if [[ "${variant}" == "tutorial" ]]; then
+    # Leave the closing owner-to-player call to action on screen long enough
+    # to be read when posted as a standard Facebook video.
+    final_video_filter+=',tpad=stop_mode=clone:stop_duration=12'
+fi
 docker exec "${browser_name}" ffmpeg -hide_banner -loglevel warning -y \
     -f concat -safe 0 -i /output/scenes.txt \
-    -vf 'fps=30,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2' \
+    -vf "${final_video_filter}" \
     -an -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p -r 30 -movflags +faststart \
     "/output/${final_filename}"
 

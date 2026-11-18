@@ -38,9 +38,12 @@ class PromotionMarketplace
     public function forVenue(Venue $venue): Collection
     {
         $venue->loadMissing('organization:id,timezone');
+        $activeDemoVenueId = $venue->interactiveDemoWorkspace()->exists()
+            ? $venue->getKey()
+            : null;
 
         return $venue->promotions()
-            ->publicInventory()
+            ->publicInventory($activeDemoVenueId)
             ->with([
                 'resource:id,venue_id,sport_id,name,is_active,base_hourly_rate,currency',
                 'audienceSport:id,name,slug',

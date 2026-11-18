@@ -45,6 +45,12 @@ class PromotionApplicability
             ]);
         }
 
+        if (! $promotion->hasRedemptionCapacity()) {
+            throw ValidationException::withMessages([
+                'campaign' => 'This deal has reached its booking limit. Choose another available offer or time.',
+            ]);
+        }
+
         return $promotion;
     }
 
@@ -59,7 +65,7 @@ class PromotionApplicability
                 $resource,
                 $window->localStart,
                 $window->localEnd,
-            ))
+            ) && $candidate->hasRedemptionCapacity())
             ->map(fn (Promotion $candidate) => [
                 'promotion' => $candidate,
                 'price' => $this->prices->quote($resource, $window->durationMinutes, $candidate, $window),

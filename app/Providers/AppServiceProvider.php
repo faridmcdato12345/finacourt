@@ -21,6 +21,7 @@ use App\Payments\Contracts\PaymentProvider;
 use App\Payments\PaymentProviderRegistry;
 use App\Payments\Providers\ManualPaymentProvider;
 use App\Payments\Providers\PayMongoPaymentProvider;
+use App\Payments\Providers\SimulatedDemoPaymentProvider;
 use App\Payouts\Contracts\PayoutProvider;
 use App\Payouts\Providers\ManualPayoutProvider;
 use App\Policies\BookingPolicy;
@@ -71,6 +72,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(BusinessProfileGateway::class, StoredBusinessProfileGateway::class);
         $this->app->singleton(ManualPaymentProvider::class);
         $this->app->singleton(PayMongoPaymentProvider::class);
+        $this->app->singleton(SimulatedDemoPaymentProvider::class);
         // Owner payouts stay manual until this deployment has an activated
         // provider wallet and a tested transfer/callback integration.
         $this->app->singleton(ManualPayoutProvider::class);
@@ -84,7 +86,7 @@ class AppServiceProvider extends ServiceProvider
             return $app->make(ManualPayoutProvider::class);
         });
         $this->app->singleton(PaymentProviderRegistry::class, function ($app) {
-            $providers = [$app->make(ManualPaymentProvider::class)];
+            $providers = [$app->make(ManualPaymentProvider::class), $app->make(SimulatedDemoPaymentProvider::class)];
             $defaultProvider = (string) config('payments.default', 'manual');
             $payMongoEnabled = (bool) config('payments.providers.paymongo.enabled', false);
 

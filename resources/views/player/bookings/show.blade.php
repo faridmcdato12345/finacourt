@@ -153,6 +153,9 @@
                     <div class="relative">
                         <p class="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">Your time is in the locker</p>
                         <h2 class="mt-2 text-2xl font-semibold text-amber-950">Finish before the hold runs out</h2>
+                        <p class="mt-4 text-sm font-semibold text-amber-950">
+                            Time remaining: <span data-hold-countdown data-expires-at="{{ $booking->expires_at->utc()->toIso8601String() }}">Calculating…</span>
+                        </p>
                         <p class="mt-2 text-sm leading-6 text-amber-800">Held until {{ $booking->expires_at->setTimezone($booking->timezone)->format('M j, Y · H:i') }}. FinACourt checks the court again before confirming.</p>
 
                         @if ($booking->payment_mode === App\Enums\PaymentMode::HostedCheckout)

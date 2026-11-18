@@ -52,6 +52,10 @@ class Venue extends Model
     public function scopeMarketplace(Builder $query): void
     {
         $query->where('is_published', true)
+            // Interactive-demo workspaces use the same database to exercise
+            // real booking logic. They are intentionally never catalogue,
+            // search, sitemap, or public-deal inventory.
+            ->whereDoesntHave('interactiveDemoWorkspace')
             ->whereNotNull('city_slug')
             ->where('city_slug', '!=', '')
             // A directory claim never becomes bookable merely because an
@@ -186,6 +190,12 @@ class Venue extends Model
     public function application(): HasOne
     {
         return $this->hasOne(VenueApplication::class);
+    }
+
+    /** @return HasOne<InteractiveDemoWorkspace, $this> */
+    public function interactiveDemoWorkspace(): HasOne
+    {
+        return $this->hasOne(InteractiveDemoWorkspace::class);
     }
 
     public function requiresPlatformReview(): bool

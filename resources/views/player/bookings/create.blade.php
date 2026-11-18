@@ -44,18 +44,13 @@
 
                         <span class="grid size-11 place-items-center rounded-2xl bg-court-50 text-court-700"><svg viewBox="0 0 24 24" class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 8a7 7 0 0 0-14 0" /></svg></span>
                         <p class="mt-4 eyebrow">No password required</p>
-                        <h2 class="mt-2 text-xl font-semibold">Continue with a secure email link</h2>
-                        <p class="mt-2 text-sm leading-6 text-slate-600">We’ll create your player account and email a one-time link. Your bookings, cancellations, payment updates, and eligible refunds will stay available through the same email.</p>
+                        <h2 class="mt-2 text-xl font-semibold">Continue with email</h2>
+                        <p class="mt-2 text-sm leading-6 text-slate-600">We’ll email a secure sign-in link. No password needed.</p>
 
                         @if ($errors->any())<div class="mt-5 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{{ $errors->first() }}</div>@endif
-                        <div class="mt-6 grid gap-5 sm:grid-cols-2">
-                            <label class="block"><span class="text-sm font-medium">Name</span><input name="name" value="{{ old('name') }}" autocomplete="name" required autofocus class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label>
-                            <label class="block"><span class="text-sm font-medium">Email</span><input name="email" type="email" value="{{ old('email') }}" autocomplete="email" required class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label>
-                        </div>
-                        <label class="mt-5 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><input name="account_terms" type="checkbox" value="1" required class="mt-1 rounded border-slate-300"><span>I agree to the <a href="{{ route('marketplace.terms', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</span></label>
-                        <label class="mt-3 flex items-start gap-3 rounded-xl border border-court-200 bg-court-50/60 p-4 text-sm leading-6 text-slate-600"><input name="marketing_opt_in" type="checkbox" value="1" @checked(old('marketing_opt_in')) class="mt-1 rounded border-slate-300 text-court-700 focus:ring-court-500"><span><strong class="block text-slate-900">Allow optional comeback messages</strong><span class="mt-1 block">Receive occasional private offers and game updates through your FinACourt account and email from venues where you have completed a booking. You can change this anytime.</span></span></label>
-                        <button data-loading-label="Sending secure link…" class="mt-6 min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Email me a secure link</button>
-                        <p class="mt-4 text-center text-xs leading-5 text-slate-500">The link expires in {{ config('auth.passwordless.expire') }} minutes. This court is not held until you return and submit the reservation.</p>
+                        <label class="mt-6 block"><span class="text-sm font-medium">Email address</span><input name="email" type="email" value="{{ old('email') }}" autocomplete="email" required autofocus class="mt-2 w-full rounded-xl border-slate-300 px-4 py-3"></label>
+                        <button data-loading-label="Sending secure link…" class="mt-6 min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Continue with email</button>
+                        <p class="mt-4 text-center text-xs leading-5 text-slate-500">The secure link expires in {{ config('auth.passwordless.expire') }} minutes. We’ll ask for the remaining booking details after your email is confirmed.</p>
                         <div class="mt-5 border-t border-slate-100 pt-5 text-center text-sm text-slate-500">Already have an account? <a href="{{ route('player.login', ['return' => $returnUrl]) }}" class="font-semibold text-court-700">Sign in</a></div>
                     </form>
                 @else
@@ -127,8 +122,8 @@
                                 <span><strong>Use one loyalty reward on this booking</strong><span class="mt-1 block">{{ number_format((float) $loyaltyReward['discount_percent'], 2) }}% off the court price after any deal, up to ₱{{ number_format((float) $loyaltyReward['discount_cap'], 2) }}. Save ₱{{ number_format((float) $loyaltyReward['discount'], 2) }} here, or leave this unchecked and save the reward for another booking. The oldest available reward is offered first. Online payment required; your deal and loyalty reward both apply.</span></span>
                             </label>
                         @endif
-                        <label class="mt-6 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><input name="terms" type="checkbox" value="1" required class="mt-1 rounded border-slate-300"><span>I understand this creates a {{ config('booking.hold_minutes') }}-minute hold. FinACourt will check the court and payment status again before confirming.</span></label>
-                        <p class="mt-3 text-xs leading-5 text-slate-500">By continuing, you agree to the <a href="{{ route('marketplace.terms', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Terms of Service</a> and acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>.</p>
+                        <label class="mt-6 flex items-start gap-3 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600"><input name="terms" type="checkbox" value="1" required class="mt-1 rounded border-slate-300"><span>I agree to the <a href="{{ route('marketplace.terms', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Terms of Service</a>, acknowledge the <a href="{{ route('marketplace.privacy', [], false) }}" target="_blank" rel="noopener" class="font-semibold text-court-700 hover:underline">Privacy Policy</a>, and understand this creates a {{ config('booking.hold_minutes') }}-minute hold.</span></label>
+                        <label class="mt-3 flex items-start gap-3 rounded-xl border border-court-200 bg-court-50/60 p-4 text-sm leading-6 text-slate-600"><input name="marketing_opt_in" type="checkbox" value="1" @checked(old('marketing_opt_in')) class="mt-1 rounded border-slate-300 text-court-700 focus:ring-court-500"><span><strong class="block text-slate-900">Allow optional comeback messages</strong><span class="mt-1 block">Receive occasional private offers and game updates through your FinACourt account and email from venues where you have completed a booking. You can change this anytime.</span></span></label>
                         <button data-loading-label="Securing your hold…" class="mt-6 min-h-12 w-full rounded-xl bg-court-700 px-5 py-3.5 font-semibold text-white hover:bg-court-800">Hold this time for {{ config('booking.hold_minutes') }} minutes</button>
                     </form>
                 @endguest
@@ -165,6 +160,9 @@
                 <div class="mx-5 rounded-xl bg-amber-50 p-4">
                     <p class="text-xs font-semibold uppercase tracking-wider text-amber-700">{{ $promotion->offerLabel() ?: $promotion->promotion_type->label() }}</p>
                     <p class="mt-1 text-sm font-semibold">{{ $promotion->title }}</p>
+                    @if ($promotion->isBonusHoursPromotion())
+                        <p class="mt-2 text-xs leading-5 text-amber-950">Reserve at least {{ $promotion->bonusMinimumDurationMinutes() }} consecutive minutes on this court. The final {{ $promotion->bonus_minutes }} minutes are held with your game at no court charge.</p>
+                    @endif
                 </div>
             @endif
             @if ($customerOffer)
