@@ -6,6 +6,7 @@ use App\Analytics\AnalyticsRecorder;
 use App\Bookings\AvailabilityService;
 use App\Bookings\BookingPrice;
 use App\Http\Controllers\Controller;
+use App\InteractiveDemo\InteractiveDemoWorkspaceManager;
 use App\Marketplace\MarketplaceQuery;
 use App\Marketplace\StructuredData;
 use App\Marketplace\VenueMap;
@@ -23,6 +24,7 @@ class VenueController extends Controller
     public function __invoke(
         Request $request,
         string $venueSlug,
+        InteractiveDemoWorkspaceManager $demo,
         MarketplaceQuery $marketplace,
         AvailabilityService $availabilityService,
         BookingPrice $prices,
@@ -33,7 +35,10 @@ class VenueController extends Controller
         AnalyticsRecorder $analytics,
         VenueMap $maps,
     ): View {
-        $venue = $marketplace->venue($venueSlug);
+        $venue = $marketplace->venue(
+            $venueSlug,
+            $demo->current($request)?->venue_id,
+        );
         $analytics->recordVenueProfileView($request, $venue);
         $validated = $request->validate([
             'resource' => ['nullable', 'integer'],

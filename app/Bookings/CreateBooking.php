@@ -117,6 +117,12 @@ class CreateBooking
                     ]);
                 }
 
+                if ($promotion !== null && ! $promotion->allow_loyalty_stacking) {
+                    throw ValidationException::withMessages([
+                        'loyalty' => 'This deal cannot be combined with a loyalty reward. Save the reward for another booking.',
+                    ]);
+                }
+
                 $quote = $this->loyalty->discountedQuote(
                     $price, $window->durationMinutes, $reward['discount_percent'], $reward['discount_cap'],
                 );
@@ -233,5 +239,4 @@ class CreateBooking
 
         return (int) $whole * 100 + (int) str_pad(substr($fraction, 0, 2), 2, '0');
     }
-
 }

@@ -215,10 +215,20 @@ class MarketplaceQuery
         );
     }
 
-    public function venue(string $slug): Venue
+    public function venue(string $slug, ?int $activeDemoVenueId = null): Venue
     {
-        $venue = $this->venueQuery()
+        $venue = Venue::query()
             ->where('slug', $slug)
+            ->where(function (Builder $query) use ($activeDemoVenueId): void {
+                $query->marketplace();
+
+                // A live-demo participant may access only the venue assigned
+                // to their current workspace. Demo venues remain invisible to
+                // every public catalogue and to other demo workspaces.
+                if ($activeDemoVenueId !== null) {
+                    $query->orWhere('venues.id', $activeDemoVenueId);
+                }
+            })
             ->withCount([
                 'reviews as published_reviews_count' => fn (Builder $query) => $query->published(),
             ])

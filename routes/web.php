@@ -4,6 +4,8 @@ use App\Auth\OwnerClaimInvitationContext;
 use App\Enums\MembershipRole;
 use App\Http\Controllers\AccountPasswordResetController;
 use App\Http\Controllers\AccountSettingsController;
+use App\Http\Controllers\InteractiveDemoController;
+use App\Http\Middleware\RestrictInteractiveDemoPlayer;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\SocialAuthenticationController;
@@ -94,7 +96,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::middleware('throttle:marketplace')->group(function () {
+Route::middleware([RestrictInteractiveDemoPlayer::class, 'throttle:marketplace'])->group(function () {
+    Route::get('/demo', [InteractiveDemoController::class, 'show'])->name('interactive-demo.show');
+    Route::get('/demo/player', [InteractiveDemoController::class, 'player'])->name('interactive-demo.player');
     Route::get('/', HomeController::class)->name('marketplace.home');
     Route::get('/for-court-owners', [OwnerAcquisitionController::class, 'show'])
         ->name('marketplace.for-owners');
@@ -121,6 +125,19 @@ Route::middleware('throttle:marketplace')->group(function () {
     Route::get('/venues/{venueSlug}', MarketplaceVenueController::class)
         ->name('marketplace.venues.show');
 });
+Route::post('/demo/start', [InteractiveDemoController::class, 'start'])
+    ->middleware('throttle:marketplace')
+    ->name('interactive-demo.start');
+Route::post('/demo/switch/{role}', [InteractiveDemoController::class, 'switch'])
+    ->whereIn('role', ['player', 'owner'])
+    ->middleware('throttle:marketplace')
+    ->name('interactive-demo.switch');
+Route::post('/demo/reset', [InteractiveDemoController::class, 'reset'])
+    ->middleware('throttle:marketplace')
+    ->name('interactive-demo.reset');
+Route::post('/demo/exit', [InteractiveDemoController::class, 'exit'])
+    ->middleware('throttle:marketplace')
+    ->name('interactive-demo.exit');
 Route::post('/directory/{directoryListing}/report', VenueDirectoryReportController::class)
     ->middleware('throttle:directory-report')
     ->name('marketplace.directory.report');

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BookingStatus;
 use App\Enums\PromotionDiscountType;
 use App\Enums\PromotionGoal;
 use App\Enums\PromotionStatus;
@@ -29,6 +30,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'status',
     'discount_type',
     'discount_value',
+    'qualifying_minutes',
+    'bonus_minutes',
+    'max_redemptions',
+    'allow_loyalty_stacking',
     'starts_on',
     'ends_on',
     'targets_specific_slots',
@@ -47,7 +52,7 @@ class Promotion extends Model
     use HasFactory;
 
     /** @param Builder<Promotion> $query */
-    public function scopePublicInventory(Builder $query): void
+    public function scopePublicInventory(Builder $query, ?int $activeDemoVenueId = null): void
     {
         $query->where('is_active', true)
             ->where(function (Builder $query): void {
@@ -62,9 +67,15 @@ class Promotion extends Model
             // date. Explicitly active promotions are released immediately, even
             // when their eligible booking dates are still in the future.
             ->whereDate('ends_on', '>=', now()->subDay()->toDateString())
-            ->whereHas('venue', fn (Builder $query) => $query
-                ->marketplace()
-                ->whereColumn('venues.organization_id', 'promotions.organization_id'))
+            ->whereHas('venue', function (Builder $query) use ($activeDemoVenueId): void {
+                $query->where(function (Builder $query) use ($activeDemoVenueId): void {
+                    $query->marketplace();
+
+                    if ($activeDemoVenueId !== null) {
+                        $query->orWhere('venues.id', $activeDemoVenueId);
+                    }
+                })->whereColumn('venues.organization_id', 'promotions.organization_id');
+            })
             ->where(function (Builder $query): void {
                 $query->whereNull('resource_id')
                     ->orWhereHas('resource', fn (Builder $query) => $query
@@ -95,6 +106,11 @@ class Promotion extends Model
         $date = $localStart->toDateString();
 
         if ($date < $this->starts_on->toDateString() || $date > $this->ends_on->toDateString()) {
+            return false;
+        }
+
+        if ($this->isBonusHoursPromotion()
+            && $localStart->diffInMinutes($localEnd) < $this->bonusMinimumDurationMinutes()) {
             return false;
         }
 
@@ -214,6 +230,7 @@ class Promotion extends Model
                 ?? ($this->isUpcoming() ? $this->starts_on->toDateString() : null),
             'campaign' => $this->campaign_token,
             'slot' => $slot?->slot_token,
+            'duration' => $this->isBonusHoursPromotion() ? $this->bonusMinimumDurationMinutes() : null,
         ]);
     }
 
@@ -244,8 +261,54 @@ class Promotion extends Model
         return match ($this->discount_type) {
             PromotionDiscountType::Percentage => rtrim(rtrim($this->discount_value, '0'), '.').'% off',
             PromotionDiscountType::FixedHourlyRate => '₱'.number_format((float) $this->discount_value, 2).'/hour',
+            PromotionDiscountType::BonusHours => sprintf(
+                'Book %s, get %s free',
+                $this->formatMinutes((int) $this->qualifying_minutes),
+                $this->formatMinutes((int) $this->bonus_minutes),
+            ),
             null => null,
         };
+    }
+
+    public function isBonusHoursPromotion(): bool
+    {
+        return $this->discount_type === PromotionDiscountType::BonusHours;
+    }
+
+    public function bonusMinimumDurationMinutes(): int
+    {
+        return (int) $this->qualifying_minutes + (int) $this->bonus_minutes;
+    }
+
+    public function hasRedemptionCapacity(): bool
+    {
+        if ($this->max_redemptions === null) {
+            return true;
+        }
+
+        return $this->activeRedemptionsCount() < $this->max_redemptions;
+    }
+
+    public function activeRedemptionsCount(): int
+    {
+        return $this->bookings()
+            ->where(function (Builder $query): void {
+                $query->where('status', BookingStatus::Confirmed->value)
+                    ->orWhere(function (Builder $query): void {
+                        $query->where('status', BookingStatus::Hold->value)
+                            ->where('expires_at', '>', now());
+                    });
+            })
+            ->count();
+    }
+
+    private function formatMinutes(int $minutes): string
+    {
+        if ($minutes > 0 && $minutes % 60 === 0) {
+            return $minutes === 60 ? '1 hour' : ($minutes / 60).' hours';
+        }
+
+        return $minutes.' minutes';
     }
 
     /** @return BelongsTo<Organization, $this> */
@@ -298,6 +361,10 @@ class Promotion extends Model
             'status' => PromotionStatus::class,
             'discount_type' => PromotionDiscountType::class,
             'discount_value' => 'decimal:2',
+            'qualifying_minutes' => 'integer',
+            'bonus_minutes' => 'integer',
+            'max_redemptions' => 'integer',
+            'allow_loyalty_stacking' => 'boolean',
             'starts_on' => 'immutable_date',
             'ends_on' => 'immutable_date',
             'targets_specific_slots' => 'boolean',

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\BookingStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\PromotionDiscountType;
 use App\Enums\PromotionType;
@@ -136,6 +137,101 @@ class PromotionFlowTest extends TestCase
         $this->assertSame('1300.00', $booking->original_total_amount);
         $this->assertSame('300.00', $booking->discount_amount);
         $this->assertSame($promotion->getKey(), $booking->promotion_id);
+    }
+
+    public function test_owner_can_create_a_capped_bonus_time_promotion_and_the_public_link_selects_its_full_duration(): void
+    {
+        [$organization, $venue, $resource, $owner] = $this->setupInventory();
+
+        $this->actingAs($owner)->post(route('owner.promotions.store'), [
+            ...$this->promotionData($venue, $resource),
+            'title' => 'Book two hours, get one free',
+            'discount_type' => PromotionDiscountType::BonusHours->value,
+            'discount_value' => null,
+            'qualifying_minutes' => 120,
+            'bonus_minutes' => 60,
+            'max_redemptions' => 3,
+            'allow_loyalty_stacking' => false,
+        ])->assertRedirect();
+
+        $promotion = Promotion::query()->firstOrFail();
+
+        $this->assertSame(PromotionDiscountType::BonusHours, $promotion->discount_type);
+        $this->assertSame(120, $promotion->qualifying_minutes);
+        $this->assertSame(60, $promotion->bonus_minutes);
+        $this->assertSame(3, $promotion->max_redemptions);
+        $this->assertFalse($promotion->allow_loyalty_stacking);
+        $this->assertSame('Book 2 hours, get 1 hour free', $promotion->offerLabel());
+        $this->assertSame(180, $promotion->marketplaceParameters()['duration']);
+    }
+
+    public function test_bonus_time_promotion_reserves_the_free_final_hour_and_rejects_short_bookings(): void
+    {
+        [$organization, $venue, $resource] = $this->setupInventory();
+        $promotion = Promotion::factory()->for($venue)->create([
+            'organization_id' => $organization->getKey(),
+            'resource_id' => $resource->getKey(),
+            'discount_type' => PromotionDiscountType::BonusHours,
+            'discount_value' => null,
+            'qualifying_minutes' => 120,
+            'bonus_minutes' => 60,
+        ]);
+        $player = User::factory()->create();
+
+        $this->actingAs($player)->post(route('player.bookings.store', $venue->slug), [
+            ...$this->holdData($resource),
+            'duration_minutes' => 120,
+            'campaign' => $promotion->campaign_token,
+        ])->assertSessionHasErrors('campaign');
+
+        $booking = $this->createHold($player, $venue, $resource, [
+            'duration_minutes' => 180,
+            'campaign' => $promotion->campaign_token,
+        ]);
+
+        $this->assertSame($promotion->getKey(), $booking->promotion_id);
+        $this->assertSame('1950.00', $booking->original_total_amount);
+        $this->assertSame('1300.00', $booking->total_amount);
+        $this->assertSame('650.00', $booking->discount_amount);
+    }
+
+    public function test_bonus_time_campaign_cap_is_reserved_by_a_hold_and_released_when_it_is_cancelled(): void
+    {
+        [$organization, $venue, $resource] = $this->setupInventory();
+        $promotion = Promotion::factory()->for($venue)->create([
+            'organization_id' => $organization->getKey(),
+            'resource_id' => $resource->getKey(),
+            'discount_type' => PromotionDiscountType::BonusHours,
+            'discount_value' => null,
+            'qualifying_minutes' => 120,
+            'bonus_minutes' => 60,
+            'max_redemptions' => 1,
+        ]);
+        $firstPlayer = User::factory()->create();
+        $secondPlayer = User::factory()->create();
+
+        $first = $this->createHold($firstPlayer, $venue, $resource, [
+            'duration_minutes' => 180,
+            'campaign' => $promotion->campaign_token,
+        ]);
+        $this->assertSame(1, $promotion->activeRedemptionsCount());
+
+        $this->actingAs($secondPlayer)->post(route('player.bookings.store', $venue->slug), [
+            ...$this->holdData($resource),
+            'start_time' => '13:00',
+            'duration_minutes' => 180,
+            'campaign' => $promotion->campaign_token,
+        ])->assertSessionHasErrors('campaign');
+
+        $first->update(['status' => BookingStatus::Cancelled]);
+        $this->assertSame(0, $promotion->fresh()->activeRedemptionsCount());
+
+        $second = $this->createHold($secondPlayer, $venue, $resource, [
+            'start_time' => '13:00',
+            'duration_minutes' => 180,
+            'campaign' => $promotion->campaign_token,
+        ]);
+        $this->assertSame($promotion->getKey(), $second->promotion_id);
     }
 
     public function test_inactive_expired_and_non_applicable_promotions_cannot_change_price(): void

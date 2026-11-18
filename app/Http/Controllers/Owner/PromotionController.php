@@ -281,6 +281,10 @@ class PromotionController extends Controller
         $data['goal'] = $data['goal'] ?? PromotionGoal::FillEmptySlots->value;
         $data['discount_type'] = $data['discount_type'] ?? null;
         $data['discount_value'] = $data['discount_value'] ?? null;
+        $data['qualifying_minutes'] = $data['qualifying_minutes'] ?? null;
+        $data['bonus_minutes'] = $data['bonus_minutes'] ?? null;
+        $data['max_redemptions'] = $data['max_redemptions'] ?? null;
+        $data['allow_loyalty_stacking'] = (bool) ($data['allow_loyalty_stacking'] ?? true);
         $data['days_of_week'] = empty($data['days_of_week']) ? null : array_map('intval', $data['days_of_week']);
         $data['starts_at_time'] = $data['starts_at_time'] ?? null;
         $data['ends_at_time'] = $data['ends_at_time'] ?? null;
@@ -340,6 +344,11 @@ class PromotionController extends Controller
             'discount_type' => $promotion->discount_type?->value,
             'discount_type_label' => $promotion->discount_type?->label(),
             'discount_value' => $promotion->discount_value,
+            'qualifying_minutes' => $promotion->qualifying_minutes,
+            'bonus_minutes' => $promotion->bonus_minutes,
+            'max_redemptions' => $promotion->max_redemptions,
+            'active_redemptions_count' => $promotion->activeRedemptionsCount(),
+            'allow_loyalty_stacking' => $promotion->allow_loyalty_stacking,
             'offer_label' => $promotion->offerLabel(),
             'venue_id' => $promotion->venue_id,
             'venue' => $promotion->venue?->name,

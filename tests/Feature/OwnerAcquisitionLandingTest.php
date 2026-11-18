@@ -15,6 +15,13 @@ class OwnerAcquisitionLandingTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('interactive-demo.enabled', true);
+    }
+
     public function test_guests_can_browse_crawlable_owner_and_pricing_pages(): void
     {
         $ownerPage = $this->get(route('marketplace.for-owners'));
@@ -31,7 +38,10 @@ class OwnerAcquisitionLandingTest extends TestCase
             ->assertSee(route('marketplace.courts.index'), false)
             ->assertSee(route('marketplace.directory.index'), false)
             ->assertSee(route('register'), false)
+            ->assertSee(route('interactive-demo.show', ['return_to' => 'owners']), false)
             ->assertSee('href="#how-it-works"', false)
+            ->assertSee('Try live demo')
+            ->assertSee('No real bookings, charges, or emails.')
             ->assertSee('index,follow')
             ->assertSee('More than a booking calendar')
             ->assertSee('Most court software helps manage bookings. FinACourt also helps create more of them.')

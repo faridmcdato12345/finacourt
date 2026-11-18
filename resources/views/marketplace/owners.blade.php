@@ -10,9 +10,15 @@
                 <p class="mt-4 max-w-2xl text-sm leading-6 text-court-100/65">FinACourt is a sports court booking, marketplace, and growth platform built for venue owners in the Philippines.</p>
                 <div class="mt-8 flex flex-col gap-3 sm:flex-row">
                     <a href="{{ route('register') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3.5 text-sm font-semibold text-court-900 shadow-lg shadow-black/10 hover:bg-court-50">List your courts @include('marketplace.partials.icon', ['name' => 'arrow-right', 'class' => 'size-4'])</a>
-                    <a href="#how-it-works" class="inline-flex items-center justify-center rounded-xl border border-white/25 bg-white/5 px-5 py-3.5 text-sm font-semibold text-white hover:bg-white/10">See how it works</a>
+                    @if (config('interactive-demo.enabled'))
+                        <a href="{{ route('interactive-demo.show', ['return_to' => 'owners']) }}" class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/5 px-5 py-3.5 text-sm font-semibold text-white hover:bg-white/10">Try live demo @include('marketplace.partials.icon', ['name' => 'arrow-right', 'class' => 'size-4'])</a>
+                    @endif
                 </div>
+                @if (config('interactive-demo.enabled'))
+                    <p class="mt-3 text-sm leading-6 text-court-100/70">Explore the player and court-owner workflows in a private simulated workspace. No real bookings, charges, or emails.</p>
+                @endif
                 <div class="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold text-court-200">
+                    <a href="#how-it-works" class="underline decoration-court-300/50 underline-offset-4 hover:text-white">See how it works</a>
                     <a href="{{ route('marketplace.pricing') }}" class="underline decoration-court-300/50 underline-offset-4 hover:text-white">See how pricing works</a>
                 </div>
                 <div class="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-court-100/80">
@@ -409,7 +415,11 @@
         <div class="page-shell flex flex-col gap-6 py-14 sm:flex-row sm:items-center sm:justify-between">
             <div><h2 class="text-2xl font-bold tracking-tight sm:text-3xl">Start turning player interest into court bookings</h2><p class="mt-2 text-sm text-court-100/80">Add a venue, publish real court times, and use FinACourt to discover what can help you grow.</p></div>
             <div class="flex shrink-0 flex-col gap-3 sm:flex-row">
-                <a href="{{ route('register') }}" class="rounded-xl bg-white px-5 py-3 text-center text-sm font-semibold text-court-900 hover:bg-court-50">List your courts</a></div>
+                <a href="{{ route('register') }}" class="rounded-xl bg-white px-5 py-3 text-center text-sm font-semibold text-court-900 hover:bg-court-50">List your courts</a>
+                @if (config('interactive-demo.enabled'))
+                    <a href="{{ route('interactive-demo.show', ['return_to' => 'owners']) }}" class="rounded-xl border border-white/35 px-5 py-3 text-center text-sm font-semibold text-white hover:bg-white/10">Try live demo</a>
+                @endif
+            </div>
         </div>
     </section>
 @endsection

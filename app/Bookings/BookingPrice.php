@@ -36,8 +36,26 @@ class BookingPrice
             : $this->rates->segments($resource, $window);
         $originalTotalCents = 0;
         $totalCents = 0;
+        $bonusMinutesBySegment = array_fill(0, count($segments), 0);
 
-        foreach ($segments as $segment) {
+        if ($promotion?->discount_type === PromotionDiscountType::BonusHours
+            && $durationMinutes >= $promotion->bonusMinimumDurationMinutes()) {
+            $remainingBonusMinutes = min(
+                (int) $promotion->bonus_minutes,
+                max(0, $durationMinutes - (int) $promotion->qualifying_minutes),
+            );
+
+            // The bonus is the final consecutive portion of the selected
+            // court time. This keeps “book 2 hours, get the next hour free”
+            // accurate when the booking crosses a scheduled-rate boundary.
+            for ($index = count($segments) - 1; $index >= 0 && $remainingBonusMinutes > 0; $index--) {
+                $freeMinutes = min($remainingBonusMinutes, (int) $segments[$index]['minutes']);
+                $bonusMinutesBySegment[$index] = $freeMinutes;
+                $remainingBonusMinutes -= $freeMinutes;
+            }
+        }
+
+        foreach ($segments as $index => $segment) {
             $originalRateCents = $this->moneyToCents($segment['hourly_rate']);
             $rateCents = match ($promotion?->discount_type) {
                 PromotionDiscountType::Percentage => max(0, intdiv(
@@ -48,10 +66,14 @@ class BookingPrice
                     $originalRateCents,
                     $this->moneyToCents($promotion->discount_value),
                 ),
+                PromotionDiscountType::BonusHours => $originalRateCents,
                 null => $originalRateCents,
             };
             $originalTotalCents += $this->durationTotal($originalRateCents, $segment['minutes']);
-            $totalCents += $this->durationTotal($rateCents, $segment['minutes']);
+            $totalCents += $this->durationTotal(
+                $rateCents,
+                max(0, (int) $segment['minutes'] - $bonusMinutesBySegment[$index]),
+            );
         }
 
         $hasTimeBasedPrice = collect($segments)->contains(

@@ -26,6 +26,17 @@ const scenes = new Set([
     'owner-growth',
     'owner-visibility',
     'owner-outro',
+    'owner-venue',
+    'owner-courts',
+    'owner-promotion-wizard',
+    'owner-reactivation',
+    'player-transition',
+    'player-mobile-discovery',
+    'player-mobile-venue',
+    'player-mobile-schedule',
+    'player-mobile-booking',
+    'player-mobile-bookings',
+    'player-mobile-game-pass',
 ]);
 
 if (!scenes.has(scene)) {
@@ -37,7 +48,10 @@ const appUrl = (process.env.APP_URL || 'http://localhost:8000').replace(/\/$/, '
 const password = process.env.DEMO_VIDEO_ACCOUNT_PASSWORD || 'finacourt-demo-only';
 const outputDirectory = process.env.DEMO_VIDEO_OUTPUT || '/var/www/html/output/demo-video';
 const controlDirectory = `${outputDirectory}/control`;
-const manifest = JSON.parse(await fs.readFile(`${outputDirectory}/manifest.json`, 'utf8'));
+const manifestFilename = process.env.DEMO_VIDEO_MANIFEST || 'manifest.json';
+const manifest = JSON.parse(await fs.readFile(`${outputDirectory}/${manifestFilename}`, 'utf8'));
+const recordMode = process.env.DEMO_VIDEO_RECORD_MODE || 'desktop';
+const isMobileRecording = recordMode === 'mobile';
 const elementKey = 'element-6066-11e4-a52e-4f735466cecf';
 let sessionId;
 
@@ -63,26 +77,29 @@ async function command(method, path, body) {
 }
 
 async function createSession() {
+    const chromeArgs = [
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-notifications',
+        '--disable-popup-blocking',
+        '--force-device-scale-factor=1',
+        '--ignore-certificate-errors',
+        '--window-size=1920,1080',
+        `--app=${appUrl}`,
+        '--kiosk',
+        '--host-resolver-rules=MAP localhost host.docker.internal, MAP existing-booking.test 127.0.0.1',
+    ];
+
+    if (!isMobileRecording) chromeArgs.push('--start-fullscreen');
+
     const value = await request('POST', '/session', {
         capabilities: {
             alwaysMatch: {
                 browserName: 'chrome',
                 pageLoadStrategy: 'normal',
                 'goog:chromeOptions': {
-                    args: [
-                        '--no-sandbox',
-                        '--disable-dev-shm-usage',
-                        '--disable-gpu',
-                        '--disable-notifications',
-                        '--disable-popup-blocking',
-                        '--force-device-scale-factor=1',
-                        '--ignore-certificate-errors',
-                        '--window-size=1920,1080',
-                        `--app=${appUrl}`,
-                        '--kiosk',
-                        '--start-fullscreen',
-                        '--host-resolver-rules=MAP localhost host.docker.internal, MAP existing-booking.test 127.0.0.1',
-                    ],
+                    args: chromeArgs,
                     excludeSwitches: ['enable-automation'],
                     prefs: {
                         'credentials_enable_service': false,
@@ -94,8 +111,12 @@ async function createSession() {
     });
 
     sessionId = value.sessionId;
-    await command('POST', '/window/rect', { x: 0, y: 0, width: 1920, height: 1080 });
-    await command('POST', '/window/fullscreen', {});
+    if (isMobileRecording) {
+        await command('POST', '/window/rect', { x: 720, y: 36, width: 480, height: 1004 });
+    } else {
+        await command('POST', '/window/rect', { x: 0, y: 0, width: 1920, height: 1080 });
+        await command('POST', '/window/fullscreen', {});
+    }
 
     const viewport = await execute(`return {
         innerWidth: window.innerWidth,
@@ -107,8 +128,12 @@ async function createSession() {
     }`);
     console.log(`Viewport check: ${JSON.stringify(viewport)}`);
 
-    if (viewport.innerWidth !== 1920 || viewport.innerHeight !== 1080) {
+    if (!isMobileRecording && (viewport.innerWidth !== 1920 || viewport.innerHeight !== 1080)) {
         throw new Error(`Application viewport must fill the 1920x1080 recording frame: ${JSON.stringify(viewport)}`);
+    }
+
+    if (isMobileRecording && (viewport.innerWidth > 480 || viewport.innerWidth < 360 || viewport.innerHeight < 760)) {
+        throw new Error(`Mobile tutorial viewport must be phone-sized: ${JSON.stringify(viewport)}`);
     }
 }
 
@@ -118,6 +143,28 @@ async function navigate(path) {
     await waitUntil(async () => (await execute('return document.readyState')) === 'complete', 20000, 'page load');
     await sleep(650);
     await sanitizeVisibleLocalOrigins();
+    await redactNonDemoContactDetails();
+    if (isMobileRecording) await injectPhoneFrame();
+}
+
+async function injectPhoneFrame() {
+    await execute(`
+        document.querySelector('#finacourt-video-phone-frame')?.remove();
+        const styleId = 'finacourt-video-phone-style';
+        if (!document.getElementById(styleId)) {
+            const style = document.createElement('style');
+            style.id = styleId;
+            style.textContent = [
+                'html { background: #061b2c !important; }',
+                'body { min-height: 100vh; border: 10px solid #334155; border-radius: 44px; box-shadow: 0 0 0 2px #94a3b8, 0 24px 65px rgba(0,0,0,.55); overflow-x: hidden; }',
+                '#finacourt-video-phone-frame { position: fixed; z-index: 2147483647; top: 9px; left: 50%; width: 126px; height: 28px; transform: translateX(-50%); border-radius: 999px; background: #020617; pointer-events: none; }',
+            ].join('');
+            document.head.appendChild(style);
+        }
+        const notch = document.createElement('div');
+        notch.id = 'finacourt-video-phone-frame';
+        document.body.appendChild(notch);
+    `);
 }
 
 async function sanitizeVisibleLocalOrigins() {
@@ -149,6 +196,24 @@ async function sanitizeVisibleLocalOrigins() {
     if (remaining.text || remaining.fields) {
         throw new Error(`A local application origin remains visible: ${JSON.stringify(remaining)}`);
     }
+}
+
+async function redactNonDemoContactDetails() {
+    await execute(`
+        const allowed = new Set([arguments[0], arguments[1]].map((value) => String(value).toLowerCase()));
+        const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}/gi;
+        const phonePattern = /(?:\\+?63|0)9\\d{2}[ -]?\\d{3}[ -]?\\d{4}/g;
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+        for (const node of nodes) {
+            let value = node.nodeValue;
+            value = value.replace(emailPattern, (email) => allowed.has(email.toLowerCase()) ? email : 'private@example.com');
+            value = value.replace(phonePattern, '••• ••• ••••');
+            value = value.replace(/OWNER-[A-Z0-9]+/g, 'PAYOUT-DEMO');
+            node.nodeValue = value;
+        }
+    `, [manifest.owner_email, manifest.player_email]);
 }
 
 async function currentUrl() {
@@ -507,7 +572,7 @@ async function prepare() {
             await login('owner');
             await navigate('/owner/earnings');
             await waitForText('Your court earnings');
-            await waitForText('Review early payout');
+            await waitForText('Request early payout');
             await injectCaption('Access available earnings when you need them', 'Request a payout once your earnings become available.', { demo: true });
             break;
         case 'owner-analytics':
@@ -554,6 +619,71 @@ async function prepare() {
         case 'owner-outro':
             await navigate('/');
             await injectTitleCard(true, true);
+            break;
+        case 'owner-venue':
+            await login('owner');
+            await navigate(`/owner/venues/${manifest.venue_id}`);
+            await waitForText('Courts players can book');
+            await injectCaption('Keep venue information accurate', 'Court details, facilities, photos, and visibility help players book with confidence.', { demo: true });
+            break;
+        case 'owner-courts':
+            await login('owner');
+            await navigate('/owner/bookings');
+            await waitForText('Bookings');
+            await injectCaption('Set the inventory players can reserve', 'Courts, opening hours, pricing, and availability control every bookable time.', { demo: true });
+            break;
+        case 'owner-promotion-wizard':
+            await login('owner');
+            await navigate('/owner/promotions/create');
+            await waitForText('Create a promotion');
+            await injectCaption('Choose the offer that matches the goal', 'Target exact slots, repeat slower hours, cover a court, or reward longer bookings with bonus time.', { demo: true });
+            break;
+        case 'owner-reactivation':
+            await login('owner');
+            await navigate('/owner/reactivation');
+            await waitForText('Bring players back');
+            await injectCaption('Reconnect with inactive customers thoughtfully', 'Private one-time offers respect customer consent, contact cooldowns, and owner control.', { demo: true });
+            break;
+        case 'player-transition':
+            await navigate(`/venues/${manifest.venue_slug}`);
+            await waitForText(manifest.venue_name);
+            await injectCaption('Now see the same setup from the player side', 'Venue details, promotions, loyalty, and availability flow directly into the booking experience.', { demo: true });
+            break;
+        case 'player-mobile-discovery':
+            await login('player');
+            await navigate('/courts?city=makati');
+            await waitForText(manifest.venue_name);
+            await injectCaption('Find courts from a phone', 'Players compare venues, sports, location, and hourly prices before opening a venue.');
+            break;
+        case 'player-mobile-venue':
+            await login('player');
+            await navigate(`/venues/${manifest.venue_slug}`);
+            await waitForText(manifest.venue_name);
+            await injectCaption('See what the owner configured', 'Venue details, facilities, active deals, and loyalty rewards are visible before a player chooses a time.');
+            break;
+        case 'player-mobile-schedule':
+            await login('player');
+            await navigate(`/venues/${manifest.venue_slug}?resource=${manifest.resource_id}&date=${manifest.booking_date}#availability`);
+            await waitForText('Pick your court and time');
+            await injectCaption('Live availability keeps the decision simple', 'Choose a court, browse open times, and see eligible promotions before continuing.');
+            break;
+        case 'player-mobile-booking':
+            await login('player');
+            await navigate(`/venues/${manifest.venue_slug}/reserve?resource=${manifest.resource_id}&date=${manifest.booking_date}&start=${manifest.booking_start}&duration=${manifest.booking_duration}`);
+            await waitForSelector('[data-booking-payment-pricing]');
+            await injectCaption('Review the booking before payment', 'The player sees the selected court, time, promotions, loyalty savings, fees, and total.');
+            break;
+        case 'player-mobile-bookings':
+            await login('player');
+            await navigate('/player/bookings');
+            await waitForText('Your reward cards');
+            await injectCaption('Bookings and loyalty stay together', 'Players can revisit game passes, track stamps, and see rewards that are ready to use.');
+            break;
+        case 'player-mobile-game-pass':
+            await login('player');
+            await navigate(`/player/bookings/${manifest.booking_reference}`);
+            await waitForText(manifest.venue_name);
+            await injectCaption('One clear game pass after booking', 'Players can review their reservation, payment status, and eligible cancellation or refund updates.');
             break;
     }
 }
@@ -709,6 +839,60 @@ async function perform() {
             break;
         case 'owner-outro':
             await sleep(5000);
+            break;
+        case 'owner-venue':
+            await sleep(3400);
+            await scrollToText('Opening hours', 'center');
+            await injectCaption('Accurate setup creates trustworthy booking', 'Opening hours, sports, rates, photos, and amenities all shape the player page.', { demo: true });
+            await sleep(11600);
+            break;
+        case 'owner-courts':
+            await sleep(3500);
+            await injectCaption('Use the calendar to protect operations', 'Owners can spot reservations, hold periods, and unavailable court time before making changes.', { demo: true });
+            await sleep(11500);
+            break;
+        case 'owner-promotion-wizard':
+            await sleep(4200);
+            await scrollToText('What do you want to promote?', 'center');
+            await sleep(11800);
+            break;
+        case 'owner-reactivation':
+            await sleep(3800);
+            await injectCaption('Win back the right customers', 'Eligible customers receive their own private offer only after the owner confirms the campaign.', { demo: true });
+            await sleep(10200);
+            break;
+        case 'player-transition':
+            await sleep(4000);
+            break;
+        case 'player-mobile-discovery':
+            await sleep(3200);
+            await scrollToText(manifest.venue_name, 'center');
+            await sleep(11800);
+            break;
+        case 'player-mobile-venue':
+            await sleep(3200);
+            await scrollToText('Available promotions', 'center');
+            await sleep(14800);
+            break;
+        case 'player-mobile-schedule':
+            await sleep(3500);
+            await scrollToSelector('[data-live-availability]', 'center');
+            await sleep(14500);
+            break;
+        case 'player-mobile-booking':
+            await sleep(3500);
+            await scrollToSelector('[data-booking-payment-pricing]', 'center');
+            await sleep(12500);
+            break;
+        case 'player-mobile-bookings':
+            await sleep(3200);
+            await scrollToText('Your reward cards', 'start');
+            await sleep(13800);
+            break;
+        case 'player-mobile-game-pass':
+            await sleep(3600);
+            await scrollToText('When and where to play', 'center');
+            await sleep(12400);
             break;
     }
 }

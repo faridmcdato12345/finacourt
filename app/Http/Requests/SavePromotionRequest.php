@@ -60,6 +60,12 @@ class SavePromotionRequest extends FormRequest
             'status' => ['nullable', Rule::enum(PromotionStatus::class)],
             'discount_type' => ['nullable', Rule::enum(PromotionDiscountType::class)],
             'discount_value' => ['nullable', 'numeric', 'between:0,999999.99'],
+            'qualifying_minutes' => ['nullable', 'integer', 'between:15,'.config('booking.maximum_player_booking_minutes')],
+            'bonus_minutes' => ['nullable', 'integer', 'between:15,'.config('booking.maximum_player_booking_minutes')],
+            'max_redemptions' => ['nullable', 'integer', 'min:1', 'max:1000000'],
+            // Existing promotions predate this setting. Treat omitted values as
+            // the safe, backwards-compatible default in the controller.
+            'allow_loyalty_stacking' => ['nullable', 'boolean'],
             'starts_on' => ['required', 'date_format:Y-m-d'],
             'ends_on' => ['required', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
             'days_of_week' => ['nullable', 'array'],
@@ -160,12 +166,34 @@ class SavePromotionRequest extends FormRequest
                 $validator->errors()->add('discount_type', 'Choose how players get the discount.');
             }
 
-            if ($discountType !== null && ! $this->filled('discount_value')) {
+            if (in_array($discountType, [PromotionDiscountType::Percentage, PromotionDiscountType::FixedHourlyRate], true)
+                && ! $this->filled('discount_value')) {
                 $validator->errors()->add('discount_value', 'Enter the percentage off or special hourly price.');
             }
 
-            if ($discountType === null && $this->filled('discount_value')) {
-                $validator->errors()->add('discount_type', 'Choose how this discount should work.');
+            if (($discountType === null || $discountType === PromotionDiscountType::BonusHours)
+                && $this->filled('discount_value')) {
+                $validator->errors()->add(
+                    'discount_value',
+                    $discountType === PromotionDiscountType::BonusHours
+                        ? 'Bonus court time uses the booked and free-time settings instead of a price value.'
+                        : 'Choose how this discount should work.',
+                );
+            }
+
+            if ($discountType === PromotionDiscountType::BonusHours) {
+                if (! $this->filled('qualifying_minutes')) {
+                    $validator->errors()->add('qualifying_minutes', 'Choose how much consecutive court time a player must book.');
+                }
+
+                if (! $this->filled('bonus_minutes')) {
+                    $validator->errors()->add('bonus_minutes', 'Choose how much bonus court time the player receives.');
+                }
+
+                $totalMinutes = $this->integer('qualifying_minutes') + $this->integer('bonus_minutes');
+                if ($totalMinutes > config('booking.maximum_player_booking_minutes')) {
+                    $validator->errors()->add('bonus_minutes', 'The paid and bonus time together exceed the maximum player booking length.');
+                }
             }
 
             if ($discountType === PromotionDiscountType::Percentage
@@ -264,6 +292,13 @@ class SavePromotionRequest extends FormRequest
                         requireFuture: false,
                     );
                     $availability->ensureBookable($slotResource, $window);
+
+                    if ($discountType === PromotionDiscountType::BonusHours
+                        && $window->localStart->diffInMinutes($window->localEnd) < $this->integer('qualifying_minutes') + $this->integer('bonus_minutes')) {
+                        throw ValidationException::withMessages([
+                            'starts_at_time' => 'A bonus-time deal needs one continuous selected court time covering the booked and free hours.',
+                        ]);
+                    }
 
                     if ($availability->hasAvailabilityBlockConflict(
                         $slotResource->getKey(),

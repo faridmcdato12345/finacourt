@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Directory\OwnerClaimWorkspaceAccess;
 use App\Enums\MembershipRole;
+use App\InteractiveDemo\InteractiveDemoWorkspaceManager;
 use App\Models\User;
 use App\Onboarding\OwnerVenueOnboarding;
 use App\Tenancy\TenantContext;
@@ -18,6 +19,7 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         $context = app(TenantContext::class);
+        $demoWorkspace = app(InteractiveDemoWorkspaceManager::class)->current($request);
 
         return [
             ...parent::share($request),
@@ -55,6 +57,15 @@ class HandleInertiaRequests extends Middleware
                 ? app(OwnerClaimWorkspaceAccess::class)->status($context->organization())
                 : ['restricted' => false, 'state' => null, 'message' => null],
             'ownerVenueSetup' => fn () => $this->ownerVenueSetup($request, $user, $context),
+            'interactiveDemo' => $demoWorkspace === null ? null : [
+                'active' => true,
+                'role' => $request->session()->get('interactive_demo.role'),
+                'venue_name' => $demoWorkspace->venue->name,
+                'player_url' => route('interactive-demo.switch', 'player', false),
+                'owner_url' => route('interactive-demo.switch', 'owner', false),
+                'reset_url' => route('interactive-demo.reset', [], false),
+                'exit_url' => route('interactive-demo.exit', [], false),
+            ],
             'flash' => [
                 'status' => fn () => $request->session()->get('status'),
             ],
